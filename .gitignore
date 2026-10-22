@@ -9,3 +9,5 @@ dist/
 # exchange folders are runtime data; keep the folders, ignore the files
 backend/exchange/**/*
 !backend/exchange/**/.gitkeep
+
+.DS_Store
