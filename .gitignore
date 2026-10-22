@@ -1,0 +1,11 @@
+.env
+node_modules/
+target/
+build/
+dist/
+.idea/
+.vscode/
+
+# exchange folders are runtime data; keep the folders, ignore the files
+backend/exchange/**/*
+!backend/exchange/**/.gitkeep

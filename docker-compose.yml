@@ -1,0 +1,124 @@
+# STAR BPA POC runtime: Camunda 8 (Orchestration Cluster + Connectors) on PostgreSQL, plus WireMock.
+# Same file on laptops and the showcase VM. Copy .env.example to .env first.
+
+name: star-bpa-poc
+
+services:
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-17}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [star]
+    restart: unless-stopped
+
+  camunda:
+    image: camunda/camunda:${CAMUNDA_VERSION:-8.10.1}
+    ports:
+      - "8080:8080"   # Operate, Tasklist, Admin, REST API
+      - "26500:26500" # gRPC
+      - "9600:9600"   # management / health
+    environment:
+      # PostgreSQL replaces Elasticsearch/H2 as secondary storage
+      CAMUNDA_DATA_SECONDARY_STORAGE_TYPE: rdbms
+      CAMUNDA_DATA_SECONDARY_STORAGE_RDBMS_URL: jdbc:postgresql://postgres:5432/${CAMUNDA_DB_NAME:-camunda}
+      CAMUNDA_DATA_SECONDARY_STORAGE_RDBMS_USERNAME: ${CAMUNDA_DB_USER:-camunda}
+      CAMUNDA_DATA_SECONDARY_STORAGE_RDBMS_PASSWORD: ${CAMUNDA_DB_PASSWORD:-camunda}
+      # Built-in basic authentication (default demo/demo user)
+      CAMUNDA_SECURITY_AUTHENTICATION_METHOD: basic
+    volumes:
+      - camunda-data:/usr/local/camunda/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9600/actuator/health/status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    networks: [star]
+    restart: unless-stopped
+
+  connectors:
+    image: camunda/connectors-bundle:${CAMUNDA_CONNECTORS_VERSION:-8.10.1}
+    ports:
+      - "8086:8080"
+    environment:
+      CAMUNDA_CLIENT_MODE: self-managed
+      CAMUNDA_CLIENT_GRPC_ADDRESS: http://camunda:26500
+      CAMUNDA_CLIENT_REST_ADDRESS: http://camunda:8080
+      CAMUNDA_CLIENT_AUTH_METHOD: basic
+      CAMUNDA_CLIENT_AUTH_USERNAME: demo
+      CAMUNDA_CLIENT_AUTH_PASSWORD: demo
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+      MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+    depends_on:
+      camunda:
+        condition: service_healthy
+    networks: [star]
+    restart: unless-stopped
+
+  wiremock:
+    image: wiremock/wiremock:${WIREMOCK_VERSION:-3.9.1}
+    command: ["--verbose"]
+    ports:
+      - "8089:8080"
+    volumes:
+      - ./backend/mocks/mappings:/home/wiremock/mappings
+      - ./backend/mocks/__files:/home/wiremock/__files
+    networks: [star]
+    restart: unless-stopped
+
+  # Uncomment once backend/app contains the Spring Boot project and a Dockerfile.
+  # bpa-app:
+  #   build: ./backend/app
+  #   environment:
+  #     CAMUNDA_CLIENT_MODE: self-managed
+  #     CAMUNDA_CLIENT_GRPC_ADDRESS: http://camunda:26500
+  #     CAMUNDA_CLIENT_REST_ADDRESS: http://camunda:8080
+  #     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${BPA_DB_NAME:-bpa}
+  #     SPRING_DATASOURCE_USERNAME: ${BPA_DB_USER:-bpa}
+  #     SPRING_DATASOURCE_PASSWORD: ${BPA_DB_PASSWORD:-bpa}
+  #     WIREMOCK_BASE_URL: http://wiremock:8080
+  #   ports:
+  #     - "8081:8080"
+  #   volumes:
+  #     - ./backend/exchange:/exchange
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     camunda:
+  #       condition: service_healthy
+  #     wiremock:
+  #       condition: service_started
+  #   networks: [star]
+  #   restart: unless-stopped
+
+  # Uncomment once the React app is scaffolded in ./frontend.
+  # frontend:
+  #   image: node:22-alpine
+  #   working_dir: /app
+  #   command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     - ./frontend:/app
+  #   networks: [star]
+
+volumes:
+  pgdata:
+  camunda-data:
+
+networks:
+  star:
