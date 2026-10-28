@@ -1,0 +1,192 @@
+{
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.10.0",
+  "exporter": {
+    "name": "LCS generator (Claude)",
+    "version": "0.1"
+  },
+  "schemaVersion": 18,
+  "id": "Form_CreateWorkPack",
+  "type": "default",
+  "components": [
+    {
+      "type": "text",
+      "id": "Text_003",
+      "text": "### Create Work Pack\nEnter the estimate for one project activity. The Workpack number is generated on save."
+    },
+    {
+      "type": "text",
+      "id": "Text_001",
+      "text": "**Please correct the following:**\n\n{{#loop validationMessages}}- {{this}}\n{{/loop}}",
+      "conditional": {
+        "hide": "=validationMessages = null or count(validationMessages) = 0"
+      }
+    },
+    {
+      "type": "select",
+      "id": "Select_004",
+      "key": "activityRef",
+      "label": "Project activity",
+      "searchable": true,
+      "valuesExpression": "=for a in refActivities return {label: a.activityRef + \" \" + a.activityName, value: a.activityRef}",
+      "validate": {
+        "required": true
+      }
+    },
+    {
+      "type": "text",
+      "id": "Text_002",
+      "text": "#### Activity context (read only)\n| Field | Value |\n|---|---|\n| Project | {{refActivities[item.activityRef = activityRef][1].projectRef}} |\n| Job Code | {{refActivities[item.activityRef = activityRef][1].jobCodeRef}} |\n| WBS | {{refActivities[item.activityRef = activityRef][1].wbsRef}} |\n| Activity | {{refActivities[item.activityRef = activityRef][1].activityRef}} {{refActivities[item.activityRef = activityRef][1].activityName}} |\n| FAC CRPO / Type / Name | {{refActivities[item.activityRef = activityRef][1].facCrpo}} / {{refActivities[item.activityRef = activityRef][1].facType}} / {{refActivities[item.activityRef = activityRef][1].facName}} |\n| Discipline | {{refActivities[item.activityRef = activityRef][1].discipline}} |\n| Baseline start / end | {{refActivities[item.activityRef = activityRef][1].baselineStart}} / {{refActivities[item.activityRef = activityRef][1].baselineEnd}} |\n| Budgeted units (MH) | {{refActivities[item.activityRef = activityRef][1].budgetedUnits}} |",
+      "conditional": {
+        "hide": "=activityRef = null"
+      }
+    },
+    {
+      "type": "select",
+      "id": "Select_005",
+      "key": "drawingRef",
+      "label": "Drawing",
+      "searchable": true,
+      "valuesExpression": "=for d in refDrawings return {label: d.drawingRef, value: d.drawingRef}",
+      "validate": {
+        "required": true
+      }
+    },
+    {
+      "type": "dynamiclist",
+      "id": "List_006",
+      "path": "phases",
+      "label": "Phases and man hours",
+      "isRepeating": true,
+      "defaultRepetitions": 1,
+      "allowAddRemove": true,
+      "showOutline": true,
+      "components": [
+        {
+          "type": "select",
+          "id": "Select_007",
+          "key": "phase",
+          "label": "Phase",
+          "searchable": false,
+          "values": [
+            {
+              "label": "Engineering",
+              "value": "Engineering"
+            },
+            {
+              "label": "Cutting",
+              "value": "Cutting"
+            },
+            {
+              "label": "Welding",
+              "value": "Welding"
+            },
+            {
+              "label": "Finishing",
+              "value": "Finishing"
+            }
+          ],
+          "validate": {
+            "required": true
+          }
+        },
+        {
+          "type": "number",
+          "id": "Number_008",
+          "key": "manhours",
+          "label": "Man hours",
+          "decimalDigits": 2,
+          "increment": "0.01",
+          "validate": {
+            "required": true,
+            "min": 0.01,
+            "max": 99999.99
+          }
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "Text_009",
+      "text": "**Total Activity hours:** {{sum(for p in phases return if p.manhours = null then 0 else p.manhours)}}",
+      "conditional": {
+        "hide": "=phases = null"
+      }
+    },
+    {
+      "type": "dynamiclist",
+      "id": "List_010",
+      "path": "materials",
+      "label": "Materials",
+      "isRepeating": true,
+      "defaultRepetitions": 1,
+      "allowAddRemove": true,
+      "showOutline": true,
+      "components": [
+        {
+          "type": "select",
+          "id": "Select_011",
+          "key": "materialRef",
+          "label": "Material",
+          "searchable": true,
+          "valuesExpression": "=for m in refMaterials return {label: m.materialRef + \" \" + m.description, value: m.materialRef}",
+          "validate": {
+            "required": true
+          }
+        },
+        {
+          "type": "select",
+          "id": "Select_012",
+          "key": "phase",
+          "label": "Used in phase",
+          "searchable": false,
+          "values": [
+            {
+              "label": "Engineering",
+              "value": "Engineering"
+            },
+            {
+              "label": "Cutting",
+              "value": "Cutting"
+            },
+            {
+              "label": "Welding",
+              "value": "Welding"
+            },
+            {
+              "label": "Finishing",
+              "value": "Finishing"
+            }
+          ],
+          "validate": {
+            "required": true
+          },
+          "description": "Must be one of the Work Pack's phases above (D16)"
+        }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "Select_013",
+      "key": "departmentRef",
+      "label": "Department",
+      "searchable": true,
+      "valuesExpression": "=for d in refDepartments return {label: d.departmentName, value: d.departmentRef}",
+      "validate": {
+        "required": true
+      }
+    },
+    {
+      "type": "datetime",
+      "id": "Date_014",
+      "key": "dateToComplete",
+      "subtype": "date",
+      "dateLabel": "Date to complete",
+      "validate": {
+        "required": true
+      },
+      "disallowPassedDates": true,
+      "description": "Not in the past (D20). Checked again on save using the Asia/Riyadh date (D28)"
+    }
+  ]
+}

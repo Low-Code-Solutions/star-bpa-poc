@@ -1,0 +1,86 @@
+{
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.10.0",
+  "exporter": {
+    "name": "LCS generator (Claude)",
+    "version": "0.1"
+  },
+  "schemaVersion": 18,
+  "id": "Form_SignOffRelease",
+  "type": "default",
+  "components": [
+    {
+      "type": "text",
+      "id": "Text_032",
+      "text": "### Sign off release\nThe release check passed: materials are reserved and the drawing is approved. Approving releases the Work Pack and locks its man hours (D8)."
+    },
+    {
+      "type": "text",
+      "id": "Text_029",
+      "text": "**Workpack:** {{workpackNumber}}  \n**Activity:** {{activityRef}}  \n**Drawing:** {{drawingRef}}  \n**Department:** {{departmentRef}}  \n**Date to complete:** {{dateToComplete}}"
+    },
+    {
+      "type": "table",
+      "id": "Table_030",
+      "label": "Phases",
+      "dataSource": "=phases",
+      "columns": [
+        {
+          "label": "Phase",
+          "key": "phase"
+        },
+        {
+          "label": "Man hours",
+          "key": "manhours"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "id": "Table_031",
+      "label": "Materials",
+      "dataSource": "=materials",
+      "columns": [
+        {
+          "label": "Material",
+          "key": "materialRef"
+        },
+        {
+          "label": "Phase",
+          "key": "phase"
+        }
+      ]
+    },
+    {
+      "type": "radio",
+      "id": "Radio_033",
+      "key": "signOffDecision",
+      "label": "Decision",
+      "values": [
+        {
+          "label": "Approve release",
+          "value": "Approved"
+        },
+        {
+          "label": "Decline",
+          "value": "Declined"
+        }
+      ],
+      "validate": {
+        "required": true
+      }
+    },
+    {
+      "type": "textarea",
+      "id": "Area_034",
+      "key": "declineReason",
+      "label": "Reason for declining",
+      "validate": {
+        "required": true
+      },
+      "conditional": {
+        "hide": "=signOffDecision != \"Declined\""
+      }
+    }
+  ]
+}

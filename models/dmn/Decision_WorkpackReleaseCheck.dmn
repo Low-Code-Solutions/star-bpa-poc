@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_WorkpackReleaseCheck" name="Work Pack release check" namespace="http://lowcodesol.com/star-bpa-poc" exporter="LCS generator (Claude)" exporterVersion="0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.1">
+  <decision id="Decision_WorkpackReleaseCheck" name="Work Pack release check">
+    <description>BPA-8, D24. Release condition FRD-7 §7.3.3 and §7.7.1: materials reserved and drawing approved (latest revision not Superseded is IFC or As-Built, D1, D10). Rule order gives the first reason when both fail.</description>
+    <decisionTable id="DecisionTable_WorkpackReleaseCheck" hitPolicy="FIRST">
+      <input id="Input_MaterialsReserved" label="Materials reserved">
+        <inputExpression id="InputExpression_MaterialsReserved" typeRef="boolean">
+          <text>materialsReserved</text>
+        </inputExpression>
+      </input>
+      <input id="Input_DrawingApproved" label="Drawing approved">
+        <inputExpression id="InputExpression_DrawingApproved" typeRef="boolean">
+          <text>drawingApproved</text>
+        </inputExpression>
+      </input>
+      <output id="Output_ReleaseResult" label="Release result" name="releaseResult" typeRef="string" />
+      <output id="Output_ReleaseReason" label="Release reason" name="releaseReason" typeRef="string" />
+      <rule id="Rule_MaterialsNotReserved">
+        <description>Rule 1: materials not reserved</description>
+        <inputEntry id="UnaryTests_R1_Materials"><text>false</text></inputEntry>
+        <inputEntry id="UnaryTests_R1_Drawing"><text>-</text></inputEntry>
+        <outputEntry id="Literal_R1_Result"><text>"Not ready"</text></outputEntry>
+        <outputEntry id="Literal_R1_Reason"><text>"Materials are not reserved for this Workpack"</text></outputEntry>
+      </rule>
+      <rule id="Rule_DrawingNotApproved">
+        <description>Rule 2: drawing not approved</description>
+        <inputEntry id="UnaryTests_R2_Materials"><text>true</text></inputEntry>
+        <inputEntry id="UnaryTests_R2_Drawing"><text>false</text></inputEntry>
+        <outputEntry id="Literal_R2_Result"><text>"Not ready"</text></outputEntry>
+        <outputEntry id="Literal_R2_Reason"><text>"Drawing is not approved (IFC or As-Built required)"</text></outputEntry>
+      </rule>
+      <rule id="Rule_Ready">
+        <description>Rule 3: ready</description>
+        <inputEntry id="UnaryTests_R3_Materials"><text>true</text></inputEntry>
+        <inputEntry id="UnaryTests_R3_Drawing"><text>true</text></inputEntry>
+        <outputEntry id="Literal_R3_Result"><text>"Ready"</text></outputEntry>
+        <outputEntry id="Literal_R3_Reason"><text>null</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="DMNDiagram_WorkpackReleaseCheck">
+      <dmndi:DMNShape id="DMNShape_WorkpackReleaseCheck" dmnElementRef="Decision_WorkpackReleaseCheck">
+        <dc:Bounds height="80" width="180" x="160" y="100" />
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

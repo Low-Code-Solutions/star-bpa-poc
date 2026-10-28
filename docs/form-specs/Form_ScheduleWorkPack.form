@@ -1,0 +1,84 @@
+{
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.10.0",
+  "exporter": {
+    "name": "LCS generator (Claude)",
+    "version": "0.1"
+  },
+  "schemaVersion": 18,
+  "id": "Form_ScheduleWorkPack",
+  "type": "default",
+  "components": [
+    {
+      "type": "text",
+      "id": "Text_035",
+      "text": "### Schedule Work Pack\nEnter the planned dates. A Work Pack is scheduled once (D27)."
+    },
+    {
+      "type": "text",
+      "id": "Text_001",
+      "text": "**Please correct the following:**\n\n{{#loop validationMessages}}- {{this}}\n{{/loop}}",
+      "conditional": {
+        "hide": "=validationMessages = null or count(validationMessages) = 0"
+      }
+    },
+    {
+      "type": "text",
+      "id": "Text_029",
+      "text": "**Workpack:** {{workpackNumber}}  \n**Activity:** {{activityRef}}  \n**Drawing:** {{drawingRef}}  \n**Department:** {{departmentRef}}  \n**Date to complete:** {{dateToComplete}}"
+    },
+    {
+      "type": "text",
+      "id": "Text_036",
+      "text": "#### Look-Ahead PPC plan dates (read only)\n| Date | Value |\n|---|---|\n| Shop Drg Mark | {{lookAhead.shopDrgMark}} |\n| Assembly / Integration | {{lookAhead.assemblyIntegration}} |\n| Weld Map Drawing | {{lookAhead.weldMapDrawing}} |",
+      "conditional": {
+        "hide": "=lookAhead = null"
+      }
+    },
+    {
+      "type": "text",
+      "id": "Text_037",
+      "text": "No Look-Ahead plan dates for {{drawingRef}}",
+      "conditional": {
+        "hide": "=lookAhead != null"
+      }
+    },
+    {
+      "type": "datetime",
+      "id": "Date_038",
+      "key": "plannedStart",
+      "subtype": "date",
+      "dateLabel": "Planned start",
+      "validate": {
+        "required": true
+      },
+      "description": "Earliest allowed: {{earliestPlannedDate}} (today + lead time, D9)"
+    },
+    {
+      "type": "datetime",
+      "id": "Date_039",
+      "key": "plannedEnd",
+      "subtype": "date",
+      "dateLabel": "Planned end",
+      "validate": {
+        "required": true
+      }
+    },
+    {
+      "type": "text",
+      "id": "Text_040",
+      "text": "Planned end cannot be before planned start",
+      "conditional": {
+        "hide": "=plannedStart = null or plannedEnd = null or date(plannedEnd) >= date(plannedStart)"
+      }
+    },
+    {
+      "type": "text",
+      "id": "Text_041",
+      "text": "Planned end is after the date to complete ({{dateToComplete}})",
+      "conditional": {
+        "hide": "=plannedEnd = null or dateToComplete = null or date(plannedEnd) <= date(dateToComplete)"
+      }
+    }
+  ]
+}

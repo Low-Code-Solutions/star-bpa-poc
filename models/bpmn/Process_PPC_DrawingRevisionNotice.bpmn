@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_DrawingRevisionNotice" targetNamespace="http://lowcodesol.com/star-bpa-poc" exporter="LCS generator (Claude)" exporterVersion="0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.1">
+  <bpmn:process id="Process_PPC_DrawingRevisionNotice" name="Drawing Revision Notice" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_DrawingRevised" name="Drawing revised">
+      <bpmn:documentation>BPA-16, D41. Message DrawingRevised, published by POST /api/v1/drawing-revisions after it records the revision and applies the Superseded status the D365 event reports for the previous revision (D45, D53). Duplicate revisions are not published (D46). Carries drawingRef, revision, status, registeredAt, supersededRevision.</bpmn:documentation>
+      <bpmn:outgoing>Flow_ToFindRecipients</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_DrawingRevised" messageRef="Message_DrawingRevised" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="ServiceTask_FindRecipients" name="Find recipients">
+      <bpmn:documentation>BPA-16. Work Packs Released or In Progress linked to the drawing (D11); owners by department role, PE by project role (D43); one entry per person (D46). Outputs recipients (list); logs 'No recipients for &lt;drawing&gt; &lt;rev&gt;' when empty.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="find-revision-recipients" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToFindRecipients</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToHasRecipients</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_HasRecipients" name="Anyone to notify?" default="Flow_NoRecipients">
+      <bpmn:documentation>NEW (design pack N9).</bpmn:documentation>
+      <bpmn:incoming>Flow_ToHasRecipients</bpmn:incoming>
+      <bpmn:outgoing>Flow_HasRecipients</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NoRecipients</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sendTask id="SendTask_NotifyRecipients" name="Notify recipients">
+      <bpmn:documentation>BPA-16, D44. Parallel multi-instance, one per recipient: store in-system notice, then send email (idempotent on notification unique key).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-revision-notice" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_HasRecipients</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRecipientsNotified</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics>
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=recipients" inputElement="recipient" />
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="EndEvent_RecipientsNotified" name="Recipients notified">
+      <bpmn:incoming>Flow_ToRecipientsNotified</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndEvent_NoRecipients" name="Nobody to notify">
+      <bpmn:incoming>Flow_NoRecipients</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_ToFindRecipients" sourceRef="StartEvent_DrawingRevised" targetRef="ServiceTask_FindRecipients" />
+    <bpmn:sequenceFlow id="Flow_ToHasRecipients" sourceRef="ServiceTask_FindRecipients" targetRef="Gateway_HasRecipients" />
+    <bpmn:sequenceFlow id="Flow_HasRecipients" name="Yes" sourceRef="Gateway_HasRecipients" targetRef="SendTask_NotifyRecipients">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=count(recipients) &gt; 0</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToRecipientsNotified" sourceRef="SendTask_NotifyRecipients" targetRef="EndEvent_RecipientsNotified" />
+    <bpmn:sequenceFlow id="Flow_NoRecipients" name="No" sourceRef="Gateway_HasRecipients" targetRef="EndEvent_NoRecipients" />
+  </bpmn:process>
+  <bpmn:message id="Message_DrawingRevised" name="DrawingRevised" />
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Process_PPC_DrawingRevisionNotice">
+    <bpmndi:BPMNPlane id="BPMNPlane_Process_PPC_DrawingRevisionNotice" bpmnElement="Process_PPC_DrawingRevisionNotice">
+      <bpmndi:BPMNShape id="StartEvent_DrawingRevised_di" bpmnElement="StartEvent_DrawingRevised">
+        <dc:Bounds x="182" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="150" y="183" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_FindRecipients_di" bpmnElement="ServiceTask_FindRecipients">
+        <dc:Bounds x="280" y="120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_HasRecipients_di" bpmnElement="Gateway_HasRecipients" isMarkerVisible="true">
+        <dc:Bounds x="445" y="135" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="420" y="103" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SendTask_NotifyRecipients_di" bpmnElement="SendTask_NotifyRecipients">
+        <dc:Bounds x="550" y="120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_RecipientsNotified_di" bpmnElement="EndEvent_RecipientsNotified">
+        <dc:Bounds x="722" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="690" y="183" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_NoRecipients_di" bpmnElement="EndEvent_NoRecipients">
+        <dc:Bounds x="582" y="252" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="550" y="293" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_ToFindRecipients_di" bpmnElement="Flow_ToFindRecipients">
+        <di:waypoint x="218" y="160" />
+        <di:waypoint x="280" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToHasRecipients_di" bpmnElement="Flow_ToHasRecipients">
+        <di:waypoint x="380" y="160" />
+        <di:waypoint x="445" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_HasRecipients_di" bpmnElement="Flow_HasRecipients">
+        <di:waypoint x="495" y="160" />
+        <di:waypoint x="550" y="160" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="501" y="138" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToRecipientsNotified_di" bpmnElement="Flow_ToRecipientsNotified">
+        <di:waypoint x="650" y="160" />
+        <di:waypoint x="722" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NoRecipients_di" bpmnElement="Flow_NoRecipients">
+        <di:waypoint x="470" y="185" />
+        <di:waypoint x="470" y="270" />
+        <di:waypoint x="582" y="270" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="476" y="227" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
