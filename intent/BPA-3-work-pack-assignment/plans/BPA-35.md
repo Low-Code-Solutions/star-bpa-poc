@@ -26,7 +26,7 @@ Branch: BPA-35-copy-design-docs, from main 5b446a9
 
 | File | Change |
 |---|---|
-| docs/00-context.md | New. Copy, with: "Master copy" line changed to the repo (ADR 0015); partner name replaced by "the partner"/"partner-side" |
+| docs/00-context.md | New. Copy, with: "Master copy" line changed to the repo (ADR 0015); partner name replaced by "the partner"/"partner-side". Departure (found while copying): the D57 "Authority" line also said the knowledge files are mastered in SharePoint; changed to "master in the repo, ADR 0015" for consistency |
 | docs/01-glossary.md | New. Copy, with the partner name replaced (2 places) |
 | docs/03-sor-matrix.md | Replaced: the template becomes the ACTIVE Project version, with the partner name replaced and the Mocks row `mocks/` → `backend/mocks/` |
 | docs/09-architecture-decisions.md | New. **Verbatim** copy (L17), no edits; checked for partner name first (none expected) |
