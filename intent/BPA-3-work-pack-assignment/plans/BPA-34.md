@@ -2,7 +2,7 @@
 
 Jira: BPA-34 (Task, epic BPA-3)
 Story last updated: 2026-10-28T19:53:05.414+0400
-Status: Draft (awaiting approval by Ahsan)
+Status: Approved (Ahsan, 2026-10-28 20:58 PKT, in the claude.ai session)
 Approver: Ahsan (Build Lead)
 Branch: BPA-34-restructure-repo-layout, from main 65eb5de
 
@@ -76,6 +76,10 @@ any content.
   in a later item once S19 is marked confirmed in 09.
 - Q2 (non-blocking): confirm that L1's `backend/pom.xml` means the Spring Boot project lives directly in
   `backend/` (so no `backend/app/`). Proceeding on that reading unless you say otherwise.
+  Resolved 28 Oct: Ahsan agreed `backend/` is the Spring Boot root (one deployable, S2). A
+  `backend/.dockerignore` excluding `mocks/` and `postgres/` comes with the walking skeleton, when a
+  Dockerfile first exists.
 
 ## Human-gap log
 - 28 Oct: layout option (a) chosen by Ahsan in chat (no `infra/`, no `microservices/`).
+- 28 Oct: plan approved and Q2 answered by Ahsan in chat (20:58 PKT).
