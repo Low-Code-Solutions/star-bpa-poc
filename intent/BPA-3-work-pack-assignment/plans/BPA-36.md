@@ -32,8 +32,8 @@ Branch: BPA-36-commit-epic1-models, from main ff4ea65
 |---|---|
 | The 8 files above | New, committed byte-for-byte from SharePoint (sizes checked). Model content changes only if a 09 §4 item 2 check fails, and then only that fix, listed here |
 | models/bpmn/.gitkeep, models/dmn/.gitkeep, docs/form-specs/.gitkeep | Deleted once the folders have files |
-| .bpmnlintrc | New: extends `bpmnlint:recommended` and `plugin:camunda-compat/camunda-cloud-8-10` (L10) |
-| package.json, package-lock.json | New: devDependencies pinned exactly: `bpmnlint` 12.0.0, `bpmnlint-plugin-camunda-compat` 2.63.0; script `lint:bpmn` |
+| .bpmnlintrc | New: extends `bpmnlint:recommended` and `plugin:camunda-compat/camunda-cloud-8-10` (L10); `moddleExtensions` registers zeebe (departure, same reason as above) |
+| package.json, package-lock.json | New: devDependencies pinned exactly: `bpmnlint` 12.0.0, `bpmnlint-plugin-camunda-compat` 2.63.0, `zeebe-bpmn-moddle` 2.0.0; script `lint:bpmn`. Departure: `zeebe-bpmn-moddle` was missing from the plan; without it the CLI cannot read `zeebe:` extensions and reports 17 false errors (plugin README) |
 | .github/workflows/lint.yml | New: on every pull request and push to main, `npm ci` then `npm run lint:bpmn` over `models/bpmn/*.bpmn`; Node 24. Departure: the plan said Node 22, but bpmnlint 12.0.0 declares `node >= 24` (it ran on 22 with an engine warning only); `package.json` engines set to `>=24` to match |
 | .github/workflows/.gitkeep | Deleted |
 | docs/form-specs/README.md | New, three lines: these are field specs for the React screens (09 S14); nothing deploys them |
@@ -73,8 +73,21 @@ Branch: BPA-36-commit-epic1-models, from main ff4ea65
 - Element-ID check: 0 missing IDs; count of flow nodes referenced.
 - Hook tests still pass.
 
+## Results (28 Oct)
+- Transfer: the SharePoint connector cannot read `.bpmn`/`.dmn`/`.form`; each file was copied to a
+  temporary `.txt` name in ClaudeWorkingFolder/bpa36-transfer-temp, read, and written out. All 8 match
+  their SharePoint byte sizes exactly (39,828 / 6,577 / 7,533 / 3,325 / 6,021 / 6,358 / 1,992 / 2,541).
+- 09 §4 item 2 checks (scratch script): 15/15 passed: 8.10.1 on all 4 models; no form links; no
+  loading steps; assignment_state transitions documented on the 4 worker elements; candidate groups
+  on the 4 user tasks. No model change needed.
+- `npm run lint:bpmn`: 0 errors, 4 warnings (the 4 user tasks have no form; intended by S14, as BPA-3
+  records).
+- Element-ID check against Jira (15 Epic 1 stories, BPMN Reference field): 0 missing IDs; 40 of 40
+  flow nodes referenced by a story; Decision_WorkpackReleaseCheck present.
+
 ## Questions
-- Q1: how do the 8 files reach the branch? Recommended, as for BPA-35: you download them from
+- Q1 (resolved 28 Oct: Ahsan's commit did not reach GitHub, so Claude used the alternative route with
+  byte-size checks): how do the 8 files reach the branch? Recommended, as for BPA-35: you download them from
   SharePoint and commit them to `BPA-36-commit-epic1-models` at the repo paths in the table (a commit
   message starting `BPA-36:` keeps the history clean). Alternative: I read them through the
   SharePoint connector and write them out, with the byte sizes as the check.
@@ -82,3 +95,5 @@ Branch: BPA-36-commit-epic1-models, from main ff4ea65
 ## Human-gap log
 - 28 Oct: plan approved by Ahsan in chat (21:55 PKT). Q1: the recommended route (Ahsan commits the 8 files)
   is being followed; tooling built meanwhile.
+- 28 Oct: Ahsan's commit of the model files did not reach GitHub (not pushed); Claude used the SharePoint
+  route instead. The connector cannot read model file types; worked around with temporary .txt copies.
