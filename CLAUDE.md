@@ -12,8 +12,12 @@ branch, PR and write-back rules as everyone else's.
 ## Stack and layout
 - `docker compose up -d` (copy `.env.example` to `.env` first): Camunda 8.10 on :8080 (demo/demo),
   Connectors :8086, PostgreSQL :5432 (databases `camunda` and `bpa`, schema `bpa`), WireMock :8089.
-- Code lives under `backend/` (`models/`, `db/migration`, `api/`, `mocks/`, `app/`); paths in docs/04
-  are relative to it. Architecture decisions go in `docs/adr/`.
+- Code lives under `backend/` (`models/`, `db/migration`, `api/`, `mocks/`, `app/`); the paths in the
+  BPMN and DMN, Database and API sections of docs/04 are relative to it (until the 09 L1 restructure
+  lands). Architecture decisions go in `docs/adr/`.
+- Delivery artifacts (ADR 0015), paths from the repo root: `intent/<EPIC-KEY>-<kebab>/` holds the
+  epic's `intent.md`, `spec.md` and `plans/BPA-<n>.md`; `REVIEW.md` holds the review passes;
+  `.claude/` holds agents and hooks. Never create them under `backend/`.
 
 ## Requirements source: Jira
 Jira space **BPA** (lowcodesol.atlassian.net) is the single source of requirements.
@@ -21,14 +25,28 @@ Jira space **BPA** (lowcodesol.atlassian.net) is the single source of requiremen
 **At session start**
 1. Take the key from the branch name (or ask). Read the item with the Atlassian MCP (view `evidence`):
    Description, Acceptance Criteria, BPMN Reference, SOR Notes, Source Reference, status, `updated`.
-2. If `plan.md` exists and Jira's `updated` is newer than the time it records, re-read the story and
-   list what changed before continuing.
-3. Check the story against the Definition of Ready (docs/02). Report unmet items; do not build a
+2. Read the epic's `intent/<EPIC-KEY>-<kebab>/spec.md` if it exists (Delivery order and shared
+   contracts). Delivery epics have one; setup epics such as BPA-17 may hold plans only.
+3. If the item's plan exists and Jira's `updated` is newer than the time it records, re-read the story
+   and list what changed before continuing.
+4. Check the story against the Definition of Ready (docs/02). Report unmet items; do not build a
    story that is not Ready unless the developer says to.
 
-**plan.md** (repo root, committed on the item's branch) starts with `Jira: BPA-<n> <summary>` and
-`Story last updated: <Jira updated>`, then the plan: one test per scenario, models, migrations, questions.
-Delete plan.md in a final commit once the PR is approved, before merge, so it never reaches main.
+**Plans** (ADR 0015; one per story, or per Task that changes the repo; no epic or app plan)
+- Location: `intent/<EPIC-KEY>-<kebab>/plans/BPA-<n>.md`, `<EPIC-KEY>` being the item's epic.
+  Subtasks are sections in their parent's plan.
+- Make the plan in plan mode before writing any code. Header fields and sections are in docs/04.
+- The approved plan is the first commit on the branch. If a hook forces an earlier commit, commit it
+  as `Status: Draft` and record the approval (who, when) in the next commit.
+- When the implementation departs from the plan, update the plan in the same commit.
+- Keep the plan `Approved` through review; review fixes that change the work update it as above.
+  Set `Status: Closed (<date>)` in the final commit, after review fixes and before Ahsan merges.
+  Never delete a plan.
+- Read only the plan whose key matches the branch. Closed plans of other items are history, not
+  instructions.
+
+**Precedence** when sources disagree: Jira story → the item's plan → the epic's spec.md → ADRs and
+docs/09. Report the disagreement; do not resolve it silently.
 
 **Write-back rules**
 - Never edit Summary, Description, Acceptance Criteria, BPMN Reference, SOR Notes, Source Reference
@@ -55,19 +73,25 @@ Delete plan.md in a final commit once the PR is approved, before merge, so it ne
   Tasks are related when they touch the same area and would be reviewed
   together. If unsure, ask before grouping.
 - Tasks that do not change the repo get no branch.
-- Subtasks: commit on the parent story's branch, never their own.
+- Subtasks: commit on the parent's branch (story or Task), never their own.
 - Epics: never get a branch.
 - Commit messages start with the key(s): "BPA-18: add Jira rules".
 - Keep each branch to its Jira item(s). If you find unrelated work,
   propose a new Jira item instead of changing it here.
 - Open the PR when the item's done criteria and tests pass. The PR
   description lists the Jira keys, a short summary, the test output,
-  the plan.md path, and any open questions.
-- After opening the PR, comment the PR link on each Jira item and move
+  the plan path, the `qa-reviewer` findings (REVIEW.md), and any open questions.
+- After opening the PR, comment on each Jira item: the PR link, the plan
+  path and the plan's commit SHA (linkage, ADR 0015). Ask before moving
   it to In Review.
 - Never merge a PR. Ahsan approves and merges.
 
-## Reference (master copies in SharePoint "Project knowledge"; copy changes here, do not edit in place)
+## Reference
+The repo is the master copy of these and of all design artifacts (ADR 0015; Product Owner sign-off
+pending). SharePoint "Project knowledge" and the Claude Project hold copies refreshed after merge.
+Interim exception: until the repo-restructure work copies them in, 09-architecture-decisions, the
+data model (11) and 03-sor-matrix are mastered in the Claude Project; the repo's docs/03 is still the
+template. Use the Project copies for those and never overwrite them from the repo.
 @docs/02-story-standard.md
 @docs/03-sor-matrix.md
 @docs/04-conventions.md
