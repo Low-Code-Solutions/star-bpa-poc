@@ -2,7 +2,7 @@
 
 Jira: BPA-35 (Task, epic BPA-3)
 Story last updated: 2026-10-28T20:08:53.772+0400
-Status: Approved (Ahsan, 2026-10-28 21:13 PKT, in the claude.ai session)
+Status: Closed (2026-10-28)
 Approver: Ahsan (Build Lead)
 Branch: BPA-35-copy-design-docs, from main 5b446a9
 
@@ -82,3 +82,5 @@ listed in the PR. 09 is verbatim (L17). Every other difference from the source i
 - 28 Oct: plan approved by Ahsan in chat (21:13 PKT); he downloads and attaches the two large files (Q1 a).
 - 28 Oct: Ahsan downloaded and committed the data model and 09 (`9ac1714`); the 09 copy was the pre-ADR-0015
   version, so the amendments were re-applied (size check matches the Project copy).
+- 28 Oct: PR #6 reviewed and accepted by Ahsan in chat (21:47 PKT); plan closed before merge. Ahsan asked Claude
+  to merge; Claude left the merge to him per CLAUDE.md ("Never merge a PR").
