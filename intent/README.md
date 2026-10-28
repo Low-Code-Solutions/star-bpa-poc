@@ -10,6 +10,7 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 |---|---|---|
 | [BPA-18](BPA-17-claude-setup/plans/BPA-18.md) | Repo setup: CLAUDE.md with Jira rules and docs imports | Closed (2026-10-28; rebuilt under BPA-33) |
 | [BPA-27](BPA-17-claude-setup/plans/BPA-27.md) | Adopt the playbook artifact chain: intent → spec → plan → PR | Closed (2026-10-28) |
+| [BPA-38](BPA-17-claude-setup/plans/BPA-38.md) | Harness: protect main, shared Atlassian MCP config, plan-closed CI check | Approved (Ahsan, 2026-10-28 22:45 PKT, in chat) |
 
 ## BPA-3-work-pack-assignment
 

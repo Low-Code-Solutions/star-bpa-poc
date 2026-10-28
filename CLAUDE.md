@@ -26,6 +26,9 @@ branch, PR and write-back rules as everyone else's.
 
 ## Requirements source: Jira
 Jira space **BPA** (lowcodesol.atlassian.net) is the single source of requirements.
+The repo's `.mcp.json` registers Atlassian's remote MCP server as `atlassian` (09 L14; no secrets).
+Approve it when Claude Code asks, then run `/mcp` once to sign in with your own Atlassian account.
+Its tools are `mcp__atlassian__*`; another Atlassian connector the session already has works too.
 
 **At session start**
 1. Take the key from the branch name (or ask). Read the item with the Atlassian MCP (view `evidence`):
@@ -68,6 +71,12 @@ docs/09. Report the disagreement; do not resolve it silently.
 
 ## Branches and pull requests
 - Never commit or push to main. All changes go through a pull request.
+- Guards (09 L13, BPA-38): deny rules in `.claude/settings.json` and `.claude/hooks/git-guard.sh`
+  block commits on main, pushes to main and force pushes in this repo, and any git command
+  outside a read-only list for `qa-reviewer`. They cover Claude Code sessions only (not a person's
+  terminal, git aliases or scripts that run git) and are not a security boundary. Never work
+  round a block; tell the developer.
+- CI `Plan check` fails a `BPA-<n>-…` PR with no plan and warns while the plan is not Closed.
 - Start every item from the latest main: `git switch main && git pull`,
   then create the branch. If a branch for the key already exists, use it.
 - Branch name: <KEY>-<short-kebab-description>, e.g. BPA-10-print-released-work-pack.
