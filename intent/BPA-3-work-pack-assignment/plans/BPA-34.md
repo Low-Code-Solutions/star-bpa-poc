@@ -2,7 +2,7 @@
 
 Jira: BPA-34 (Task, epic BPA-3)
 Story last updated: 2026-10-28T19:53:05.414+0400
-Status: Approved (Ahsan, 2026-10-28 20:58 PKT, in the claude.ai session)
+Status: Closed (2026-10-28)
 Approver: Ahsan (Build Lead)
 Branch: BPA-34-restructure-repo-layout, from main 65eb5de
 
@@ -87,3 +87,6 @@ any content.
 - 28 Oct: plan approved and Q2 answered by Ahsan in chat (20:58 PKT).
 - 28 Oct: the plan was committed as Draft (3dbd317) before approval because the session's stop hook
   requires the work of each turn to be committed and pushed; approval recorded in 1994bf8.
+- 28 Oct: PR #5 cannot be approved in GitHub: it was opened under Ahsan's account (the session uses his
+  credentials) and GitHub blocks self-approval. Review confirmed by Ahsan in chat (21:06 PKT); plan
+  closed before merge; the merge is the sign-off.

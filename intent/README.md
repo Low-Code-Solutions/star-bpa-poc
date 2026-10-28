@@ -18,5 +18,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 
 | Plan | Summary | Status |
 |---|---|---|
-| [BPA-34](BPA-3-work-pack-assignment/plans/BPA-34.md) | Restructure repo to 09 L1 (layout only, no content) | Approved (Ahsan, 2026-10-28 20:58 PKT, in the claude.ai session) |
+| [BPA-34](BPA-3-work-pack-assignment/plans/BPA-34.md) | Restructure repo to 09 L1 (layout only, no content) | Closed (2026-10-28) |
 
