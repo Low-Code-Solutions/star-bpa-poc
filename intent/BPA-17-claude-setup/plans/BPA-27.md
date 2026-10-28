@@ -1,8 +1,8 @@
 # Plan: BPA-27 Adopt the playbook artifact chain: intent → spec → plan → PR
 
 Jira: BPA-27 (Task, epic BPA-17)
-Story last updated: 2026-10-28T17:59:03.731+0400
-Status: Closed (2026-10-28; approved by Ahsan 2026-10-28 19:05 PKT, in the claude.ai session)
+Story last updated: 2026-10-28T17:59:03.731+0400 (later Jira update 19:04:42 was the move to Done only)
+Status: Closed (2026-10-28)
 Approver: Ahsan (Build Lead)
 Branch: BPA-27-artifact-chain, from main 9b3322e
 
@@ -106,7 +106,7 @@ Out of scope, new Jira item proposed: docs/03-sor-matrix.md on main names the pa
 - 28 Oct: PR #2 merged by Ahsan (Claude never merges).
 - 28 Oct: the session's stop hook required the draft plan to be committed and pushed before
   approval; it was committed as Draft (fe3d485) and approval recorded in the next commit.
-- 28 Oct: plan approved by Ahsan in chat.
+- 28 Oct: plan approved by Ahsan in chat (19:05 PKT).
 - 28 Oct: PR #3 reviewed and merged by Ahsan (3d7aaee) before the plan was set to Closed. The close
   step depends on a human remembering the order, the same gap as BPA-18. Proposed fix: a check in
   the repo-restructure CI work that fails a PR whose plan is not Closed (not decided).
