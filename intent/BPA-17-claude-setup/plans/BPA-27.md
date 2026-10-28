@@ -37,6 +37,7 @@ Departure (BPA-32, recorded in the same commit): the commit check runs as PostTo
 finished commit, not PreToolUse. Claude usually runs `git add … && git commit` as one command, so
 nothing is staged when PreToolUse fires. A post-commit warning still lets Claude amend the commit.
 | intent/README.md | BPA-33 | New: generated, non-authoritative index |
+| intent/generate-index.sh | BPA-33 | New (departure, added 28 Oct): the script that generates intent/README.md, so "generated" is true |
 | intent/BPA-3-work-pack-assignment/intent.md | BPA-33 | New: from 00-context and the BPA-3 epic |
 | intent/BPA-3-work-pack-assignment/spec.md | BPA-33 | New: links to 07, 09, ADRs, data model; Delivery order section |
 | intent/BPA-17-claude-setup/plans/BPA-18.md | BPA-33 | Rebuilt from git history (555f874:plan.md), Closed |
