@@ -2,7 +2,7 @@
 
 Jira: BPA-38 (Task, epic BPA-17)
 Story last updated: 2026-10-28T21:40:13.155+0400
-Status: Draft (awaiting approval by Ahsan)
+Status: Approved (Ahsan, 2026-10-28 22:45 PKT, in chat)
 Approver: Ahsan (Build Lead)
 Branch: BPA-38-harness-protect-main, from main 04ed323
 
