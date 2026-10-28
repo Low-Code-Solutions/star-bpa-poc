@@ -1,0 +1,20 @@
+# Lints the BPMN models on every pull request and on pushes to main (09 L10).
+# Uses the same .bpmnlintrc and pinned plugin versions as a local `npm run lint:bpmn`.
+name: Lint models
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  bpmnlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint:bpmn

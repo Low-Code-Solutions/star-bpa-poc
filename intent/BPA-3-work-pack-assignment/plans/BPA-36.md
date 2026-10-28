@@ -34,7 +34,7 @@ Branch: BPA-36-commit-epic1-models, from main ff4ea65
 | models/bpmn/.gitkeep, models/dmn/.gitkeep, docs/form-specs/.gitkeep | Deleted once the folders have files |
 | .bpmnlintrc | New: extends `bpmnlint:recommended` and `plugin:camunda-compat/camunda-cloud-8-10` (L10) |
 | package.json, package-lock.json | New: devDependencies pinned exactly: `bpmnlint` 12.0.0, `bpmnlint-plugin-camunda-compat` 2.63.0; script `lint:bpmn` |
-| .github/workflows/lint.yml | New: on every pull request and push to main, `npm ci` then `npm run lint:bpmn` over `models/**/*.bpmn`; Node 22 |
+| .github/workflows/lint.yml | New: on every pull request and push to main, `npm ci` then `npm run lint:bpmn` over `models/bpmn/*.bpmn`; Node 24. Departure: the plan said Node 22, but bpmnlint 12.0.0 declares `node >= 24` (it ran on 22 with an engine warning only); `package.json` engines set to `>=24` to match |
 | .github/workflows/.gitkeep | Deleted |
 | docs/form-specs/README.md | New, three lines: these are field specs for the React screens (09 S14); nothing deploys them |
 | .gitignore | Already ignores `node_modules/`; no change expected |

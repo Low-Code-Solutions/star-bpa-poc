@@ -1,0 +1,15 @@
+{
+  "name": "star-bpa-poc-tooling",
+  "private": true,
+  "description": "Repo tooling for the STAR BPA POC: BPMN lint (09 L10). Application code lives in backend/ and frontend/.",
+  "scripts": {
+    "lint:bpmn": "bpmnlint models/bpmn/*.bpmn"
+  },
+  "devDependencies": {
+    "bpmnlint": "12.0.0",
+    "bpmnlint-plugin-camunda-compat": "2.63.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
