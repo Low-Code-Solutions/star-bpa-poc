@@ -30,7 +30,7 @@ Branch: BPA-35-copy-design-docs, from main 5b446a9
 | docs/01-glossary.md | New. Copy, with the partner name replaced (2 places) |
 | docs/03-sor-matrix.md | Replaced: the template becomes the ACTIVE Project version, with the partner name replaced and the Mocks row `mocks/` → `backend/mocks/` |
 | docs/09-architecture-decisions.md | New. **Verbatim** copy (L17), no edits; checked for partner name first (none expected). Departure: the uploaded file (`9ac1714`, 26,664 B) predated the ADR 0015 amendment, so the four amendment edits already in the Project copy were applied to it; result 27,958 B, the same size as the Project copy |
-| docs/data-model.md | New. Copy of v0.4 (uploaded as `docs/11-data-model-v0.4.md` in `9ac1714`, 67,018 B, renamed), with the partner name replaced in §3.2 (1 place); status line unchanged ("awaiting approval") |
+| docs/data-model.md | New. Copy of v0.4 (uploaded as `docs/11-data-model-v0.4.md` in `9ac1714`, 67,018 B, renamed), with the partner name replaced in §3.2 (1 place); status line unchanged (v0.4; formal approval for V1 still pending, its §9) |
 | docs/00-context.md (2nd edit) | Departure (found by the name scan): the SharePoint site name, which may be the client's name, replaced by "the team SharePoint site" |
 | CLAUDE.md | Reference section: interim exception removed; repo is master for all design artifacts; imports add `@docs/00-context.md`. (09 and data model are linked, not imported, to keep the always-loaded context small.) |
 | intent/BPA-3-work-pack-assignment/spec.md | "Design sources" table: repo locations now live (09, data model, 03) |
