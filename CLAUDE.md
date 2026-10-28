@@ -4,6 +4,11 @@ LCS proof of concept: one business-process slice for STAR on Camunda 8 + Postgre
 FMS and myPeople stay the systems of record (SOR); the POC automates the work between them.
 Codename "STAR" in all outputs. Synthetic data only. Never invent a business rule: mark it ASSUMPTION.
 
+**Team:** Faraz (Product Owner and Architect; also works as BA alongside Khitaba and as a developer),
+Khitaba (BA, Scrum Master), Ahsan (Build Lead; approves and merges PRs), Usama (Lead Developer).
+Apply the rules for the role the person is working in: Faraz's BA and dev work follows the same
+branch, PR and write-back rules as everyone else's.
+
 ## Stack and layout
 - `docker compose up -d` (copy `.env.example` to `.env` first): Camunda 8.10 on :8080 (demo/demo),
   Connectors :8086, PostgreSQL :5432 (databases `camunda` and `bpa`, schema `bpa`), WireMock :8089.
@@ -35,7 +40,8 @@ Delete plan.md in a final commit once the PR is approved, before merge, so it ne
 **Status rules** (PROPOSAL, not yet agreed; ask before every transition)
 - Ready → In Progress when work starts; In Progress → In Review when the PR is opened.
 - Any → Needs Answer when an open question blocks the story, with the question as a comment.
-- Never move an item to Ready or Done; only the Product Owner (Faraz) does that.
+- Never move an item to Ready or Done. Faraz makes those moves in Jira as Product Owner, even when
+  working as BA or developer in the session.
 
 ## Branches and pull requests
 - Never commit or push to main. All changes go through a pull request.
