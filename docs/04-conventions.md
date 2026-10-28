@@ -1,7 +1,7 @@
 # 04 Conventions: STAR BPA POC
 
 Status: PROPOSED. Owner: Ahsan. The same file lives in the repo's docs/ folder so Claude in the
-Project and Claude Code use identical names.
+Project and Claude Code use identical names. All file paths below are from the repo root (09 L1).
 
 ## Jira
 - Space key: BPA. Work item keys: BPA-<n>.
@@ -23,7 +23,7 @@ Project and Claude Code use identical names.
 - Primary keys: id uuid
 - Columns referencing another SOR end in _ref and hold that system's ID, e.g. employee_ref (myPeople)
 - Audit columns on every table: created_at, created_by, updated_at, updated_by
-- Migrations: db/migration/V<n>__<description>.sql (Flyway)
+- Migrations: backend/src/main/resources/db/migration/V<n>__<description>.sql (Flyway)
 
 ## API
 - OpenAPI 3.1 in api/openapi.yaml

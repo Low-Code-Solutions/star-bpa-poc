@@ -42,6 +42,7 @@ frontend/
 | docker-compose.yml | Commented `bpa-app` service: `build: ./backend` and its comment line, instead of `./backend/app`. Volumes for Postgres init and WireMock unchanged |
 | intent/BPA-3-work-pack-assignment/plans/BPA-34.md | This plan |
 | intent/README.md | Regenerated |
+| .claude/hooks/test-hooks.sh | Departure (added during the work): sample paths in the throwaway test repos changed from `backend/app/Foo.java` to `backend/src/main/java/Foo.java`, so no stale layout path remains; behaviour unchanged |
 
 Not changed: `backend/mocks/`, `backend/postgres/init/` (kept by decision); `docs/03-sor-matrix.md`
 "mocks/" location (03 is replaced in BPA-35); `.gitignore` and compose `backend/exchange` lines (Q1);
@@ -66,7 +67,8 @@ any content.
 - `find` listing of the tree matches the target layout above; no `.gitkeep` left in removed folders.
 - `grep` finds no remaining references to `backend/models`, `backend/api`, `backend/db` or
   `backend/app` outside this plan and git history.
-- Hook tests still pass (`sh .claude/hooks/test-hooks.sh`).
+- Hook tests still pass (`sh .claude/hooks/test-hooks.sh`). Done 28 Oct: 25 passed, 0 failed (dash and bash).
+- Done 28 Oct: `docker compose config -q` valid before and after; stale-path grep clean; removed folders gone.
 - qa-reviewer findings pasted in the PR.
 
 ## Questions

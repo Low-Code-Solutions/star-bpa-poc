@@ -80,9 +80,9 @@ services:
     networks: [star]
     restart: unless-stopped
 
-  # Uncomment once backend/app contains the Spring Boot project and a Dockerfile.
+  # Uncomment once backend/ contains the Spring Boot project (backend/pom.xml) and a Dockerfile.
   # bpa-app:
-  #   build: ./backend/app
+  #   build: ./backend
   #   environment:
   #     CAMUNDA_CLIENT_MODE: self-managed
   #     CAMUNDA_CLIENT_GRPC_ADDRESS: http://camunda:26500
