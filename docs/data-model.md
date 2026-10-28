@@ -246,7 +246,7 @@ All seeded by `R__seed_reference_data.sql` (09 S17, L2). None is written at runt
 | `wbs_ref` | `text` | NOT NULL | UNIQUE | D365 F&O Project Management | BPA-6; C8c; **P1** |
 | `project_ref` | `text` | NOT NULL **(A)** | FK → `project_job_code(project_ref)` | D365 F&O Project Management | BPA-6; C8a |
 
-**Integration note (P1, PO 28 Oct).** In the target landscape D365 F&O sources WBS data from FMS, and a D365 F&O → FMS integration carries updates. The POC holds a seeded copy and implements neither flow; if made live, the FMS side is batch/file (project rule for Saipem-side integrations). The FRD conflict behind C8c (FRD-7 §7.4, §7.6 s1 name FMS) stays recorded; STAR question 2 stays open.
+**Integration note (P1, PO 28 Oct).** In the target landscape D365 F&O sources WBS data from FMS, and a D365 F&O → FMS integration carries updates. The POC holds a seeded copy and implements neither flow; if made live, the FMS side is batch/file (project rule for partner-side integrations). The FRD conflict behind C8c (FRD-7 §7.4, §7.6 s1 name FMS) stays recorded; STAR question 2 stays open.
 
 ### 3.3 `activity`
 

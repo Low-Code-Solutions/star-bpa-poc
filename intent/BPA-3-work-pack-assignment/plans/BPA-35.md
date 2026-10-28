@@ -29,8 +29,9 @@ Branch: BPA-35-copy-design-docs, from main 5b446a9
 | docs/00-context.md | New. Copy, with: "Master copy" line changed to the repo (ADR 0015); partner name replaced by "the partner"/"partner-side". Departure (found while copying): the D57 "Authority" line also said the knowledge files are mastered in SharePoint; changed to "master in the repo, ADR 0015" for consistency |
 | docs/01-glossary.md | New. Copy, with the partner name replaced (2 places) |
 | docs/03-sor-matrix.md | Replaced: the template becomes the ACTIVE Project version, with the partner name replaced and the Mocks row `mocks/` → `backend/mocks/` |
-| docs/09-architecture-decisions.md | New. **Verbatim** copy (L17), no edits; checked for partner name first (none expected) |
-| docs/data-model.md | New. Copy of v0.4, with the partner name replaced in §3.2 (1 place); status line unchanged ("awaiting approval") |
+| docs/09-architecture-decisions.md | New. **Verbatim** copy (L17), no edits; checked for partner name first (none expected). Departure: the uploaded file (`9ac1714`, 26,664 B) predated the ADR 0015 amendment, so the four amendment edits already in the Project copy were applied to it; result 27,958 B, the same size as the Project copy |
+| docs/data-model.md | New. Copy of v0.4 (uploaded as `docs/11-data-model-v0.4.md` in `9ac1714`, 67,018 B, renamed), with the partner name replaced in §3.2 (1 place); status line unchanged ("awaiting approval") |
+| docs/00-context.md (2nd edit) | Departure (found by the name scan): the SharePoint site name, which may be the client's name, replaced by "the team SharePoint site" |
 | CLAUDE.md | Reference section: interim exception removed; repo is master for all design artifacts; imports add `@docs/00-context.md`. (09 and data model are linked, not imported, to keep the always-loaded context small.) |
 | intent/BPA-3-work-pack-assignment/spec.md | "Design sources" table: repo locations now live (09, data model, 03) |
 | intent/BPA-3-work-pack-assignment/plans/BPA-35.md | This plan |
@@ -79,3 +80,5 @@ listed in the PR. 09 is verbatim (L17). Every other difference from the source i
 ## Human-gap log
 - 28 Oct: no tool moves a file from the Claude Project into the repo; Q1 asks a human to bridge it.
 - 28 Oct: plan approved by Ahsan in chat (21:13 PKT); he downloads and attaches the two large files (Q1 a).
+- 28 Oct: Ahsan downloaded and committed the data model and 09 (`9ac1714`); the 09 copy was the pre-ADR-0015
+  version, so the amendments were re-applied (size check matches the Project copy).

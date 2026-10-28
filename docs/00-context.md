@@ -80,6 +80,6 @@ Not chosen: HSE incidents, D365 to FMS batch orchestration, Transport requests, 
 
 ## Where things are
 - Jira space: BPA (STAR BPA POC); Epic 1 = BPA-3, Epic 2 = BPA-4
-- SharePoint: AlRushaidTech > STAR BPA POC (01 Setup and governance, 02 Source material,
+- SharePoint: the team SharePoint site > STAR BPA POC (01 Setup and governance, 02 Source material,
   03 Workshops, 04 Requirements snapshots, 05 Showcase)
 - GitHub: star-bpa-poc (Low-Code-Solutions organisation); Camunda 8.10.1 pinned in the repo
