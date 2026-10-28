@@ -19,4 +19,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | Plan | Summary | Status |
 |---|---|---|
 | [BPA-34](BPA-3-work-pack-assignment/plans/BPA-34.md) | Restructure repo to 09 L1 (layout only, no content) | Closed (2026-10-28) |
+| [BPA-35](BPA-3-work-pack-assignment/plans/BPA-35.md) | Copy design docs into the repo and make it master: 00, 01, 03, 09, data model | Closed (2026-10-28) |
 
