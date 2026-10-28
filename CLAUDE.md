@@ -12,10 +12,12 @@ branch, PR and write-back rules as everyone else's.
 ## Stack and layout
 - `docker compose up -d` (copy `.env.example` to `.env` first): Camunda 8.10 on :8080 (demo/demo),
   Connectors :8086, PostgreSQL :5432 (databases `camunda` and `bpa`, schema `bpa`), WireMock :8089.
-- Code lives under `backend/` (`models/`, `db/migration`, `api/`, `mocks/`, `app/`); paths in docs/04
-  are relative to it. Architecture decisions go in `docs/adr/`.
-- Delivery artifacts (ADR 0015): `intent/<EPIC-KEY>-<kebab>/` holds the epic's `intent.md`, `spec.md`
-  and `plans/BPA-<n>.md`; `REVIEW.md` holds the review passes; `.claude/` holds agents and hooks.
+- Code lives under `backend/` (`models/`, `db/migration`, `api/`, `mocks/`, `app/`); the paths in the
+  BPMN and DMN, Database and API sections of docs/04 are relative to it (until the 09 L1 restructure
+  lands). Architecture decisions go in `docs/adr/`.
+- Delivery artifacts (ADR 0015), paths from the repo root: `intent/<EPIC-KEY>-<kebab>/` holds the
+  epic's `intent.md`, `spec.md` and `plans/BPA-<n>.md`; `REVIEW.md` holds the review passes;
+  `.claude/` holds agents and hooks. Never create them under `backend/`.
 
 ## Requirements source: Jira
 Jira space **BPA** (lowcodesol.atlassian.net) is the single source of requirements.
@@ -23,7 +25,8 @@ Jira space **BPA** (lowcodesol.atlassian.net) is the single source of requiremen
 **At session start**
 1. Take the key from the branch name (or ask). Read the item with the Atlassian MCP (view `evidence`):
    Description, Acceptance Criteria, BPMN Reference, SOR Notes, Source Reference, status, `updated`.
-2. Read the epic's `intent/<EPIC-KEY>-<kebab>/spec.md` (Delivery order and shared contracts).
+2. Read the epic's `intent/<EPIC-KEY>-<kebab>/spec.md` if it exists (Delivery order and shared
+   contracts). Delivery epics have one; setup epics such as BPA-17 may hold plans only.
 3. If the item's plan exists and Jira's `updated` is newer than the time it records, re-read the story
    and list what changed before continuing.
 4. Check the story against the Definition of Ready (docs/02). Report unmet items; do not build a
@@ -36,8 +39,11 @@ Jira space **BPA** (lowcodesol.atlassian.net) is the single source of requiremen
 - The approved plan is the first commit on the branch. If a hook forces an earlier commit, commit it
   as `Status: Draft` and record the approval (who, when) in the next commit.
 - When the implementation departs from the plan, update the plan in the same commit.
-- Before the PR is approved, set `Status: Closed`. Never delete a plan.
-- Read only the plan whose key matches the branch. Closed plans are history, not instructions.
+- Keep the plan `Approved` through review; review fixes that change the work update it as above.
+  Set `Status: Closed (<date>)` in the final commit, after review fixes and before Ahsan merges.
+  Never delete a plan.
+- Read only the plan whose key matches the branch. Closed plans of other items are history, not
+  instructions.
 
 **Precedence** when sources disagree: Jira story → the item's plan → the epic's spec.md → ADRs and
 docs/09. Report the disagreement; do not resolve it silently.
@@ -83,6 +89,9 @@ docs/09. Report the disagreement; do not resolve it silently.
 ## Reference
 The repo is the master copy of these and of all design artifacts (ADR 0015; Product Owner sign-off
 pending). SharePoint "Project knowledge" and the Claude Project hold copies refreshed after merge.
+Interim exception: until the repo-restructure work copies them in, 09-architecture-decisions, the
+data model (11) and 03-sor-matrix are mastered in the Claude Project; the repo's docs/03 is still the
+template. Use the Project copies for those and never overwrite them from the repo.
 @docs/02-story-standard.md
 @docs/03-sor-matrix.md
 @docs/04-conventions.md

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-plan.sh\""
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/require-plan.sh\"; if [ -f \"$f\" ]; then sh \"$f\"; fi"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/plan-sync-check.sh\""
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/plan-sync-check.sh\"; if [ -f \"$f\" ]; then sh \"$f\"; fi"
           }
         ]
       }

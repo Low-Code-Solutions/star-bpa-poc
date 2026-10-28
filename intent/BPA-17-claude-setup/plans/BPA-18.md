@@ -4,10 +4,13 @@ Jira: BPA-18 (Task, epic BPA-17 Claude setup)
 Story last updated: 2026-10-22T13:13:38.293+0400
 Status: Closed (2026-10-28; rebuilt under BPA-33)
 Approver: Ahsan (Build Lead)
-Branch: BPA-18-claude-md-jira-rules (PR #1, merged 2026-10-22) and BPA-18-remove-plan-md (PR #2, merged 2026-10-28)
+Branch: BPA-18-claude-md-jira-rules, from main faa8458 (PR #1, merged 2026-10-22); BPA-18-remove-plan-md (PR #2, merged 2026-10-28)
 
 Rebuilt on 28 Oct 2026 from the original root `plan.md` (commit 555f874, removed in 0e2ae8b) so the
-audit trail survives (ADR 0015). The content below is the original; only the header is new.
+audit trail survives (ADR 0015). The Plan and Open questions items are the original text. Added on
+28 Oct: this header, the strikethrough note on the last Plan item, the "Status:" answers under each
+open question, and the sections from "Human-gap log" on. This plan predates the docs/04 plan
+sections, so it does not have them.
 
 ## Plan
 - [x] CLAUDE.md at repo root, under one page (67 lines)

@@ -34,7 +34,8 @@ Run three passes and tag each finding with its pass and a severity.
 - Every field touched has exactly one SOR, matching docs/03 and the data model.
 - BPMN and DMN in the repo are the ones deployed; DMN tables complete (inputs, outputs, hit policy).
 - No business rule invented: anything not in a source is marked ASSUMPTION and commented in Jira.
-- Plan header complete; `Status: Closed` set before approval; human-gap log filled in.
+- Plan header complete (docs/04); human-gap log filled in; `Status: Closed` set in the final commit
+  before merge (while under review the plan stays `Approved`).
 - ADRs or docs updated when the change alters a decision, convention or CLAUDE.md rule.
 
 ## Severity

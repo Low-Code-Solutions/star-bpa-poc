@@ -7,14 +7,20 @@ not changed by this file.
 Source of truth: Jira BPA-3 and its stories for scope and acceptance criteria; this file states intent.
 
 ## Problem
-In STAR's Production Planning & Control (PPC), Work Packs are prepared across several systems, and
-production teams keep Worker assignments in Excel and hand them to FMS by hand (FMS<>D365 flow
-Int-5; MoM-2026-10-01). Work Packs and their Workers are not tracked in one process, so hours cannot
-be tracked per Worker.
+In STAR's Production Planning & Control (PPC), Work Packs are prepared across several systems.
+Production teams keep rosters and team assignments in Excel and upload hours to FMS; planning is at
+team level, not individual Workers (MOM-2026-10-01). Work Packs and their Workers are not tracked in
+one process, so hours cannot be tracked per Worker. The POC keeps a Worker-level assignment file
+(C10, C18 in BPA-3), which is the future flow the same minutes describe.
+
+Source note (contradiction, flagged): BPA-3 and 00-context say "Worker assignments in Excel" and
+cite the FMS<>D365 flow as Int-5. The source-register summary of MOM-2026-10-01 says team
+assignments, and lists employee data as interface 5 and team assignment as interface 6. This file
+follows the minutes; which Int number applies is unverified (FLOW-FMS-D365 diagram to be checked).
 
 ## Proposed outcome
 Every Work Pack is created with estimated man hours per phase, passes a release check, is signed off,
-scheduled once, printed, and assigned to individual Workers; every assigned Worker has a Project Hour
+scheduled once (no rescheduling: D27, FRD-7 §7.5.5 and §7.6), printed, and assigned to individual Workers; every assigned Worker has a Project Hour
 Journal Line and a Digital Time sheet, so hours can later be booked per Worker (Epic 2).
 
 ## Affected users
@@ -35,7 +41,7 @@ Supervisor, Production / Workpack Owner. Each uses a React portal for their own 
   source says otherwise.
 - Synthetic data only; codename STAR; no business rule without a source (otherwise ASSUMPTION).
 - Every field has exactly one SOR.
-- Business dates in Asia/Riyadh; timestamps in UTC.
+- Business dates in Asia/Riyadh; timestamps in UTC (D28, 09 S9).
 - Architecture decisions in 09 (LOCKED 27 Oct 2026) are inputs, not open points.
 
 ## Out of scope

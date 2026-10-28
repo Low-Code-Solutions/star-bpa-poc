@@ -5,7 +5,8 @@
 - Deciders: Ahsan (Build Lead), Usama (Lead Developer)
 - Informed: Faraz (Product Owner), Khitaba (BA)
 - Jira: BPA-27, BPA-28
-- Amends: 09-architecture-decisions L1 (repo layout); replaces L14 (plan.md handling)
+- Amends: 09-architecture-decisions L1 (repo layout); replaces the plan.md sentence of L14 (the rest
+  of L14, `.mcp.json` with per-developer OAuth and the `qa-reviewer` subagent, stands)
 
 ## Context
 
@@ -52,12 +53,16 @@ Plan lifecycle:
 1. Made in plan mode at the start of the item, before code.
 2. The approved plan is the first commit on the branch (or, where a session hook forces an earlier
    commit, committed as `Status: Draft` and approved in the next commit).
-3. Updated in the same commit as any departure from it.
-4. Set to `Status: Closed` before the PR is approved; never deleted.
+3. Updated in the same commit as any departure from it, including review fixes.
+4. Set to `Status: Closed` in the final commit, after review fixes and before merge; never deleted.
 5. Subtasks are sections inside the parent's plan.
 
+Delivery epics have `intent.md` and `spec.md`. Setup epics (such as BPA-17 Claude setup) may hold
+plans only.
+
 Precedence when sources disagree: Jira story → story plan → epic spec.md → ADRs and 09. Claude Code
-reads only the plan matching the branch key; Closed plans are history, not instructions.
+reads only the plan matching the branch key; closed plans of other items are history, not
+instructions.
 
 Source of truth per artifact:
 
@@ -67,7 +72,9 @@ Source of truth per artifact:
 - SharePoint: signed FRDs and workshop minutes, cited by source-register key only.
 
 The repo becoming master for design artifacts is pending the Product Owner's sign-off; until then
-CLAUDE.md records it as the working rule.
+CLAUDE.md records it as the working rule. Interim exception: 09, the data model and 03-sor-matrix
+stay mastered in the Claude Project until the repo-restructure work copies them in, because the repo
+has no copy (09, data model) or an outdated one (03).
 
 ## Consequences
 

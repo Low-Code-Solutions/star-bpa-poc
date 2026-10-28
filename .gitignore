@@ -11,3 +11,7 @@ backend/exchange/**/*
 !backend/exchange/**/.gitkeep
 
 .DS_Store
+
+# Claude Code worktrees and personal settings (shared settings are .claude/settings.json)
+.claude/worktrees/
+.claude/settings.local.json
