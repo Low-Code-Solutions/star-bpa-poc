@@ -2,7 +2,7 @@
 
 Jira: BPA-36 (Task, epic BPA-3)
 Story last updated: 2026-10-28T19:53:17.498+0400
-Status: Approved (Ahsan, 2026-10-28 21:55 PKT, in the claude.ai session)
+Status: Closed (2026-10-28)
 Approver: Ahsan (Build Lead)
 Branch: BPA-36-commit-epic1-models, from main ff4ea65
 
@@ -107,3 +107,5 @@ reviewed in Modeler (S13), so this goes to the next model change.
   is being followed; tooling built meanwhile.
 - 28 Oct: Ahsan's commit of the model files did not reach GitHub (not pushed); Claude used the SharePoint
   route instead. The connector cannot read model file types; worked around with temporary .txt copies.
+- 28 Oct: PR #7 reviewed and accepted by Ahsan in chat (22:30 PKT); plan closed before merge; merge left to Ahsan
+  per CLAUDE.md.
