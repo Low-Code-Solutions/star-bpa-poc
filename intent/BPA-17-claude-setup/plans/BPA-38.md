@@ -22,8 +22,8 @@ Branch: BPA-38-harness-protect-main, from main 04ed323
 - **Deny rules** in `.claude/settings.json` `permissions.deny` (first line, cheap):
   `Bash(git push * main)`, `Bash(git push * main *)`, `Bash(git push *:main)`,
   `Bash(git push *:main *)`, `Bash(git push --force*)`, `Bash(git push * --force*)`,
-  `Bash(git push -f*)`, `Bash(git push * -f*)` (eight; amended in build from six, to cover a
-  trailing option and any `<src>:main`).
+  `Bash(git push -f*)`, `Bash(git push * -f*)`, plus `*:refs/heads/main` and `*:refs/heads/main *`
+  (ten; amended in build from six, to cover a trailing option and any `<src>:main` form).
   The docs confirm deny rules apply to chained commands (`&&`, `;`, subshells) and to subagents.
 - **A guard hook** `.claude/hooks/git-guard.sh` (PreToolUse on Bash; exit 2 blocks and tells
   Claude why). It normalises `git -C <dir>` and `git -c k=v` forms, then blocks:
@@ -33,7 +33,8 @@ Branch: BPA-38-harness-protect-main, from main 04ed323
   - force pushes (`--force`, `-f`, `--force-with-lease`, `+refspec`);
   Rules for main and force pushes apply to this repository and its worktrees only (same git common
   dir as `$CLAUDE_PROJECT_DIR`), so scratch repos elsewhere are not affected (amended in build).
-  - any git write (commit, push, merge, rebase, reset, checkout, switch, cherry-pick, tag) when the
+  - any git command outside a read-only allowlist (status, diff, log, show, rev-parse, and the
+    read forms of branch, tag, config, stash, remote, worktree, notes, reflog) when the
     call comes from the `qa-reviewer` subagent (hook input carries `agent_type`), which makes the
     agent's read-only promise enforced rather than prose (closes the BPA-31 note).
   Limits, stated in CLAUDE.md: guards Claude Code sessions only; not a person's own terminal;
@@ -57,7 +58,7 @@ The warning is visible on the PR before merge, which is where the BPA-27 and BPA
 
 | File | Change |
 |---|---|
-| .claude/settings.json | Add `permissions.deny` (eight rules above) and a PreToolUse Bash hook for git-guard.sh (same missing-file guard as the existing hooks) |
+| .claude/settings.json | Add `permissions.deny` (ten rules above) and a PreToolUse Bash hook for git-guard.sh (same missing-file guard as the existing hooks) |
 | .claude/hooks/git-guard.sh | New: the guard hook above (POSIX sh, portable sed/grep like the others) |
 | .claude/hooks/test-hooks.sh | Extend: git-guard cases (commit on main blocked / on branch allowed; push to main in 5 forms blocked; force push in 4 forms blocked; normal branch push allowed; `git -C` form; chained command; qa-reviewer write blocked, read allowed; non-git command ignored) |
 | .mcp.json | New: Atlassian remote MCP server `atlassian`, HTTP, no secrets |
@@ -83,18 +84,44 @@ Not changed: `docs/adr/README.md` (avoids conflicts with BPA-37, which may run i
 
 ## Risks
 - A guard blocks legitimate work. Mitigation: only `main` targets, force pushes and qa-reviewer
-  writes are blocked; tests cover allowed cases; messages say how to proceed.
+  writes are blocked; quoted text and heredoc bodies (commit messages) are treated as data; tests
+  cover allowed cases; messages say how to proceed.
+- Fail closed (amended in review): a `cd`/`-C`/`--git-dir` target the hook cannot resolve counts as
+  this repository, so `cd "$(…)" && git push origin main` is blocked. Side effect: a commit on main
+  in a repository created earlier in the same command is blocked too; run it as a separate command.
+- Text matching has limits: git aliases, scripts that run git, and environment set in an earlier
+  command are not seen. Stated in CLAUDE.md; GitHub branch protection remains the real control.
 - Deny-rule patterns mis-match. Mitigation: the hook is the real check and is tested; deny rules are
   a cheap first layer. Patterns avoid the trailing `:*` form, which the docs treat as prefix syntax.
 - `.mcp.json` approval prompt surprises developers. Mitigation: CLAUDE.md and the PR explain it.
 - The Atlassian endpoint changes. Mitigation: one line in `.mcp.json`; `/sse` is still served.
 
 ## Proof
-- `sh .claude/hooks/test-hooks.sh` and `bash` the same: all pass (25 existing plus new cases).
-- `sh .github/scripts/test-plan-check.sh`: all pass.
+- `sh .claude/hooks/test-hooks.sh` and `bash` the same: all pass (120: 25 existing plus 95 new).
+- `sh .github/scripts/test-plan-check.sh`: all pass (13).
 - `.claude/settings.json` and `.mcp.json` are valid JSON.
 - The plan-check workflow runs on this PR (warning while Approved, pass after Closed).
 - Not provable here: OAuth sign-in to the Atlassian server (each developer, human step).
+
+## Review (qa-reviewer, 28 Oct 2026, at 1660ab3)
+7 Important, 5 Nits. All Important fixed in git-guard.sh with a test per bypass or false block
+(81 → 120 hook tests):
+1. Other spellings of main (`heads/main`, `@`, wildcard refspecs, `main>/dev/null`, `ma\in`): fixed.
+2. git after wrappers (`if`, `timeout`, `env -i`, `bash -c`, `eval`, `\git`): git is now found after
+   any leading words; `sh -c`/`bash -c`/`eval` scripts are checked as commands. Fixed.
+3. Backslash-newline continuation split one command in two: fixed.
+4. Unresolved directories failed open: now fail closed; `$CLAUDE_PROJECT_DIR`, `$PWD`, `GIT_DIR=`,
+   `--git-dir` resolved. Fixed.
+5. `-c remote.*`/`push.*`/`branch.*` on a push: blocked. Fixed.
+6. qa-reviewer denylist missed writes (fetch, bisect, symbolic-ref, reflog expire, …): replaced by
+   an allowlist. Fixed.
+7. False blocks (checkout main -- file, switch --detach, heredoc or parenthesised commit messages,
+   worktree list, notes show): fixed.
+Nits: backticks inside `$( )` (fixed); `-o<value>` read as -f (fixed); deny rules gained the
+`refs/heads/main` forms (`-uf` left to the hook: a `-*f*` pattern would also deny `-u origin feature`);
+plan-check now checks a bare `BPA-<n>` branch (fixed, 2 tests; `**Status:**` not supported, docs/04
+fixes the header as `Status:`); Jira BPA-38 Development panel shows an older merged PR, to check when
+linking this PR.
 
 ## Questions
 - None blocking. Note for Faraz: the L13 limit stays (no protection against a person pushing

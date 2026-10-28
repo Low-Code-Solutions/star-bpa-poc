@@ -28,6 +28,8 @@ run "BPA-55-status-in-body";     check "$rc" 0 "$out" "has no Status line" "Stat
 plan BPA-17-claude-setup BPA-56 "Draft"; plan BPA-3-work-pack-assignment BPA-56 "Draft"
 run "BPA-56-two-plans";          check "$rc" 1 "$out" "more than one plan for BPA-56" "two plans for one key -> fail"
 run "BPA-5-x";                   check "$rc" 1 "$out" "no plan for BPA-5\\." "BPA-5 does not match BPA-51's plan"
+run "BPA-50";                  check "$rc" 1 "$out" "no plan for BPA-50" "bare key branch BPA-50 -> checked, fail"
+run "BPA-501x-y";               check "$rc" 0 "$out" "::notice::" "BPA-501x-y is not a key -> notice"
 run "feature-unkeyed";           check "$rc" 0 "$out" "::notice::" "unkeyed branch -> notice, pass"
 run "";                          check "$rc" 0 "$out" "::notice::" "no branch given -> notice, pass"
 run "bpa-51-lowercase";          check "$rc" 0 "$out" "::notice::" "lowercase key is not a key -> notice"

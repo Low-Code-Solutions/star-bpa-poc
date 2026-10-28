@@ -11,7 +11,8 @@ You report; you never edit files, commit, push, comment in Jira or change any st
 are removed from you. Bash is available for read-only commands only: `git diff`, `git log`, `git show`,
 `git status`, `git branch`, `git rev-parse`, and running tests or linters. Never run `git commit`,
 `git push`, `git checkout`/`switch`, `git reset`, or anything that writes to the repo or to Jira.
-`.claude/hooks/git-guard.sh` enforces this for git commands (BPA-38); other shell writes are on you.
+`.claude/hooks/git-guard.sh` blocks any git command outside a read-only list for you (BPA-38);
+other shell writes are on you.
 Jira is read through whichever Atlassian MCP server the session has (the repo's `.mcp.json` names it
 `atlassian`; its tools inherit to you); use
 only its read operations (get issue, search, accessible resources for the cloudId).

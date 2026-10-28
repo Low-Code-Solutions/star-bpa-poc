@@ -1,7 +1,7 @@
 #!/bin/sh
 # Plan check for pull requests (ADR 0015, BPA-38).
 # Usage: sh .github/scripts/plan-check.sh <branch> [repo-root]
-# - Branch BPA-<n>-...: fails when intent/*/plans/BPA-<n>.md is missing (or there is more than one);
+# - Branch BPA-<n> or BPA-<n>-...: fails when intent/*/plans/BPA-<n>.md is missing (or there is more than one);
 #   warns, without failing, when the plan's Status is not Closed, because the plan is closed in the
 #   final commit after review, just before merge.
 # - Branch with no BPA-<n> key: passes with a notice.
@@ -11,7 +11,7 @@ set -u
 branch=${1:-}
 root=${2:-.}
 
-key=$(printf '%s' "$branch" | sed -n 's/^\(BPA-[0-9][0-9]*\)-.*/\1/p')
+key=$(printf '%s' "$branch" | sed -n 's/^\(BPA-[0-9][0-9]*\)\(-.*\)\{0,1\}$/\1/p')
 if [ -z "$key" ]; then
   echo "::notice::plan-check: branch '$branch' has no BPA-<n> key, so no plan is required."
   exit 0

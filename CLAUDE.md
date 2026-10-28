@@ -72,9 +72,10 @@ docs/09. Report the disagreement; do not resolve it silently.
 ## Branches and pull requests
 - Never commit or push to main. All changes go through a pull request.
 - Guards (09 L13, BPA-38): deny rules in `.claude/settings.json` and `.claude/hooks/git-guard.sh`
-  block commits on main, pushes to main and force pushes in this repo, and any git write by
-  `qa-reviewer`. They cover Claude Code sessions only, not a person's own terminal, and are not a
-  security boundary. Never work round a block; tell the developer.
+  block commits on main, pushes to main and force pushes in this repo, and any git command
+  outside a read-only list for `qa-reviewer`. They cover Claude Code sessions only (not a person's
+  terminal, git aliases or scripts that run git) and are not a security boundary. Never work
+  round a block; tell the developer.
 - CI `Plan check` fails a `BPA-<n>-…` PR with no plan and warns while the plan is not Closed.
 - Start every item from the latest main: `git switch main && git pull`,
   then create the branch. If a branch for the key already exists, use it.
