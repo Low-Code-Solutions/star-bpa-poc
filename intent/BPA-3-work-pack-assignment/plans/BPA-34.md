@@ -85,3 +85,5 @@ any content.
 ## Human-gap log
 - 28 Oct: layout option (a) chosen by Ahsan in chat (no `infra/`, no `microservices/`).
 - 28 Oct: plan approved and Q2 answered by Ahsan in chat (20:58 PKT).
+- 28 Oct: the plan was committed as Draft (3dbd317) before approval because the session's stop hook
+  requires the work of each turn to be committed and pushed; approval recorded in 1994bf8.
