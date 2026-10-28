@@ -2,7 +2,7 @@
 
 Jira: BPA-35 (Task, epic BPA-3)
 Story last updated: 2026-10-28T20:08:53.772+0400
-Status: Draft (awaiting approval by Ahsan)
+Status: Approved (Ahsan, 2026-10-28 21:13 PKT, in the claude.ai session)
 Approver: Ahsan (Build Lead)
 Branch: BPA-35-copy-design-docs, from main 5b446a9
 
@@ -72,8 +72,10 @@ listed in the PR. 09 is verbatim (L17). Every other difference from the source i
   (a) Recommended: you download `claude/11-data-model.md` and `claude/09-architecture-decisions-2026-10-27.md`
   from the Claude Project and attach them in chat; I commit the exact bytes (plus the listed edits).
   (b) I retype both from the Project text and verify by structure and byte counts. Slower and riskier.
+  Resolved 28 Oct: option (a); Ahsan attaches both files.
 - Q2 (non-blocking): the Project has two `00-context.md` docs. After merge, delete the older one
   (only a Project owner can).
 
 ## Human-gap log
 - 28 Oct: no tool moves a file from the Claude Project into the repo; Q1 asks a human to bridge it.
+- 28 Oct: plan approved by Ahsan in chat (21:13 PKT); he downloads and attaches the two large files (Q1 a).
