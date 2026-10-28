@@ -32,7 +32,8 @@ From the BPA-3 epic (proposed sprints), 08 Gate 5 (Ready order) and 09 §4 (foll
 Items marked PROPOSED are delivery sequencing by Claude, not business rules; the team may reorder.
 
 **Before any story (repo readiness, BPA-3 DoR row "Repo readiness")**
-1. Repo restructure to 09 L1 plus the `infra/` amendment; docs copies (00, 03, 09, data model);
+1. Repo restructure to 09 L1 as written (WireMock mocks and the Postgres init stay under `backend/`;
+   decided by Ahsan, 28 Oct 2026); docs copies (00, 03, 09, data model);
    models into `models/`; ADRs 0001–0014.
 2. Data model approved (BA checks SORs; PO and build team approve) → full `V1__baseline_schema.sql`
    and `R__seed_reference_data.sql` (S17, L5, L11).
