@@ -29,9 +29,13 @@ before merge (CLAUDE.md) or gitignored (09 L14), so the audit trail and the
 | docs/04-conventions.md | BPA-30 | intent/ and plans/ naming; plan header fields |
 | REVIEW.md | BPA-31 | New: bugs, security, compliance passes; Important vs Nit; skips |
 | .claude/agents/qa-reviewer.md | BPA-31 | New: read-only reviewer subagent |
-| .claude/settings.json | BPA-32 | New: PreToolUse (Edit/Write) and PreToolUse (Bash git commit) hooks |
+| .claude/settings.json | BPA-32 | New: PreToolUse (Edit/Write/MultiEdit/NotebookEdit) and PostToolUse (Bash) hooks |
 | .claude/hooks/require-plan.sh | BPA-32 | New: block edits outside intent/ and docs/ until the branch's plan exists |
-| .claude/hooks/plan-sync-check.sh | BPA-32 | New: warn when a commit stages code but not the plan |
+| .claude/hooks/plan-sync-check.sh | BPA-32 | New: after a commit, warn when it changed build files but not the plan |
+
+Departure (BPA-32, recorded in the same commit): the commit check runs as PostToolUse on the
+finished commit, not PreToolUse. Claude usually runs `git add … && git commit` as one command, so
+nothing is staged when PreToolUse fires. A post-commit warning still lets Claude amend the commit.
 | intent/README.md | BPA-33 | New: generated, non-authoritative index |
 | intent/BPA-3-work-pack-assignment/intent.md | BPA-33 | New: from 00-context and the BPA-3 epic |
 | intent/BPA-3-work-pack-assignment/spec.md | BPA-33 | New: links to 07, 09, ADRs, data model; Delivery order section |
@@ -64,7 +68,7 @@ L13 deny rules (BPA-18 harness work).
 
 ## Proof
 - Hooks: scripted test runs on throwaway branches (BPA-999-test with and without a plan,
-  main, an unkeyed branch), output pasted in the PR.
+  main, an unkeyed branch), output pasted in the PR. Done 28 Oct: 17 passed, 0 failed.
 - qa-reviewer: run once against this branch's diff; findings pasted in the PR.
 - Docs: checked by a fresh read that no personal names, client names or signed-document IDs appear.
 - No application code changes, so no unit tests apply.
