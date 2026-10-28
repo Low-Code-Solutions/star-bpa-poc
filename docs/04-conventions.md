@@ -30,6 +30,22 @@ Project and Claude Code use identical names.
 - Paths: /api/v1/<plural-resource>, kebab-case
 - JSON fields: camelCase
 
+## Delivery artifacts (ADR 0015)
+- Epic folder: intent/<EPIC-KEY>-<kebab-epic-name>/, e.g. intent/BPA-3-work-pack-assignment/
+- Epic files: intent.md (problem, outcome, actors, constraints, open questions) and
+  spec.md (design links, shared contracts, Delivery order)
+- Plans: intent/<EPIC-KEY>-<kebab>/plans/BPA-<n>.md, one per story or repo-changing Task
+- Plan header (first lines, in this order):
+  - `# Plan: BPA-<n> <Jira summary>`
+  - `Jira: BPA-<n> (<type>, epic <EPIC-KEY>)`
+  - `Story last updated: <Jira updated timestamp>`
+  - `Status: Draft | Approved (<who>, <when>) | Closed (<date>)`
+  - `Approver: <name and role>`
+  - `Branch: <branch>, from main <sha>`
+- Plan sections: Readiness check; Files that change; Order of work; Scenario-to-test table
+  (stories); Risks; Proof; Questions; Human-gap log
+- intent/README.md is generated and non-authoritative; never edit it by hand
+
 ## Tests
 - One test per Gherkin scenario, named after the story key and scenario,
   e.g. BPA14_validNearMissStartsIncidentProcess

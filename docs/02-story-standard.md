@@ -1,7 +1,7 @@
 # 02 Story standard: STAR BPA POC
 
-Status: AGREED v0.1. Owner: Khitaba. Every story follows this template so Claude Code can turn each
-Gherkin scenario into an automated test.
+Status: AGREED v0.1; v0.2 PROPOSED (BPA-30, ADR 0015), pending the owner's sign-off. Owner: Khitaba.
+Every story follows this template so Claude Code can turn each Gherkin scenario into an automated test.
 
 ## Jira mapping (space BPA)
 | Template part | Jira field |
@@ -57,6 +57,8 @@ Estimate: 3
 - DMN tables are complete (all inputs, outputs and hit policy)
 - No open question or contradiction blocks the story
 - Estimated at 8 points or fewer
+- The epic's `intent.md` and `spec.md` are accepted by the Product Owner (from 28 Oct 2026; stories
+  already Ready on that date are not moved back)
 - Product Owner (Faraz) has approved it
 
 ## Definition of Done
@@ -65,6 +67,7 @@ Estimate: 3
 - Process runs end to end in the local Camunda stack
 - BPMN and DMN files in the repo match the deployed models
 - Claude Code's open questions for the story are resolved or logged as new stories
+- The story's plan matches the merged diff and is marked `Status: Closed`
 - Demoed at sprint review
 
 ## Workflow
