@@ -1,0 +1,610 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_WorkPackAssignment" targetNamespace="http://lowcodesol.com/star-bpa-poc" exporter="LCS generator (Claude)" exporterVersion="0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.1">
+  <bpmn:collaboration id="Collaboration_WorkPackAssignment">
+    <bpmn:participant id="Participant_PPC_WorkPackAssignment" name="Work Pack Assignment (Epic 1)" processRef="Process_PPC_WorkPackAssignment" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_PPC_WorkPackAssignment" name="Work Pack Assignment" isExecutable="true">
+    <bpmn:laneSet id="LaneSet_WorkPackAssignment">
+      <bpmn:lane id="Lane_TimeMethodAnalyst" name="Time &amp; Method Analyst">
+        <bpmn:flowNodeRef>StartEvent_WorkPackRequested</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_MergeCreate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_CreateWorkPack</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_MergeConfirm</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_ConfirmWorkPack</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_ProjectEngineer" name="Project Engineer">
+        <bpmn:flowNodeRef>UserTask_SignOffRelease</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_ProductionPlanner" name="Production Planner">
+        <bpmn:flowNodeRef>Gateway_MergeSchedule</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_ScheduleWorkPack</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_ProductionTeam" name="Production Team">
+        <bpmn:flowNodeRef>Gateway_MergeAssignment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>IntermediateCatchEvent_AssignmentFileReceived</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_System" name="System (POC workers)">
+        <bpmn:flowNodeRef>ServiceTask_SaveWorkPack</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_CreateHourJournalHeader</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_SaveWorkPackCorrections</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_UpdateHourJournalHeader</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_EvaluateReleaseInputs</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BusinessRuleTask_ReleaseCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_IsReleaseReady</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_RecordSignOff</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_IsSignOffApproved</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_SaveWorkPackSchedule</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_GenerateWorkPackPrint</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_ValidateWorkerAssignment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_HasAssignedWorkers</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_CreateHourJournalLines</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_CreateDigitalTimesheets</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_WorkPackAssigned</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BoundaryEvent_WorkPackInvalid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BoundaryEvent_CorrectionInvalid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BoundaryEvent_ScheduleInvalid</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="StartEvent_WorkPackRequested" name="Work Pack requested">
+      <bpmn:documentation>Started by the Time &amp; Method Analyst from the portal through POST /api/v1/workpacks (S20, replaces the Tasklist start of D52). BPA-6.</bpmn:documentation>
+      <bpmn:outgoing>Flow_ToMergeCreate</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="Gateway_MergeCreate" name="">
+      <bpmn:documentation>Merge: first entry or corrected input after a validation error.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToMergeCreate</bpmn:incoming>
+      <bpmn:incoming>Flow_WorkPackInvalid</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToCreateWorkPack</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="UserTask_CreateWorkPack" name="Create Work Pack">
+      <bpmn:documentation>BPA-6. React screen (S14; lists fetched from the backend): activity (context panel D17), drawing, materials with phase (D16), man hours per phase (D14), department (D18), date to complete (D20). Shows validationMessages after a rejected save.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="time-method-analyst" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToCreateWorkPack</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToSaveWorkPack</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="ServiceTask_SaveWorkPack" name="Save Work Pack">
+      <bpmn:documentation>NEW (design pack N2). Worker save-workpack: server-side validation of D14/D16/D20, generates WP-###### (D15), status Draft. Outputs workpackId, workpackNumber. Throws WORKPACK_INVALID with validationMessages. BPA-6.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="save-workpack" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToSaveWorkPack</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToCreateHeader</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="ServiceTask_CreateHourJournalHeader" name="Create Project Hour Journal Header">
+      <bpmn:documentation>BPA-7. Upsert on workpack_id (idempotent).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="create-hour-journal-header" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToCreateHeader</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToMergeConfirm</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_MergeConfirm" name="">
+      <bpmn:documentation>Merge: first entry; release check Not ready (D2); Project Engineer declined (D3); correction rejected.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToMergeConfirm</bpmn:incoming>
+      <bpmn:incoming>Flow_CorrectionInvalid</bpmn:incoming>
+      <bpmn:incoming>Flow_ReleaseNotReady</bpmn:incoming>
+      <bpmn:incoming>Flow_SignOffDeclined</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToConfirmWorkPack</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="UserTask_ConfirmWorkPack" name="Confirm Workpack">
+      <bpmn:documentation>BPA-8, BPA-23. React screen (S14): editable Draft fields (D21) plus confirmMessage (release reason or decline reason) and validationMessages.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="time-method-analyst" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToConfirmWorkPack</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToSaveCorrections</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="ServiceTask_SaveWorkPackCorrections" name="Save corrections">
+      <bpmn:documentation>NEW (design pack N3). Same worker type as ServiceTask_SaveWorkPack; audits old/new values (FRD-7 §7.3.3). Throws WORKPACK_INVALID. BPA-23.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="save-workpack" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToSaveCorrections</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToUpdateHeader</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="ServiceTask_UpdateHourJournalHeader" name="Update Project Hour Journal Header">
+      <bpmn:documentation>NEW ID (design pack N4); same worker as ServiceTask_CreateHourJournalHeader (upsert). BPA-7 'Header follows corrections'.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="create-hour-journal-header" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToUpdateHeader</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEvaluate</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="ServiceTask_EvaluateReleaseInputs" name="Evaluate release inputs">
+      <bpmn:documentation>BPA-8, D24. Outputs materialsReserved, drawingApproved (D1, D10).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="evaluate-release-inputs" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToEvaluate</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToReleaseCheck</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:businessRuleTask id="BusinessRuleTask_ReleaseCheck" name="Release check">
+      <bpmn:documentation>BPA-8. Decision_WorkpackReleaseCheck (FIRST). confirmMessage = releaseReason.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:calledDecision decisionId="Decision_WorkpackReleaseCheck" resultVariable="releaseCheck" />
+        <zeebe:ioMapping>
+          <zeebe:output source="=releaseCheck.releaseResult" target="releaseResult" />
+          <zeebe:output source="=releaseCheck.releaseReason" target="confirmMessage" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToReleaseCheck</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToIsReleaseReady</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="Gateway_IsReleaseReady" name="Release ready?" default="Flow_ReleaseNotReady">
+      <bpmn:documentation>BPA-8.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToIsReleaseReady</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReleaseReady</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ReleaseNotReady</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="UserTask_SignOffRelease" name="Sign off release">
+      <bpmn:documentation>BPA-9. React screen (S14): signOffDecision Approved/Declined; declineReason required when Declined (D3), re-checked by the backend.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="project-engineer" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ReleaseReady</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRecordSignOff</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="ServiceTask_RecordSignOff" name="Record sign-off">
+      <bpmn:documentation>NEW (design pack N5). Writes release_signoff. Approved: workpack Released, Header locked (D8). Declined: confirmMessage = 'Declined by Project Engineer: &lt;reason&gt;'. BPA-9.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="record-release-signoff" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToRecordSignOff</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToIsSignOffApproved</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_IsSignOffApproved" name="Signed off?" default="Flow_SignOffDeclined">
+      <bpmn:documentation>BPA-9.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToIsSignOffApproved</bpmn:incoming>
+      <bpmn:outgoing>Flow_SignOffApproved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_SignOffDeclined</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gateway_MergeSchedule" name="">
+      <bpmn:documentation>Merge: first entry or rejected schedule.</bpmn:documentation>
+      <bpmn:incoming>Flow_SignOffApproved</bpmn:incoming>
+      <bpmn:incoming>Flow_ScheduleInvalid</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToScheduleWorkPack</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="UserTask_ScheduleWorkPack" name="Schedule Work Pack">
+      <bpmn:documentation>BPA-11. React screen (S14): Look-Ahead dates read-only from GET workpacks/{n}/look-ahead (D48), planned start/end, late-end notice (D26). Scheduled once (D27).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="production-planner" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToScheduleWorkPack</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToSaveSchedule</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="ServiceTask_SaveWorkPackSchedule" name="Save schedule">
+      <bpmn:documentation>NEW (design pack N6). Validates lead time (D9, D28) and end &gt;= start; writes workpack_schedule. Throws SCHEDULE_INVALID. BPA-11.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="save-workpack-schedule" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToSaveSchedule</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToGeneratePrint</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="ServiceTask_GenerateWorkPackPrint" name="Generate Workpack print">
+      <bpmn:documentation>BPA-10, D4, D29, D30, S1. Idempotent on workpack_id. Sets workpack.assignment_state = AwaitingFile (D50, G7).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generate-workpack-print" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToGeneratePrint</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToMergeAssignment</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_MergeAssignment" name="">
+      <bpmn:documentation>Merge: first entry or every row rejected (D5).</bpmn:documentation>
+      <bpmn:incoming>Flow_ToMergeAssignment</bpmn:incoming>
+      <bpmn:incoming>Flow_NoWorkerAssigned</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToAssignmentFileReceived</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="IntermediateCatchEvent_AssignmentFileReceived" name="Assignment file received">
+      <bpmn:documentation>BPA-12. Message AssignmentFileReceived, correlation key workpackNumber, TTL 0 (D62; replaces PT1H of D31/D50). Published by the assignment upload endpoint POST /api/v1/assignment-files (D58) only when assignment_state is AwaitingFile (D50). Message ID sha256:workpackNumber (G10). Carries assignmentFileId.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToAssignmentFileReceived</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToValidateAssignment</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_AssignmentFileReceived" messageRef="Message_AssignmentFileReceived" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="ServiceTask_ValidateWorkerAssignment" name="Validate and save assignment rows">
+      <bpmn:documentation>BPA-22. Row checks (D14, D32, C11); writes worker_assignment and row outcomes; outputs assignedWorkerCount. Sets assignment_state = Assigning when at least one row is accepted, back to AwaitingFile when every row is rejected (D61).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="validate-worker-assignment" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToValidateAssignment</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToHasAssignedWorkers</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_HasAssignedWorkers" name="Any Worker assigned?" default="Flow_NoWorkerAssigned">
+      <bpmn:documentation>D5: if every row is rejected, wait for a corrected file (assignment_state back to AwaitingFile, D61).</bpmn:documentation>
+      <bpmn:incoming>Flow_ToHasAssignedWorkers</bpmn:incoming>
+      <bpmn:outgoing>Flow_WorkersAssigned</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NoWorkerAssigned</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="ServiceTask_CreateHourJournalLines" name="Create Project Hour Journal Lines">
+      <bpmn:documentation>BPA-14. Idempotent: unique(header_id, worker_id).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="create-hour-journal-lines" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_WorkersAssigned</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToCreateTimesheets</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="ServiceTask_CreateDigitalTimesheets" name="Create Digital Time sheets">
+      <bpmn:documentation>BPA-15. Idempotent: unique(worker_id, workpack_id). D40. Sets workpack.assignment_state = Assigned (G7).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="create-digital-timesheets" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToCreateTimesheets</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEnd</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="EndEvent_WorkPackAssigned" name="Work Pack assigned">
+      <bpmn:documentation>BPA-15. Replacement (BPA-13) and Epic 2 (BPA-4) start only after this (D37).</bpmn:documentation>
+      <bpmn:incoming>Flow_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:boundaryEvent id="BoundaryEvent_WorkPackInvalid" name="Input invalid" attachedToRef="ServiceTask_SaveWorkPack">
+      <bpmn:documentation>WORKPACK_INVALID; variables validationMessages.</bpmn:documentation>
+      <bpmn:outgoing>Flow_WorkPackInvalid</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_WorkPackInvalid" errorRef="Error_WorkPackInvalid" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="BoundaryEvent_CorrectionInvalid" name="Correction invalid" attachedToRef="ServiceTask_SaveWorkPackCorrections">
+      <bpmn:documentation>WORKPACK_INVALID; variables validationMessages.</bpmn:documentation>
+      <bpmn:outgoing>Flow_CorrectionInvalid</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_CorrectionInvalid" errorRef="Error_WorkPackInvalid" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="BoundaryEvent_ScheduleInvalid" name="Schedule invalid" attachedToRef="ServiceTask_SaveWorkPackSchedule">
+      <bpmn:documentation>SCHEDULE_INVALID; variables validationMessages.</bpmn:documentation>
+      <bpmn:outgoing>Flow_ScheduleInvalid</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_ScheduleInvalid" errorRef="Error_ScheduleInvalid" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_ToMergeCreate" sourceRef="StartEvent_WorkPackRequested" targetRef="Gateway_MergeCreate" />
+    <bpmn:sequenceFlow id="Flow_ToCreateWorkPack" sourceRef="Gateway_MergeCreate" targetRef="UserTask_CreateWorkPack" />
+    <bpmn:sequenceFlow id="Flow_ToSaveWorkPack" sourceRef="UserTask_CreateWorkPack" targetRef="ServiceTask_SaveWorkPack" />
+    <bpmn:sequenceFlow id="Flow_ToCreateHeader" sourceRef="ServiceTask_SaveWorkPack" targetRef="ServiceTask_CreateHourJournalHeader" />
+    <bpmn:sequenceFlow id="Flow_ToMergeConfirm" sourceRef="ServiceTask_CreateHourJournalHeader" targetRef="Gateway_MergeConfirm" />
+    <bpmn:sequenceFlow id="Flow_ToConfirmWorkPack" sourceRef="Gateway_MergeConfirm" targetRef="UserTask_ConfirmWorkPack" />
+    <bpmn:sequenceFlow id="Flow_ToSaveCorrections" sourceRef="UserTask_ConfirmWorkPack" targetRef="ServiceTask_SaveWorkPackCorrections" />
+    <bpmn:sequenceFlow id="Flow_ToUpdateHeader" sourceRef="ServiceTask_SaveWorkPackCorrections" targetRef="ServiceTask_UpdateHourJournalHeader" />
+    <bpmn:sequenceFlow id="Flow_ToEvaluate" sourceRef="ServiceTask_UpdateHourJournalHeader" targetRef="ServiceTask_EvaluateReleaseInputs" />
+    <bpmn:sequenceFlow id="Flow_ToReleaseCheck" sourceRef="ServiceTask_EvaluateReleaseInputs" targetRef="BusinessRuleTask_ReleaseCheck" />
+    <bpmn:sequenceFlow id="Flow_ToIsReleaseReady" sourceRef="BusinessRuleTask_ReleaseCheck" targetRef="Gateway_IsReleaseReady" />
+    <bpmn:sequenceFlow id="Flow_ReleaseReady" name="Ready" sourceRef="Gateway_IsReleaseReady" targetRef="UserTask_SignOffRelease">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=releaseResult = &quot;Ready&quot;</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToRecordSignOff" sourceRef="UserTask_SignOffRelease" targetRef="ServiceTask_RecordSignOff" />
+    <bpmn:sequenceFlow id="Flow_ToIsSignOffApproved" sourceRef="ServiceTask_RecordSignOff" targetRef="Gateway_IsSignOffApproved" />
+    <bpmn:sequenceFlow id="Flow_SignOffApproved" name="Approved" sourceRef="Gateway_IsSignOffApproved" targetRef="Gateway_MergeSchedule">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=signOffDecision = &quot;Approved&quot;</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToScheduleWorkPack" sourceRef="Gateway_MergeSchedule" targetRef="UserTask_ScheduleWorkPack" />
+    <bpmn:sequenceFlow id="Flow_ToSaveSchedule" sourceRef="UserTask_ScheduleWorkPack" targetRef="ServiceTask_SaveWorkPackSchedule" />
+    <bpmn:sequenceFlow id="Flow_ToGeneratePrint" sourceRef="ServiceTask_SaveWorkPackSchedule" targetRef="ServiceTask_GenerateWorkPackPrint" />
+    <bpmn:sequenceFlow id="Flow_ToMergeAssignment" sourceRef="ServiceTask_GenerateWorkPackPrint" targetRef="Gateway_MergeAssignment" />
+    <bpmn:sequenceFlow id="Flow_ToAssignmentFileReceived" sourceRef="Gateway_MergeAssignment" targetRef="IntermediateCatchEvent_AssignmentFileReceived" />
+    <bpmn:sequenceFlow id="Flow_ToValidateAssignment" sourceRef="IntermediateCatchEvent_AssignmentFileReceived" targetRef="ServiceTask_ValidateWorkerAssignment" />
+    <bpmn:sequenceFlow id="Flow_ToHasAssignedWorkers" sourceRef="ServiceTask_ValidateWorkerAssignment" targetRef="Gateway_HasAssignedWorkers" />
+    <bpmn:sequenceFlow id="Flow_WorkersAssigned" name="Yes" sourceRef="Gateway_HasAssignedWorkers" targetRef="ServiceTask_CreateHourJournalLines">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=assignedWorkerCount &gt; 0</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToCreateTimesheets" sourceRef="ServiceTask_CreateHourJournalLines" targetRef="ServiceTask_CreateDigitalTimesheets" />
+    <bpmn:sequenceFlow id="Flow_ToEnd" sourceRef="ServiceTask_CreateDigitalTimesheets" targetRef="EndEvent_WorkPackAssigned" />
+    <bpmn:sequenceFlow id="Flow_WorkPackInvalid" sourceRef="BoundaryEvent_WorkPackInvalid" targetRef="Gateway_MergeCreate" />
+    <bpmn:sequenceFlow id="Flow_CorrectionInvalid" sourceRef="BoundaryEvent_CorrectionInvalid" targetRef="Gateway_MergeConfirm" />
+    <bpmn:sequenceFlow id="Flow_ReleaseNotReady" name="Not ready" sourceRef="Gateway_IsReleaseReady" targetRef="Gateway_MergeConfirm" />
+    <bpmn:sequenceFlow id="Flow_SignOffDeclined" name="Declined" sourceRef="Gateway_IsSignOffApproved" targetRef="Gateway_MergeConfirm" />
+    <bpmn:sequenceFlow id="Flow_ScheduleInvalid" sourceRef="BoundaryEvent_ScheduleInvalid" targetRef="Gateway_MergeSchedule" />
+    <bpmn:sequenceFlow id="Flow_NoWorkerAssigned" name="No" sourceRef="Gateway_HasAssignedWorkers" targetRef="Gateway_MergeAssignment" />
+  </bpmn:process>
+  <bpmn:message id="Message_AssignmentFileReceived" name="AssignmentFileReceived">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=workpackNumber" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:error id="Error_WorkPackInvalid" name="Work Pack input invalid" errorCode="WORKPACK_INVALID" />
+  <bpmn:error id="Error_ScheduleInvalid" name="Schedule input invalid" errorCode="SCHEDULE_INVALID" />
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Process_PPC_WorkPackAssignment">
+    <bpmndi:BPMNPlane id="BPMNPlane_Process_PPC_WorkPackAssignment" bpmnElement="Collaboration_WorkPackAssignment">
+      <bpmndi:BPMNShape id="Participant_Process_PPC_WorkPackAssignment_di" bpmnElement="Participant_PPC_WorkPackAssignment" isHorizontal="true">
+        <dc:Bounds x="160" y="60" width="3716" height="1150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_TimeMethodAnalyst_di" bpmnElement="Lane_TimeMethodAnalyst" isHorizontal="true">
+        <dc:Bounds x="190" y="60" width="3686" height="230" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ProjectEngineer_di" bpmnElement="Lane_ProjectEngineer" isHorizontal="true">
+        <dc:Bounds x="190" y="290" width="3686" height="230" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ProductionPlanner_di" bpmnElement="Lane_ProductionPlanner" isHorizontal="true">
+        <dc:Bounds x="190" y="520" width="3686" height="230" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ProductionTeam_di" bpmnElement="Lane_ProductionTeam" isHorizontal="true">
+        <dc:Bounds x="190" y="750" width="3686" height="230" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_System_di" bpmnElement="Lane_System" isHorizontal="true">
+        <dc:Bounds x="190" y="980" width="3686" height="230" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_WorkPackRequested_di" bpmnElement="StartEvent_WorkPackRequested">
+        <dc:Bounds x="242" y="157" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="210" y="198" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_MergeCreate_di" bpmnElement="Gateway_MergeCreate" isMarkerVisible="true">
+        <dc:Bounds x="375" y="150" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_CreateWorkPack_di" bpmnElement="UserTask_CreateWorkPack">
+        <dc:Bounds x="490" y="135" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_SaveWorkPack_di" bpmnElement="ServiceTask_SaveWorkPack">
+        <dc:Bounds x="630" y="1055" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_CreateHourJournalHeader_di" bpmnElement="ServiceTask_CreateHourJournalHeader">
+        <dc:Bounds x="770" y="1055" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_MergeConfirm_di" bpmnElement="Gateway_MergeConfirm" isMarkerVisible="true">
+        <dc:Bounds x="935" y="150" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_ConfirmWorkPack_di" bpmnElement="UserTask_ConfirmWorkPack">
+        <dc:Bounds x="1050" y="135" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_SaveWorkPackCorrections_di" bpmnElement="ServiceTask_SaveWorkPackCorrections">
+        <dc:Bounds x="1190" y="1055" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_UpdateHourJournalHeader_di" bpmnElement="ServiceTask_UpdateHourJournalHeader">
+        <dc:Bounds x="1330" y="1055" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_EvaluateReleaseInputs_di" bpmnElement="ServiceTask_EvaluateReleaseInputs">
+        <dc:Bounds x="1470" y="1055" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BusinessRuleTask_ReleaseCheck_di" bpmnElement="BusinessRuleTask_ReleaseCheck">
+        <dc:Bounds x="1610" y="1055" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_IsReleaseReady_di" bpmnElement="Gateway_IsReleaseReady" isMarkerVisible="true">
+        <dc:Bounds x="1775" y="1070" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1750" y="1038" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_SignOffRelease_di" bpmnElement="UserTask_SignOffRelease">
+        <dc:Bounds x="1890" y="365" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_RecordSignOff_di" bpmnElement="ServiceTask_RecordSignOff">
+        <dc:Bounds x="2030" y="1055" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_IsSignOffApproved_di" bpmnElement="Gateway_IsSignOffApproved" isMarkerVisible="true">
+        <dc:Bounds x="2195" y="1070" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2170" y="1038" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_MergeSchedule_di" bpmnElement="Gateway_MergeSchedule" isMarkerVisible="true">
+        <dc:Bounds x="2335" y="610" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_ScheduleWorkPack_di" bpmnElement="UserTask_ScheduleWorkPack">
+        <dc:Bounds x="2450" y="595" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_SaveWorkPackSchedule_di" bpmnElement="ServiceTask_SaveWorkPackSchedule">
+        <dc:Bounds x="2590" y="1055" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_GenerateWorkPackPrint_di" bpmnElement="ServiceTask_GenerateWorkPackPrint">
+        <dc:Bounds x="2730" y="1055" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_MergeAssignment_di" bpmnElement="Gateway_MergeAssignment" isMarkerVisible="true">
+        <dc:Bounds x="2895" y="840" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="IntermediateCatchEvent_AssignmentFileReceived_di" bpmnElement="IntermediateCatchEvent_AssignmentFileReceived">
+        <dc:Bounds x="3042" y="847" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3010" y="888" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_ValidateWorkerAssignment_di" bpmnElement="ServiceTask_ValidateWorkerAssignment">
+        <dc:Bounds x="3150" y="1055" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_HasAssignedWorkers_di" bpmnElement="Gateway_HasAssignedWorkers" isMarkerVisible="true">
+        <dc:Bounds x="3315" y="1070" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3290" y="1038" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_CreateHourJournalLines_di" bpmnElement="ServiceTask_CreateHourJournalLines">
+        <dc:Bounds x="3430" y="1055" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_CreateDigitalTimesheets_di" bpmnElement="ServiceTask_CreateDigitalTimesheets">
+        <dc:Bounds x="3570" y="1055" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_WorkPackAssigned_di" bpmnElement="EndEvent_WorkPackAssigned">
+        <dc:Bounds x="3742" y="1077" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3710" y="1118" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BoundaryEvent_WorkPackInvalid_di" bpmnElement="BoundaryEvent_WorkPackInvalid">
+        <dc:Bounds x="662" y="1117" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="630" y="1158" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BoundaryEvent_CorrectionInvalid_di" bpmnElement="BoundaryEvent_CorrectionInvalid">
+        <dc:Bounds x="1222" y="1117" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1190" y="1158" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BoundaryEvent_ScheduleInvalid_di" bpmnElement="BoundaryEvent_ScheduleInvalid">
+        <dc:Bounds x="2622" y="1117" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2590" y="1158" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_ToMergeCreate_di" bpmnElement="Flow_ToMergeCreate">
+        <di:waypoint x="278" y="175" />
+        <di:waypoint x="375" y="175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToCreateWorkPack_di" bpmnElement="Flow_ToCreateWorkPack">
+        <di:waypoint x="425" y="175" />
+        <di:waypoint x="490" y="175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToSaveWorkPack_di" bpmnElement="Flow_ToSaveWorkPack">
+        <di:waypoint x="590" y="175" />
+        <di:waypoint x="610" y="175" />
+        <di:waypoint x="610" y="1095" />
+        <di:waypoint x="630" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToCreateHeader_di" bpmnElement="Flow_ToCreateHeader">
+        <di:waypoint x="730" y="1095" />
+        <di:waypoint x="770" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToMergeConfirm_di" bpmnElement="Flow_ToMergeConfirm">
+        <di:waypoint x="870" y="1095" />
+        <di:waypoint x="902" y="1095" />
+        <di:waypoint x="902" y="175" />
+        <di:waypoint x="935" y="175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToConfirmWorkPack_di" bpmnElement="Flow_ToConfirmWorkPack">
+        <di:waypoint x="985" y="175" />
+        <di:waypoint x="1050" y="175" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToSaveCorrections_di" bpmnElement="Flow_ToSaveCorrections">
+        <di:waypoint x="1150" y="175" />
+        <di:waypoint x="1170" y="175" />
+        <di:waypoint x="1170" y="1095" />
+        <di:waypoint x="1190" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToUpdateHeader_di" bpmnElement="Flow_ToUpdateHeader">
+        <di:waypoint x="1290" y="1095" />
+        <di:waypoint x="1330" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToEvaluate_di" bpmnElement="Flow_ToEvaluate">
+        <di:waypoint x="1430" y="1095" />
+        <di:waypoint x="1470" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToReleaseCheck_di" bpmnElement="Flow_ToReleaseCheck">
+        <di:waypoint x="1570" y="1095" />
+        <di:waypoint x="1610" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToIsReleaseReady_di" bpmnElement="Flow_ToIsReleaseReady">
+        <di:waypoint x="1710" y="1095" />
+        <di:waypoint x="1775" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReleaseReady_di" bpmnElement="Flow_ReleaseReady">
+        <di:waypoint x="1825" y="1095" />
+        <di:waypoint x="1857" y="1095" />
+        <di:waypoint x="1857" y="405" />
+        <di:waypoint x="1890" y="405" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1831" y="1073" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToRecordSignOff_di" bpmnElement="Flow_ToRecordSignOff">
+        <di:waypoint x="1990" y="405" />
+        <di:waypoint x="2010" y="405" />
+        <di:waypoint x="2010" y="1095" />
+        <di:waypoint x="2030" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToIsSignOffApproved_di" bpmnElement="Flow_ToIsSignOffApproved">
+        <di:waypoint x="2130" y="1095" />
+        <di:waypoint x="2195" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignOffApproved_di" bpmnElement="Flow_SignOffApproved">
+        <di:waypoint x="2245" y="1095" />
+        <di:waypoint x="2290" y="1095" />
+        <di:waypoint x="2290" y="635" />
+        <di:waypoint x="2335" y="635" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2251" y="1073" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToScheduleWorkPack_di" bpmnElement="Flow_ToScheduleWorkPack">
+        <di:waypoint x="2385" y="635" />
+        <di:waypoint x="2450" y="635" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToSaveSchedule_di" bpmnElement="Flow_ToSaveSchedule">
+        <di:waypoint x="2550" y="635" />
+        <di:waypoint x="2570" y="635" />
+        <di:waypoint x="2570" y="1095" />
+        <di:waypoint x="2590" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToGeneratePrint_di" bpmnElement="Flow_ToGeneratePrint">
+        <di:waypoint x="2690" y="1095" />
+        <di:waypoint x="2730" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToMergeAssignment_di" bpmnElement="Flow_ToMergeAssignment">
+        <di:waypoint x="2830" y="1095" />
+        <di:waypoint x="2862" y="1095" />
+        <di:waypoint x="2862" y="865" />
+        <di:waypoint x="2895" y="865" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToAssignmentFileReceived_di" bpmnElement="Flow_ToAssignmentFileReceived">
+        <di:waypoint x="2945" y="865" />
+        <di:waypoint x="3042" y="865" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToValidateAssignment_di" bpmnElement="Flow_ToValidateAssignment">
+        <di:waypoint x="3078" y="865" />
+        <di:waypoint x="3114" y="865" />
+        <di:waypoint x="3114" y="1095" />
+        <di:waypoint x="3150" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToHasAssignedWorkers_di" bpmnElement="Flow_ToHasAssignedWorkers">
+        <di:waypoint x="3250" y="1095" />
+        <di:waypoint x="3315" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_WorkersAssigned_di" bpmnElement="Flow_WorkersAssigned">
+        <di:waypoint x="3365" y="1095" />
+        <di:waypoint x="3430" y="1095" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3371" y="1073" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToCreateTimesheets_di" bpmnElement="Flow_ToCreateTimesheets">
+        <di:waypoint x="3530" y="1095" />
+        <di:waypoint x="3570" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToEnd_di" bpmnElement="Flow_ToEnd">
+        <di:waypoint x="3670" y="1095" />
+        <di:waypoint x="3742" y="1095" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_WorkPackInvalid_di" bpmnElement="Flow_WorkPackInvalid">
+        <di:waypoint x="680" y="1153" />
+        <di:waypoint x="680" y="1175" />
+        <di:waypoint x="400" y="1175" />
+        <di:waypoint x="400" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CorrectionInvalid_di" bpmnElement="Flow_CorrectionInvalid">
+        <di:waypoint x="1240" y="1153" />
+        <di:waypoint x="1240" y="1175" />
+        <di:waypoint x="960" y="1175" />
+        <di:waypoint x="960" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReleaseNotReady_di" bpmnElement="Flow_ReleaseNotReady">
+        <di:waypoint x="1800" y="1120" />
+        <di:waypoint x="1800" y="1190" />
+        <di:waypoint x="960" y="1190" />
+        <di:waypoint x="960" y="200" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1806" y="1155" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SignOffDeclined_di" bpmnElement="Flow_SignOffDeclined">
+        <di:waypoint x="2220" y="1120" />
+        <di:waypoint x="2220" y="1205" />
+        <di:waypoint x="960" y="1205" />
+        <di:waypoint x="960" y="200" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2226" y="1162" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ScheduleInvalid_di" bpmnElement="Flow_ScheduleInvalid">
+        <di:waypoint x="2640" y="1153" />
+        <di:waypoint x="2640" y="1175" />
+        <di:waypoint x="2360" y="1175" />
+        <di:waypoint x="2360" y="660" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NoWorkerAssigned_di" bpmnElement="Flow_NoWorkerAssigned">
+        <di:waypoint x="3340" y="1120" />
+        <di:waypoint x="3340" y="1175" />
+        <di:waypoint x="2920" y="1175" />
+        <di:waypoint x="2920" y="890" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3346" y="1147" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

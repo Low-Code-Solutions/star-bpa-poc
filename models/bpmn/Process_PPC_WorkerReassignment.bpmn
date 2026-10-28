@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_WorkerReassignment" targetNamespace="http://lowcodesol.com/star-bpa-poc" exporter="LCS generator (Claude)" exporterVersion="0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.1">
+  <bpmn:process id="Process_PPC_WorkerReassignment" name="Worker Reassignment" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_AssignmentFileReplaced" name="Replacement file received">
+      <bpmn:documentation>BPA-13. Message AssignmentFileReplaced, correlation key workpackNumber, TTL 0. Published by the assignment upload endpoint (D58) only when assignment_state is Assigned (D61); the endpoint sets Replacing in the same transaction and no replacement is running (D37).</bpmn:documentation>
+      <bpmn:outgoing>Flow_ToReplaceAssignment</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_AssignmentFileReplaced" messageRef="Message_AssignmentFileReplaced" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="ServiceTask_ReplaceAssignment" name="Replace Worker assignment">
+      <bpmn:documentation>BPA-13. All-or-nothing full replace (D35); keeps Workers with hours loaded (D36); history (D38); Journal Lines Closed and empty time sheets Cancelled (D7). Outputs replacementApplied. Resets assignment_state to Assigned on both outcomes (D61).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="replace-worker-assignment" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToReplaceAssignment</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToIsReplacementApplied</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_IsReplacementApplied" name="Applied?" default="Flow_ReplacementNotApplied">
+      <bpmn:documentation>NEW (design pack N8).</bpmn:documentation>
+      <bpmn:incoming>Flow_ToIsReplacementApplied</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReplacementApplied</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ReplacementNotApplied</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="EndEvent_AssignmentReplaced" name="Assignment replaced">
+      <bpmn:incoming>Flow_ReplacementApplied</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndEvent_ReplacementNotApplied" name="Replacement not applied">
+      <bpmn:documentation>File had rejected rows; result file says 'Replacement not applied: file has rejected rows'.</bpmn:documentation>
+      <bpmn:incoming>Flow_ReplacementNotApplied</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_ToReplaceAssignment" sourceRef="StartEvent_AssignmentFileReplaced" targetRef="ServiceTask_ReplaceAssignment" />
+    <bpmn:sequenceFlow id="Flow_ToIsReplacementApplied" sourceRef="ServiceTask_ReplaceAssignment" targetRef="Gateway_IsReplacementApplied" />
+    <bpmn:sequenceFlow id="Flow_ReplacementApplied" name="Yes" sourceRef="Gateway_IsReplacementApplied" targetRef="EndEvent_AssignmentReplaced">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=replacementApplied = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ReplacementNotApplied" name="No" sourceRef="Gateway_IsReplacementApplied" targetRef="EndEvent_ReplacementNotApplied" />
+  </bpmn:process>
+  <bpmn:message id="Message_AssignmentFileReplaced" name="AssignmentFileReplaced" />
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Process_PPC_WorkerReassignment">
+    <bpmndi:BPMNPlane id="BPMNPlane_Process_PPC_WorkerReassignment" bpmnElement="Process_PPC_WorkerReassignment">
+      <bpmndi:BPMNShape id="StartEvent_AssignmentFileReplaced_di" bpmnElement="StartEvent_AssignmentFileReplaced">
+        <dc:Bounds x="182" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="150" y="183" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_ReplaceAssignment_di" bpmnElement="ServiceTask_ReplaceAssignment">
+        <dc:Bounds x="280" y="120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_IsReplacementApplied_di" bpmnElement="Gateway_IsReplacementApplied" isMarkerVisible="true">
+        <dc:Bounds x="445" y="135" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="420" y="103" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_AssignmentReplaced_di" bpmnElement="EndEvent_AssignmentReplaced">
+        <dc:Bounds x="582" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="550" y="183" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_ReplacementNotApplied_di" bpmnElement="EndEvent_ReplacementNotApplied">
+        <dc:Bounds x="582" y="252" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="550" y="293" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_ToReplaceAssignment_di" bpmnElement="Flow_ToReplaceAssignment">
+        <di:waypoint x="218" y="160" />
+        <di:waypoint x="280" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToIsReplacementApplied_di" bpmnElement="Flow_ToIsReplacementApplied">
+        <di:waypoint x="380" y="160" />
+        <di:waypoint x="445" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReplacementApplied_di" bpmnElement="Flow_ReplacementApplied">
+        <di:waypoint x="495" y="160" />
+        <di:waypoint x="582" y="160" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="501" y="138" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReplacementNotApplied_di" bpmnElement="Flow_ReplacementNotApplied">
+        <di:waypoint x="470" y="185" />
+        <di:waypoint x="470" y="270" />
+        <di:waypoint x="582" y="270" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="476" y="227" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
