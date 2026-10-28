@@ -2,7 +2,7 @@
 
 Jira: BPA-38 (Task, epic BPA-17)
 Story last updated: 2026-10-28T21:40:13.155+0400
-Status: Approved (Ahsan, 2026-10-28 22:45 PKT, in chat)
+Status: Closed (2026-10-28)
 Approver: Ahsan (Build Lead)
 Branch: BPA-38-harness-protect-main, from main 04ed323
 
@@ -123,12 +123,21 @@ plan-check now checks a bare `BPA-<n>` branch (fixed, 2 tests; `**Status:**` not
 fixes the header as `Status:`); Jira BPA-38 Development panel shows an older merged PR, to check when
 linking this PR.
 
+## Results
+- PR #8 merged 2026-10-28 18:02Z (d2c5279) by Ahsan. CI on the PR: bpmnlint, plan-check and
+  harness-tests passed; plan-check showed the expected "not Closed" warning (proof on a test PR).
+- The plan was merged while still Approved, so this follow-up closes it, as for BPA-27 (PR #4).
+  The CI warning was visible but does not block; turning it into a failure would block every PR
+  until its last commit, so it stays a warning (open for the team to decide).
+- Human gaps remaining: each developer approves `atlassian` and runs `/mcp` once; GitHub branch
+  protection waits on a plan decision (09 L13).
+
 ## Questions
 - None blocking. Note for Faraz: the L13 limit stays (no protection against a person pushing
   directly) until a GitHub plan with branch protection is chosen.
 
 ## Human-gap log
-- (pending) Each developer runs `/mcp` once to sign in to Atlassian and approves the project server.
+- (open) Each developer runs `/mcp` once to sign in to Atlassian and approves the project server.
 
 ## Sources
 - Claude Code docs: permissions (https://code.claude.com/docs/en/permissions.md), hooks
