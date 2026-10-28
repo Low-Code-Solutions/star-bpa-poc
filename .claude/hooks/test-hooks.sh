@@ -18,22 +18,22 @@ export CLAUDE_PROJECT_DIR="$R"
 
 echo "== require-plan.sh"
 git switch -q -c BPA-999-test
-check "$(rp "$R/backend/app/Foo.java")" 2 "keyed branch, no plan, code edit -> blocked"
+check "$(rp "$R/backend/src/main/java/Foo.java")" 2 "keyed branch, no plan, code edit -> blocked"
 check "$(rp "$R/intent/BPA-3-x/plans/BPA-999.md")" 0 "keyed branch, no plan, intent/ edit -> allowed"
 check "$(rp "$R/docs/04-conventions.md")" 0 "keyed branch, no plan, docs/ edit -> allowed"
-check "$(rp "backend/app/Foo.java")" 2 "relative path, no plan -> blocked"
+check "$(rp "backend/src/main/java/Foo.java")" 2 "relative path, no plan -> blocked"
 check "$(rp "$R/docs/../backend/x.java")" 2 "docs/../backend path, no plan -> blocked"
 check "$(rp "/etc/hosts")" 0 "path outside any repo -> ignored"
 check "$(printf '{"tool_input":{"notebook_path":"%s"}}' "$R/backend/n.ipynb" | sh "$RP" >/dev/null 2>&1; echo $?)" 2 "notebook_path, no plan -> blocked"
 check "$(rp "$R/backend/dir with space/A.java")" 2 "path with spaces, no plan -> blocked"
 mkdir -p intent/BPA-3-x/plans && echo plan > intent/BPA-3-x/plans/BPA-999.md
-check "$(rp "$R/backend/app/Foo.java")" 0 "keyed branch, plan exists -> allowed"
+check "$(rp "$R/backend/src/main/java/Foo.java")" 0 "keyed branch, plan exists -> allowed"
 check "$(rp "$R/backend/dir with space/A.java")" 0 "path with spaces, plan exists -> allowed"
 git add -A && git commit -qm "BPA-999: plan"
 git switch -q main
-check "$(rp "$R/backend/app/Foo.java")" 0 "main -> no effect"
+check "$(rp "$R/backend/src/main/java/Foo.java")" 0 "main -> no effect"
 git switch -q -c scratch-unkeyed
-check "$(rp "$R/backend/app/Foo.java")" 0 "unkeyed branch -> no effect"
+check "$(rp "$R/backend/src/main/java/Foo.java")" 0 "unkeyed branch -> no effect"
 
 echo "== require-plan.sh in a git worktree (session root on BPA-999, which has a plan)"
 git switch -q BPA-999-test

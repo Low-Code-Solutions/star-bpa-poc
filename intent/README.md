@@ -16,3 +16,7 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 - [intent.md](BPA-3-work-pack-assignment/intent.md): Draft, awaiting Product Owner acceptance
 - [spec.md](BPA-3-work-pack-assignment/spec.md): Draft, awaiting Product Owner acceptance
 
+| Plan | Summary | Status |
+|---|---|---|
+| [BPA-34](BPA-3-work-pack-assignment/plans/BPA-34.md) | Restructure repo to 09 L1 (layout only, no content) | Closed (2026-10-28) |
+
