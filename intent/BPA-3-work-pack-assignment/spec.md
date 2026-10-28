@@ -19,8 +19,8 @@ precedence in CLAUDE.md applies.
 | Domain data model, SOR per field, assignment_state transitions | `docs/data-model.md` (S16) | v0.4, awaiting the approval chain (09 §4 item 3) |
 | Assignment file layout | Claude Project `claude/10-s18-s19-assignment-file.md` | `templates/README.md` (L6) |
 | SOR matrix | `docs/03-sor-matrix.md` | ACTIVE 28 Oct, master in the repo since BPA-35 |
-| Models | SharePoint `04 Requirements snapshots/Epic 1 design 2026-10-27/models/` | to `models/bpmn/`, `models/dmn/` under BPA-36 |
-| Field specs for React screens | the four `.form` files in the same snapshot | to `docs/form-specs/` under BPA-36 (L1, S14) |
+| Models | `models/bpmn/`, `models/dmn/` | master in the repo since BPA-36; linted on every PR (`npm run lint:bpmn`) |
+| Field specs for React screens | `docs/form-specs/` | moved unchanged under BPA-36 (L1, S14); see its README |
 | Stories and acceptance criteria | Jira BPA-6 to BPA-16, BPA-22, BPA-23, BPA-26; Spike BPA-25 | Jira only |
 
 Processes: `Process_PPC_WorkPackAssignment` (main), `Process_PPC_WorkerReassignment` (BPA-13),
@@ -72,4 +72,3 @@ to a contract's shape is recorded in the plan and, if it changes a decision, in 
 - Sprint 1 places BPA-6, 8, 9 and 23 before BPA-26 (task API). Whether those stories are first built
   and tested through Camunda Process Tests without the portal, with the React screens following
   BPA-26, is not stated in the sources. Question for the build team and PO; not decided here.
-- The models and form specs are not yet in the repo (BPA-36); their row above still points to SharePoint.

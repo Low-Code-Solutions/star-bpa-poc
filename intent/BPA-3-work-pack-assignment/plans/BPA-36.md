@@ -32,12 +32,15 @@ Branch: BPA-36-commit-epic1-models, from main ff4ea65
 |---|---|
 | The 8 files above | New, committed byte-for-byte from SharePoint (sizes checked). Model content changes only if a 09 §4 item 2 check fails, and then only that fix, listed here |
 | models/bpmn/.gitkeep, models/dmn/.gitkeep, docs/form-specs/.gitkeep | Deleted once the folders have files |
-| .bpmnlintrc | New: extends `bpmnlint:recommended` and `plugin:camunda-compat/camunda-cloud-8-10` (L10); `moddleExtensions` registers zeebe (departure, same reason as above) |
+| .bpmnlintrc | New: extends `bpmnlint:recommended` and `plugin:camunda-compat/camunda-cloud-8-10` (L10); `moddleExtensions` registers zeebe (departure; reason in the package.json row) |
 | package.json, package-lock.json | New: devDependencies pinned exactly: `bpmnlint` 12.0.0, `bpmnlint-plugin-camunda-compat` 2.63.0, `zeebe-bpmn-moddle` 2.0.0; script `lint:bpmn`. Departure: `zeebe-bpmn-moddle` was missing from the plan; without it the CLI cannot read `zeebe:` extensions and reports 17 false errors (plugin README) |
 | .github/workflows/lint.yml | New: on every pull request and push to main, `npm ci` then `npm run lint:bpmn` over `models/bpmn/*.bpmn`; Node 24. Departure: the plan said Node 22, but bpmnlint 12.0.0 declares `node >= 24` (it ran on 22 with an engine warning only); `package.json` engines set to `>=24` to match |
 | .github/workflows/.gitkeep | Deleted |
 | docs/form-specs/README.md | New, three lines: these are field specs for the React screens (09 S14); nothing deploys them |
 | .gitignore | Already ignores `node_modules/`; no change expected |
+| package.json `lint:bpmn` (review fix) | Departure: fails when `models/bpmn/` has no `.bpmn` file (bpmnlint exits 0 on an unmatched glob, so CI passed on a commit without models), and `--max-warnings=4` so a warning beyond the 4 S14 ones fails CI |
+| docs/form-specs/README.md (review fix) | Adds: the specs refer to process variables the dropped loading steps filled (React uses the S20 endpoints), and they keep 8.10.0 because they moved unchanged |
+| intent/BPA-3-work-pack-assignment/spec.md (review fix) | Models and form-specs rows now point to the repo; the "not yet in the repo" open point removed |
 | intent/BPA-3-work-pack-assignment/plans/BPA-36.md, intent/README.md | This plan; regenerated index |
 
 ## Order of work
@@ -84,6 +87,13 @@ Branch: BPA-36-commit-epic1-models, from main ff4ea65
   records).
 - Element-ID check against Jira (15 Epic 1 stories, BPMN Reference field): 0 missing IDs; 40 of 40
   flow nodes referenced by a story; Decision_WorkpackReleaseCheck present.
+
+## Review
+qa-reviewer at 58239e1: 1 Important (CI passed when no models matched the lint glob), fixed with the
+`lint:bpmn` change above; verified: normal run exit 0, empty `models/bpmn/` exit 1, a model with an
+extra problem exit 1. Nits fixed: README detail, spec.md rows, plan wording. Not changed: the models'
+assignment_state notes name only the target state (L10 says "the transition"); the models are kept as
+reviewed in Modeler (S13), so this goes to the next model change.
 
 ## Questions
 - Q1 (resolved 28 Oct: Ahsan's commit did not reach GitHub, so Claude used the alternative route with
