@@ -2,7 +2,7 @@
 
 Jira: BPA-27 (Task, epic BPA-17 Claude setup). Subtasks: BPA-28 to BPA-33.
 Story last updated: 2026-10-28T17:59:03.731+0400
-Status: Draft (awaiting approval by Ahsan)
+Status: Approved (Ahsan, 2026-10-28 19:05 PKT, in the claude.ai session)
 Approver: Ahsan (Build Lead)
 Branch: BPA-27-artifact-chain, from main 9b3322e
 
@@ -72,8 +72,12 @@ L13 deny rules (BPA-18 harness work).
 ## Questions
 - Q1 ADR numbering: BPA-19 ("ADR 0001: Jira as source of truth") is Done but no file exists, and
   09 L3 assigns 0001-0014 to other topics. Proposal: keep L3 numbers; this ADR is 0015; record
-  "Jira as source of truth" as 0016 later under BPA-19's follow-up. Needs Ahsan's yes.
+  "Jira as source of truth" as 0016 later under BPA-19's follow-up.
+  Resolved: taken as accepted with the plan approval (28 Oct); flagged again in the PR.
 
 ## Human-gap log
 - 28 Oct: decision to replace L14 taken by Ahsan and Usama in chat; Claude cannot approve it.
 - 28 Oct: PR #2 merged by Ahsan (Claude never merges).
+- 28 Oct: the session's stop hook required the draft plan to be committed and pushed before
+  approval; it was committed as Draft (fe3d485) and approval recorded in the next commit.
+- 28 Oct: plan approved by Ahsan in chat.
