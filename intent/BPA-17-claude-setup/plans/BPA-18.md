@@ -23,7 +23,7 @@ sections, so it does not have them.
 
 ## Open questions (status 28 Oct 2026)
 - docs/04 paths (models/, db/migration/, api/, mocks/) are under backend/ in the repo. Fix the master copy or keep the note in CLAUDE.md?
-  Status: decided by 09 L1 (top-level models/, api/, templates/) and the infra/ amendment of 28 Oct; delivered by the repo-restructure work, not BPA-18.
+  Status: decided by 09 L1 (top-level models/, api/, templates/; WireMock mocks and the Postgres init stay under backend/, decided by Ahsan on 28 Oct); delivered by the repo-restructure work, not BPA-18.
 - Does branch protection dismiss approvals on new commits? If so, deleting plan.md after approval needs a re-approval.
   Status: moot. There is no branch protection on the current GitHub plan (08 R2), and plans are no longer deleted (ADR 0015).
 

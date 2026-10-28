@@ -9,7 +9,7 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | Plan | Summary | Status |
 |---|---|---|
 | [BPA-18](BPA-17-claude-setup/plans/BPA-18.md) | Repo setup: CLAUDE.md with Jira rules and docs imports | Closed (2026-10-28; rebuilt under BPA-33) |
-| [BPA-27](BPA-17-claude-setup/plans/BPA-27.md) | Adopt the playbook artifact chain: intent → spec → plan → PR | Approved (Ahsan, 2026-10-28 19:05 PKT, in the claude.ai session) |
+| [BPA-27](BPA-17-claude-setup/plans/BPA-27.md) | Adopt the playbook artifact chain: intent → spec → plan → PR | Closed (2026-10-28; approved by Ahsan 2026-10-28 19:05 PKT, in the claude.ai session) |
 
 ## BPA-3-work-pack-assignment
 

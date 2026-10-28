@@ -1,7 +1,7 @@
 #!/bin/sh
 # PostToolUse hook (Bash). ADR 0015, BPA-32.
 # After a Bash call whose command runs `git commit` on a branch named BPA-<n>-..., warn when the
-# commit just made changed build files (backend/, frontend/, models/, api/, templates/, infra/)
+# commit just made changed build files (backend/, frontend/, models/, api/, templates/)
 # but not the item's plan, unless the commit message contains "plan unaffected".
 # Warns only: exit 2 after a tool call shows stderr to Claude without undoing anything.
 
@@ -34,7 +34,7 @@ made=$(git -C "$root" log -1 --pretty=%ct)
 files=$(git -C "$root" show --name-only --pretty=format: HEAD)
 msg=$(git -C "$root" log -1 --pretty=%B)
 
-printf '%s\n' "$files" | grep -Eq '^(backend|frontend|models|api|templates|infra)/' || exit 0
+printf '%s\n' "$files" | grep -Eq '^(backend|frontend|models|api|templates)/' || exit 0
 printf '%s\n' "$files" | grep -Eq "^intent/[^/]+/plans/$key\.md$" && exit 0
 printf '%s' "$msg" | grep -qi 'plan unaffected' && exit 0
 

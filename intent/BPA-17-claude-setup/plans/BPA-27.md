@@ -2,7 +2,7 @@
 
 Jira: BPA-27 (Task, epic BPA-17)
 Story last updated: 2026-10-28T17:59:03.731+0400
-Status: Approved (Ahsan, 2026-10-28 19:05 PKT, in the claude.ai session)
+Status: Closed (2026-10-28; approved by Ahsan 2026-10-28 19:05 PKT, in the claude.ai session)
 Approver: Ahsan (Build Lead)
 Branch: BPA-27-artifact-chain, from main 9b3322e
 
@@ -65,6 +65,8 @@ L13 deny rules (BPA-18 harness work).
 7. BPA-33: intent/ backfill and BPA-18 plan.
 8. BPA-27: open the PR with this plan still Approved.
 9. BPA-27: after review fixes, set this plan to Closed in the final commit, before Ahsan merges.
+   Done late: PR #3 was merged (3d7aaee) before this step, so the plan was closed in follow-up
+   PR BPA-27-close-plan.
 
 ## Risks
 - CLAUDE.md and the hooks steer every later session; a wrong rule spreads. Mitigation:
@@ -105,3 +107,8 @@ Out of scope, new Jira item proposed: docs/03-sor-matrix.md on main names the pa
 - 28 Oct: the session's stop hook required the draft plan to be committed and pushed before
   approval; it was committed as Draft (fe3d485) and approval recorded in the next commit.
 - 28 Oct: plan approved by Ahsan in chat.
+- 28 Oct: PR #3 reviewed and merged by Ahsan (3d7aaee) before the plan was set to Closed. The close
+  step depends on a human remembering the order, the same gap as BPA-18. Proposed fix: a check in
+  the repo-restructure CI work that fails a PR whose plan is not Closed (not decided).
+- 28 Oct: Ahsan reversed the `infra/` layout amendment and kept 09 L1 as written (mocks and Postgres
+  init under backend/). Corrected in spec.md, BPA-18.md and plan-sync-check.sh in the follow-up PR.
