@@ -20,5 +20,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 |---|---|---|
 | [BPA-34](BPA-3-work-pack-assignment/plans/BPA-34.md) | Restructure repo to 09 L1 (layout only, no content) | Closed (2026-10-28) |
 | [BPA-35](BPA-3-work-pack-assignment/plans/BPA-35.md) | Copy design docs into the repo and make it master: 00, 01, 03, 09, data model | Closed (2026-10-28) |
-| [BPA-36](BPA-3-work-pack-assignment/plans/BPA-36.md) | Commit Epic 1 models with 09 fixes, bpmnlint config and lint CI; form specs to docs | Draft (awaiting approval by Ahsan) |
+| [BPA-36](BPA-3-work-pack-assignment/plans/BPA-36.md) | Commit Epic 1 models with 09 fixes, bpmnlint config and lint CI; form specs to docs | Approved (Ahsan, 2026-10-28 21:55 PKT, in the claude.ai session) |
 

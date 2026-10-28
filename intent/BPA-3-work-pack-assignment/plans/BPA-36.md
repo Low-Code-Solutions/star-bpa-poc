@@ -2,7 +2,7 @@
 
 Jira: BPA-36 (Task, epic BPA-3)
 Story last updated: 2026-10-28T19:53:17.498+0400
-Status: Draft (awaiting approval by Ahsan)
+Status: Approved (Ahsan, 2026-10-28 21:55 PKT, in the claude.ai session)
 Approver: Ahsan (Build Lead)
 Branch: BPA-36-commit-epic1-models, from main ff4ea65
 
@@ -80,4 +80,5 @@ Branch: BPA-36-commit-epic1-models, from main ff4ea65
   SharePoint connector and write them out, with the byte sizes as the check.
 
 ## Human-gap log
-- (none yet)
+- 28 Oct: plan approved by Ahsan in chat (21:55 PKT). Q1: the recommended route (Ahsan commits the 8 files)
+  is being followed; tooling built meanwhile.
