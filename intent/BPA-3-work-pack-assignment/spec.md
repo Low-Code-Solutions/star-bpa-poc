@@ -10,17 +10,17 @@ precedence in CLAUDE.md applies.
 
 ## Design sources
 
-| Topic | Source | Repo location (when copied) |
+| Topic | Master | Notes |
 |---|---|---|
-| Architecture decisions (LOCKED) | Claude Project `claude/09-architecture-decisions-2026-10-27.md` | `docs/09-architecture-decisions.md` (L17, repo-restructure work) |
-| ADRs | `docs/adr/` (index in `docs/adr/README.md`; 0001–0014 planned) | here |
+| Architecture decisions (LOCKED) | `docs/09-architecture-decisions.md` | verbatim copy of the Project file (L17), master in the repo since BPA-35 |
+| ADRs | `docs/adr/` (index in `docs/adr/README.md`) | 0015 written; 0001–0014 and 0016 under BPA-37 |
 | Business decisions D1–D65 | Claude Project `claude/06-epic1-decisions-draft.md` | not copied (rationale; cited by D-number) |
 | Process design (elements, workers, messages, errors) | Claude Project `claude/07-epic1-design-pack.md` §2–§7 | not copied; §1 forms, §8, §9 user_role, §10 and Flyway names are superseded by 09 |
-| Domain data model, SOR per field, assignment_state transitions | Claude Project `claude/11-data-model.md` v0.4 (awaiting approval) | `docs/data-model.md` (S16) |
+| Domain data model, SOR per field, assignment_state transitions | `docs/data-model.md` (S16) | v0.4, awaiting the approval chain (09 §4 item 3) |
 | Assignment file layout | Claude Project `claude/10-s18-s19-assignment-file.md` | `templates/README.md` (L6) |
-| SOR matrix | Claude Project `03-sor-matrix.md` (28 Oct) | `docs/03-sor-matrix.md` (repo copy is still the template) |
-| Models | SharePoint `04 Requirements snapshots/Epic 1 design 2026-10-27/models/` | `models/bpmn/`, `models/dmn/` (L1) |
-| Field specs for React screens | the four `.form` files in the same snapshot | `docs/form-specs/` (L1, S14) |
+| SOR matrix | `docs/03-sor-matrix.md` | ACTIVE 28 Oct, master in the repo since BPA-35 |
+| Models | SharePoint `04 Requirements snapshots/Epic 1 design 2026-10-27/models/` | to `models/bpmn/`, `models/dmn/` under BPA-36 |
+| Field specs for React screens | the four `.form` files in the same snapshot | to `docs/form-specs/` under BPA-36 (L1, S14) |
 | Stories and acceptance criteria | Jira BPA-6 to BPA-16, BPA-22, BPA-23, BPA-26; Spike BPA-25 | Jira only |
 
 Processes: `Process_PPC_WorkPackAssignment` (main), `Process_PPC_WorkerReassignment` (BPA-13),
@@ -72,5 +72,4 @@ to a contract's shape is recorded in the plan and, if it changes a decision, in 
 - Sprint 1 places BPA-6, 8, 9 and 23 before BPA-26 (task API). Whether those stories are first built
   and tested through Camunda Process Tests without the portal, with the React screens following
   BPA-26, is not stated in the sources. Question for the build team and PO; not decided here.
-- `docs/data-model.md`, `docs/09-…` and the models are not yet in the repo; the links above point
-  to the Claude Project and SharePoint until the repo-restructure work lands.
+- The models and form specs are not yet in the repo (BPA-36); their row above still points to SharePoint.

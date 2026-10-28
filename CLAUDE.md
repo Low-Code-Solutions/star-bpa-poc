@@ -93,10 +93,11 @@ docs/09. Report the disagreement; do not resolve it silently.
 
 ## Reference
 The repo is the master copy of these and of all design artifacts (ADR 0015; Product Owner sign-off
-pending). SharePoint "Project knowledge" and the Claude Project hold copies refreshed after merge.
-Interim exception: until the repo-restructure work copies them in, 09-architecture-decisions, the
-data model (11) and 03-sor-matrix are mastered in the Claude Project; the repo's docs/03 is still the
-template. Use the Project copies for those and never overwrite them from the repo.
+pending): change them only by pull request. SharePoint "Project knowledge" and the Claude Project
+hold copies refreshed after merge. Read on demand (not imported, to keep this context small):
+`docs/09-architecture-decisions.md` (LOCKED decisions; READ THIS FIRST applies) and
+`docs/data-model.md` (the single domain data model, 09 S16).
+@docs/00-context.md
 @docs/02-story-standard.md
 @docs/03-sor-matrix.md
 @docs/04-conventions.md
