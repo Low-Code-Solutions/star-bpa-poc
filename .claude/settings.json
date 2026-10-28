@@ -1,4 +1,16 @@
 {
+  "permissions": {
+    "deny": [
+      "Bash(git push * main)",
+      "Bash(git push * main *)",
+      "Bash(git push *:main)",
+      "Bash(git push *:main *)",
+      "Bash(git push --force*)",
+      "Bash(git push * --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * -f*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -7,6 +19,15 @@
           {
             "type": "command",
             "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/require-plan.sh\"; if [ -f \"$f\" ]; then sh \"$f\"; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/git-guard.sh\"; if [ -f \"$f\" ]; then sh \"$f\"; fi"
           }
         ]
       }

@@ -67,6 +67,80 @@ check "$(ps_ "$R" 'git commit -m x')" 0 "HEAD not made just now (failed or other
 git switch -q main
 check "$(ps_ "$R" 'git commit -m x')" 0 "main -> no effect"
 
+echo "== git-guard.sh (09 L13, BPA-38). Commands are written as they appear inside the JSON string."
+GG="$HOOKS/git-guard.sh"
+# gg <cwd> <command> [agent_type]
+gg() {
+  if [ -n "${3:-}" ]; then a=",\"agent_id\":\"a1\",\"agent_type\":\"$3\""; else a=""; fi
+  printf '{"tool_name":"Bash","cwd":"%s"%s,"tool_input":{"command":"%s","description":"run"}}' "$1" "$a" "$2" \
+    | sh "$GG" >/dev/null 2>&1; echo $?
+}
+cd "$R" && git switch -q main
+echo "-- on main"
+check "$(gg "$R" 'git commit -m x')" 2 "commit on main -> blocked"
+check "$(gg "$T" 'git -C repo commit -m x')" 2 "git -C <dir> commit on main -> blocked"
+check "$(gg "$T" 'cd repo && git commit -am x')" 2 "cd <dir> && git commit on main -> blocked"
+check "$(gg "$R" 'git add -A && git commit -m \"a b\"')" 2 "chained add && commit on main -> blocked"
+check "$(gg "$R" 'git push')" 2 "push with no refspec on main -> blocked"
+check "$(gg "$R" 'git push origin')" 2 "push to remote with no refspec on main -> blocked"
+check "$(gg "$R" 'git push origin \"$(git branch --show-current)\"')" 2 "push of \$(current branch) on main -> blocked"
+check "$(gg "$R" 'git push --tags')" 0 "push --tags on main -> allowed (tags only)"
+check "$(gg "$R" 'git status && git log --oneline -3')" 0 "read-only git on main -> allowed"
+check "$(gg "$R" 'git switch main && git pull')" 0 "switch main && pull -> allowed"
+git switch -q -c BPA-996-guard
+echo "-- on BPA-996-guard"
+check "$(gg "$R" 'git commit -m x')" 0 "commit on a keyed branch -> allowed"
+check "$(gg "$R" 'git push -u origin BPA-996-guard')" 0 "push own branch -> allowed"
+check "$(gg "$R" 'git push origin \"$(git branch --show-current)\"')" 0 "push of \$(current branch) on a branch -> allowed"
+check "$(gg "$R" 'git push origin main:BPA-996-guard')" 0 "push main as source to another branch -> allowed"
+check "$(gg "$R" 'git commit -m \"docs: explain git push origin main\"')" 0 "push text inside a commit message -> allowed"
+check "$(gg "$R" 'echo git push origin main')" 0 "echo of a push command -> allowed"
+check "$(gg "$R" 'ls -la')" 0 "non-git command -> ignored"
+check "$(gg "$R" 'git push origin main')" 2 "push origin main -> blocked"
+check "$(gg "$R" 'git push origin HEAD:main')" 2 "push HEAD:main -> blocked"
+check "$(gg "$R" 'git push origin HEAD:refs/heads/main')" 2 "push HEAD:refs/heads/main -> blocked"
+check "$(gg "$R" 'git push origin :main')" 2 "push :main (delete) -> blocked"
+check "$(gg "$R" 'git push origin --delete main')" 2 "push --delete main -> blocked"
+check "$(gg "$R" 'git push origin main --follow-tags')" 2 "push main with a trailing option -> blocked"
+check "$(gg "$R" "git -c push.default=current push origin 'main'")" 2 "git -c ... push 'main' (quoted) -> blocked"
+check "$(gg "$T" 'git -C repo push origin main')" 2 "git -C <dir> push origin main -> blocked"
+check "$(gg "$R" 'git status && git push origin main 2>&1 | tail -3')" 2 "push main inside a chain and pipe -> blocked"
+check "$(gg "$R" 'git push --all origin')" 2 "push --all -> blocked"
+check "$(gg "$R" 'git push --mirror origin')" 2 "push --mirror -> blocked"
+check "$(gg "$R" 'git push --force origin BPA-996-guard')" 2 "push --force -> blocked"
+check "$(gg "$R" 'git push -f')" 2 "push -f -> blocked"
+check "$(gg "$R" 'git push -uf origin BPA-996-guard')" 2 "push -uf (clustered) -> blocked"
+check "$(gg "$R" 'git push --force-with-lease origin BPA-996-guard')" 2 "push --force-with-lease -> blocked"
+check "$(gg "$R" 'git push origin +BPA-996-guard')" 2 "push +refspec -> blocked"
+check "$(gg "$R" 'git switch main && git commit -m x')" 2 "switch main && commit -> blocked"
+check "$(gg "$R" 'git checkout main\ngit commit -m x')" 2 "checkout main, newline, commit -> blocked"
+echo "-- worktree of this repository, and another repository"
+check "$(gg "$T/wt" 'git push origin main')" 2 "push main from a worktree of the project -> blocked"
+O="$T/other"; mkdir -p "$O" && git -C "$O" init -q -b main
+check "$(gg "$O" 'git commit -m x')" 0 "commit on main in another repository -> allowed"
+check "$(gg "$O" 'git push origin main')" 0 "push main in another repository -> allowed"
+check "$(gg "$O" 'git push --force origin main' qa-reviewer)" 2 "qa-reviewer push in another repository -> blocked"
+echo "-- qa-reviewer subagent (agent_type), on BPA-996-guard"
+check "$(gg "$R" 'git commit -m x' qa-reviewer)" 2 "qa-reviewer commit -> blocked"
+check "$(gg "$R" 'git push -u origin BPA-996-guard' qa-reviewer)" 2 "qa-reviewer push -> blocked"
+check "$(gg "$R" 'git checkout main' qa-reviewer)" 2 "qa-reviewer checkout -> blocked"
+check "$(gg "$R" 'git stash' qa-reviewer)" 2 "qa-reviewer stash -> blocked"
+check "$(gg "$R" 'git branch tmp-x' qa-reviewer)" 2 "qa-reviewer branch create -> blocked"
+check "$(gg "$R" 'git tag v1' qa-reviewer)" 2 "qa-reviewer tag create -> blocked"
+check "$(gg "$R" 'git config user.name x' qa-reviewer)" 2 "qa-reviewer config set -> blocked"
+check "$(gg "$R" 'git status && git diff main...HEAD' qa-reviewer)" 0 "qa-reviewer status and diff -> allowed"
+check "$(gg "$R" 'git log --oneline -5 && git show HEAD --stat' qa-reviewer)" 0 "qa-reviewer log and show -> allowed"
+check "$(gg "$R" 'git branch --show-current' qa-reviewer)" 0 "qa-reviewer branch --show-current -> allowed"
+check "$(gg "$R" 'git stash list' qa-reviewer)" 0 "qa-reviewer stash list -> allowed"
+check "$(gg "$R" 'git tag -l' qa-reviewer)" 0 "qa-reviewer tag -l -> allowed"
+check "$(gg "$R" 'git config user.name' qa-reviewer)" 0 "qa-reviewer config get -> allowed"
+check "$(gg "$R" 'sh .claude/hooks/test-hooks.sh' qa-reviewer)" 0 "qa-reviewer runs tests -> allowed"
+check "$(gg "$R" 'git commit -m x' plugin:qa-reviewer)" 2 "namespaced qa-reviewer commit -> blocked"
+check "$(gg "$R" 'git commit -m x' Explore)" 0 "other subagent commit on a branch -> allowed"
+echo "-- settings.json guard for git-guard.sh when the script is missing"
+cmd='f="$CLAUDE_PROJECT_DIR/.claude/hooks/git-guard.sh"; if [ -f "$f" ]; then sh "$f"; fi'
+check "$(echo '{}' | CLAUDE_PROJECT_DIR="$G" sh -c "$cmd" >/dev/null 2>&1; echo $?)" 0 "missing git-guard script -> exit 0, not a block"
+
 echo
 echo "RESULT: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
