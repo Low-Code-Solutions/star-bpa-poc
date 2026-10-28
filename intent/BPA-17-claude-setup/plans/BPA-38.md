@@ -20,8 +20,10 @@ Branch: BPA-38-harness-protect-main, from main 04ed323
 **1. Protect main: two layers (L13).** The docs say permission rules match command text and are
 "not a security boundary" (`git -C . push origin main` slips past `Bash(git push *)`). So:
 - **Deny rules** in `.claude/settings.json` `permissions.deny` (first line, cheap):
-  `Bash(git push * main)`, `Bash(git push * HEAD:main)`, `Bash(git push --force*)`,
-  `Bash(git push * --force*)`, `Bash(git push -f*)`, `Bash(git push * -f*)`.
+  `Bash(git push * main)`, `Bash(git push * main *)`, `Bash(git push *:main)`,
+  `Bash(git push *:main *)`, `Bash(git push --force*)`, `Bash(git push * --force*)`,
+  `Bash(git push -f*)`, `Bash(git push * -f*)` (eight; amended in build from six, to cover a
+  trailing option and any `<src>:main`).
   The docs confirm deny rules apply to chained commands (`&&`, `;`, subshells) and to subagents.
 - **A guard hook** `.claude/hooks/git-guard.sh` (PreToolUse on Bash; exit 2 blocks and tells
   Claude why). It normalises `git -C <dir>` and `git -c k=v` forms, then blocks:
@@ -29,6 +31,8 @@ Branch: BPA-38-harness-protect-main, from main 04ed323
   - `git push` whose destination ref is `main` (`main`, `HEAD:main`, `refs/heads/main`, `x:main`),
     or a push with no refspec while on `main`;
   - force pushes (`--force`, `-f`, `--force-with-lease`, `+refspec`);
+  Rules for main and force pushes apply to this repository and its worktrees only (same git common
+  dir as `$CLAUDE_PROJECT_DIR`), so scratch repos elsewhere are not affected (amended in build).
   - any git write (commit, push, merge, rebase, reset, checkout, switch, cherry-pick, tag) when the
     call comes from the `qa-reviewer` subagent (hook input carries `agent_type`), which makes the
     agent's read-only promise enforced rather than prose (closes the BPA-31 note).
@@ -53,14 +57,15 @@ The warning is visible on the PR before merge, which is where the BPA-27 and BPA
 
 | File | Change |
 |---|---|
-| .claude/settings.json | Add `permissions.deny` (six rules above) and a PreToolUse Bash hook for git-guard.sh (same missing-file guard as the existing hooks) |
+| .claude/settings.json | Add `permissions.deny` (eight rules above) and a PreToolUse Bash hook for git-guard.sh (same missing-file guard as the existing hooks) |
 | .claude/hooks/git-guard.sh | New: the guard hook above (POSIX sh, portable sed/grep like the others) |
 | .claude/hooks/test-hooks.sh | Extend: git-guard cases (commit on main blocked / on branch allowed; push to main in 5 forms blocked; force push in 4 forms blocked; normal branch push allowed; `git -C` form; chained command; qa-reviewer write blocked, read allowed; non-git command ignored) |
 | .mcp.json | New: Atlassian remote MCP server `atlassian`, HTTP, no secrets |
-| .github/workflows/plan-check.yml | New: runs plan-check.sh on pull requests |
+| .github/workflows/plan-check.yml | New: runs plan-check.sh on pull requests; a second job runs test-plan-check.sh and test-hooks.sh (amended in build, so the guards stay tested) |
 | .github/scripts/plan-check.sh | New: the check above |
 | .github/scripts/test-plan-check.sh | New: local tests for plan-check.sh (missing plan fails; Draft/Approved warn; Closed passes; unkeyed branch passes) |
-| CLAUDE.md | "Branches and pull requests": guards and their limits; new "Atlassian MCP" note (server `atlassian`, `/mcp` sign-in once per developer). Short |
+| CLAUDE.md | "Branches and pull requests": guards, their limits and the CI plan check; "Requirements source: Jira": the `atlassian` server and the one-time `/mcp` sign-in. Short |
+| .claude/agents/qa-reviewer.md | Two lines: git writes are now enforced by git-guard.sh (other shell writes are not); the shared server is `atlassian` (amended in build: the plan said no change, but L14 asks that qa-reviewer and CLAUDE.md agree) |
 | intent/BPA-17-claude-setup/plans/BPA-38.md, intent/README.md | This plan; regenerated index |
 
 Not changed: `docs/adr/README.md` (avoids conflicts with BPA-37, which may run in parallel);
