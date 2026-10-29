@@ -98,7 +98,7 @@ Reviews (Q12): one qa-reviewer run after the Part A gate and one at the end, bot
 Part A
 | File | Change |
 |---|---|
-| `backend/pom.xml` | new: Boot 3.5.16 parent, Java 21, deps per P1/P2/P4, resource directories `../models` and `../templates` |
+| `backend/pom.xml` | new: Boot 3.5.16 parent, Java 21, deps per P1/P2/P4, resource directories `../models` and `../templates`, `micrometer-core` excluded and banned by `maven-enforcer-plugin` |
 | `backend/mvnw`, `backend/mvnw.cmd`, `backend/.mvn/wrapper/maven-wrapper.properties` | new: Maven Wrapper |
 | `backend/src/main/java/com/lcs/star/bpa/BpaApplication.java` | new: application and `@Deployment` |
 | `backend/src/main/java/com/lcs/star/bpa/worker/SkeletonCreateHourJournalHeaderWorker.java` | new: the pass-through worker (P3) |
@@ -110,7 +110,7 @@ Part A
 | `docker-compose.yml` | change: `bpa-app` enabled; `build: {context: ., dockerfile: backend/Dockerfile}`; drop the `./backend/exchange` volume (S19 watched folder, replaced by D58); env from `.env` |
 | `.env.example` | change: add `DEMO_PASSWORD`, `BPA_SERVICE_PASSWORD` placeholders (Part B uses them; added with Part A so the app boots) |
 | `.github/workflows/backend.yml` | new: `backend-tests` (P4) |
-| `docs/adr/0002-application-stack.md` | change: one line recording P1 under Consequences |
+| `docs/adr/0002-application-stack.md` | change: Consequences record P1, the Boot 4 production item and the Micrometer finding |
 | `backend/README.md` | new: how to build, test and run (short) |
 Part B
 | File | Change |
@@ -179,3 +179,9 @@ Not changed: `models/`, `templates/`, V1 and the seed, `docs/data-model.md`, Jir
   `micrometer-core` and `micrometer-jakarta9` are excluded from the actuator starter in `backend/pom.xml`. Dependency versions were clean (Boot 3.5.16, Framework 6.2.19, `-boot-3` Camunda artifacts).
   Workaround in place; the underlying defect (starter metrics path or its executor wrapper) is not diagnosed and should be reported to Camunda or rechecked on a later 8.10.x patch. Consequence for the
   app: no Micrometer metrics (actuator health is unaffected).
+- 29 Oct: Ahsan accepted the Micrometer exclusion and added three items: (1) a `maven-enforcer-plugin` `bannedDependencies` rule for `io.micrometer:micrometer-core` and
+  `micrometer-jakarta9` (`ban-micrometer-core`, runs in `validate`; checked: passes on the clean pom, fails with the message when the exclusion is removed) in place of keeping the probe test;
+  (2) one line in ADR 0002 Consequences and in the PR description: "camunda-spring-boot-3-starter 8.10.1: workers never run while micrometer-core is on the classpath (found under BPA-43).
+  Micrometer is excluded and banned; recheck on the next 8.10.x patch and then report it to Camunda."; (3) the Part B integration Camunda matches `docker-compose.yml` as closely as practical:
+  API protected, authorizations on, the demo admin initialisation and **PostgreSQL** secondary storage (ADR 0001). H2 only if PostgreSQL makes the setup unreasonable; if so it is stated here.
+  Rule from Ahsan: any single failure that takes more than 20 minutes is stopped and reported.

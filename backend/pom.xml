@@ -111,6 +111,33 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
+      <!-- Guard: a later dependency must not bring Micrometer back and silently stop every worker (see the comment on
+           spring-boot-starter-actuator above and the BPA-43 plan, Human-gap log). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.6.3</version>
+        <executions>
+          <execution>
+            <id>ban-micrometer-core</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <searchTransitive>true</searchTransitive>
+                  <excludes>
+                    <exclude>io.micrometer:micrometer-core</exclude>
+                    <exclude>io.micrometer:micrometer-jakarta9</exclude>
+                  </excludes>
+                  <message>camunda-spring-boot-3-starter 8.10.1: job workers never run while micrometer-core is on the classpath (found under BPA-43). Exclude it where it comes in; see the comment on spring-boot-starter-actuator in backend/pom.xml and the Human-gap log in intent/BPA-3-work-pack-assignment/plans/BPA-43.md.</message>
+                </bannedDependencies>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>
