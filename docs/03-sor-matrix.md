@@ -6,6 +6,7 @@ Column-level detail (types, constraints, SOR per column) is in claude/11-data-mo
 
 Rule of thumb: the workflow owns the flow and its state; existing systems keep owning their data.
 One SOR per field. "Real SOR" is the system that owns the data after go-live; in the POC every such row is a seeded copy labelled with that SOR.
+This matrix labels each **entity**. Column-level labels (including foreign-key columns, which carry the SOR of the entity they identify, e.g. `lookahead_item.design_dwg_ref` → D365 F&O Document Control) live in `docs/data-model.md` §1.3 (A12, 29 Oct 2026).
 
 ## Known SOR positions (from the FRD review)
 | Data domain | SOR | Integration pattern | Note |
