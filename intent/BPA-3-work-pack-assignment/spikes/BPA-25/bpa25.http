@@ -1,0 +1,100 @@
+### BPA-25 spike: single calls for VS Code REST Client / IntelliJ HTTP client.
+### Fill the variables, run run-bpa25.sh first (it creates users and deploys the models),
+### then use these to re-try one call by hand. Never commit real passwords.
+
+@base = http://localhost:8080
+@admin = demo:demo
+@svc = bpa-service:CHANGE_ME
+@tma = bpa25-tma:CHANGE_ME
+@wp = BPA25-WP-manual-1
+@pi = PASTE_PROCESS_INSTANCE_KEY
+@task = PASTE_USER_TASK_KEY
+@job = PASTE_JOB_KEY
+
+### 0 Topology (expect 401 without credentials)
+GET {{base}}/v2/topology
+
+### 3 Groups at login
+GET {{base}}/v2/authentication/me
+Authorization: Basic {{tma}}
+
+### Start a spike instance
+POST {{base}}/v2/process-instances
+Authorization: Basic {{admin}}
+Content-Type: application/json
+
+{ "processDefinitionId": "Process_Spike_BPA25_TaskApi", "variables": { "workpackNumber": "{{wp}}" } }
+
+### 1 Search by candidate group
+POST {{base}}/v2/user-tasks/search
+Authorization: Basic {{svc}}
+Content-Type: application/json
+
+{ "filter": { "candidateGroup": "time-method-analyst", "processInstanceKey": "{{pi}}", "state": "CREATED" } }
+
+### 2/5 Assign (as the user for check 2, as svc for check 5)
+POST {{base}}/v2/user-tasks/{{task}}/assignment
+Authorization: Basic {{svc}}
+Content-Type: application/json
+
+{ "assignee": "bpa25-tma", "allowOverride": true }
+
+### 2/5 Complete with variables
+POST {{base}}/v2/user-tasks/{{task}}/completion
+Authorization: Basic {{svc}}
+Content-Type: application/json
+
+{ "variables": { "estimatedManHours": 12.5 } }
+
+### Read a task (state, assignee)
+GET {{base}}/v2/user-tasks/{{task}}
+Authorization: Basic {{admin}}
+
+### 4 Activate the save job
+POST {{base}}/v2/jobs/activation
+Authorization: Basic {{svc}}
+Content-Type: application/json
+
+{ "type": "bpa25-save-workpack", "worker": "bpa25-manual", "timeout": 60000, "maxJobsToActivate": 10, "requestTimeout": 2000 }
+
+### 4 Throw WORKPACK_INVALID
+POST {{base}}/v2/jobs/{{job}}/error
+Authorization: Basic {{svc}}
+Content-Type: application/json
+
+{ "errorCode": "WORKPACK_INVALID", "errorMessage": "manual", "variables": { "validationMessages": [ { "field": "phase", "message": "Phase is required" } ] } }
+
+### 4 Read the task's variables
+POST {{base}}/v2/user-tasks/{{task}}/variables/search
+Authorization: Basic {{svc}}
+Content-Type: application/json
+
+{}
+
+### 6a Correlate with a messageId
+POST {{base}}/v2/messages/correlation
+Authorization: Basic {{svc}}
+Content-Type: application/json
+
+{ "name": "BPA25_AssignmentFileReceived", "correlationKey": "BPA25-NOWAIT-manual", "messageId": "sha:manual", "variables": {} }
+
+### 6b Publish at TTL 0 with a messageId (send twice)
+POST {{base}}/v2/messages/publication
+Authorization: Basic {{svc}}
+Content-Type: application/json
+
+{ "name": "BPA25_AssignmentFileReceived", "correlationKey": "BPA25-NOWAIT-manual", "timeToLive": 0, "messageId": "sha:manual", "variables": {} }
+
+### 7a/7b Correlate the replacement (send twice while the first instance is active)
+POST {{base}}/v2/messages/correlation
+Authorization: Basic {{svc}}
+Content-Type: application/json
+
+{ "name": "BPA25_AssignmentFileReplaced", "correlationKey": "{{wp}}", "variables": { "workpackNumber": "{{wp}}" } }
+
+### 7c Correlate with nothing waiting
+POST {{base}}/v2/messages/correlation
+Authorization: Basic {{svc}}
+Content-Type: application/json
+
+{ "name": "BPA25_AssignmentFileReceived", "correlationKey": "BPA25-NOWAIT-manual-7c", "variables": {} }

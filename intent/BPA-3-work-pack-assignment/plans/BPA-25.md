@@ -1,6 +1,6 @@
 # Plan BPA-25: Spike, confirm the Camunda 8.10.1 task and identity API calls
 
-- Status: Approved (Ahsan, 29 Oct 2026)
+- Status: Closed (29 Oct 2026)
 - Jira: BPA-25 (Spike, Epic BPA-3). Branch: `BPA-25-spike`
 - Owner: Ahsan / Usama. Plan prepared by Claude (BA), 29 Oct 2026
 - Sources: Jira BPA-25 description and comments (checks 6 and 7); 09 S5, S6, S14, S15, S25; ADR 0004, 0005,
