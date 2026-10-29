@@ -2,7 +2,7 @@
 
 Jira: BPA-37 (Task, epic BPA-3)
 Story last updated: 2026-10-28T21:39:14.876+0400
-Status: Approved (Faraz, 29 Oct 2026, in the claude.ai session)
+Status: Closed (2026-10-29)
 Approver: Faraz (Product Owner and Architect)
 Branch: BPA-37-write-adrs, from main 119a557
 
@@ -129,3 +129,5 @@ Not fixed: CLAUDE.md example (outside this item; Q5).
 ## Human-gap log
 - 29 Oct: the 06, 07, 08 and 10 sources live only in the Claude Project; Claude read them there (no copy needed).
 - 29 Oct: plan approved by Faraz in the claude.ai session, with Q1 and Q2 answered there.
+- 29 Oct: PR #10 merged by Ahsan (07:45 UTC) before the plan was set to Closed; closed in a follow-up PR
+  (same route as BPA-38, PR #9). After-merge step 6 (06 ADR column, ADRs copied to the Project) done the same day.
