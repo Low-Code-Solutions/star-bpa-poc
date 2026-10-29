@@ -1,8 +1,8 @@
-# Plan: BPA-41 n/a (summary pending: the Jira item is being created)
-Jira: BPA-41 (Task, epic BPA-17); relates to BPA-32 and BPA-25
-Story last updated: 29 Oct 2026
+# Plan: BPA-41 Fix require-plan.sh for Windows paths; create the demo/demo admin in compose
+Jira: BPA-41 (Task, epic BPA-17), status Backlog (it moves to Done after merge); relates to BPA-32 and BPA-25
+Story last updated: 2026-10-29T16:31:17+04:00
 Status: Closed (29 Oct 2026)
-Approver: Ahsan (Build Lead)
+Approver: Ahsan (Build Lead); approved 29 Oct 2026
 Branch: BPA-41-windows-hook-demo-admin, from main 6315f5c
 
 ## Problem
@@ -11,8 +11,8 @@ Branch: BPA-41-windows-hook-demo-admin, from main 6315f5c
 2. `docker-compose.yml` created no Camunda admin, although ADR 0005 (S29) assumes `demo/demo`.
 
 ## Readiness check (setup Task, so a light check)
-- Goal and limits: stated in the task text below. Jira item being created; relates to BPA-32 (the
-  hook) and BPA-25 (where the two faults were found). Jira status: n/a (setup Task).
+- Goal and limits: stated in the task text below. Relates to BPA-32 (the
+  hook) and BPA-25 (where the two faults were found). Jira status: Backlog.
 - Decisions behind it: ADR 0015 (plans and the require-plan hook), ADR 0005 S29 (demo/demo kept).
 - No business rule is involved; nothing to mark ASSUMPTION.
 - Blocking questions: none.
