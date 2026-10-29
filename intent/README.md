@@ -23,5 +23,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-35](BPA-3-work-pack-assignment/plans/BPA-35.md) | Copy design docs into the repo and make it master: 00, 01, 03, 09, data model | Closed (2026-10-28) |
 | [BPA-36](BPA-3-work-pack-assignment/plans/BPA-36.md) | Commit Epic 1 models with 09 fixes, bpmnlint config and lint CI; form specs to docs | Closed (2026-10-28) |
 | [BPA-37](BPA-3-work-pack-assignment/plans/BPA-37.md) | Write ADRs 0001-0014 and 0016 | Closed (2026-10-29) |
-| [BPA-39](BPA-3-work-pack-assignment/plans/BPA-39.md) | Docs catch-up after the ADRs: CLAUDE.md test-first rule and ADR reference, 09 stale rows | Approved (Faraz, 29 Oct 2026, in the claude.ai session) |
+| [BPA-39](BPA-3-work-pack-assignment/plans/BPA-39.md) | Docs catch-up after the ADRs: CLAUDE.md test-first rule and ADR reference, 09 stale rows | Closed (2026-10-29) |
 

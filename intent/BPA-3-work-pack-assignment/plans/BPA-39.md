@@ -2,7 +2,7 @@
 
 Jira: BPA-39 (Task, epic BPA-3)
 Story last updated: 2026-10-29T12:55:26.739+0400
-Status: Approved (Faraz, 29 Oct 2026, in the claude.ai session)
+Status: Closed (2026-10-29)
 Approver: Faraz (Product Owner and Architect)
 Branch: BPA-39-docs-catch-up, from main f60294b
 
@@ -51,3 +51,4 @@ notes mark rule and wording ASSUMPTION as BPA-12 does; the A11 notes cite BPA-15
 
 ## Human-gap log
 - 29 Oct: plan approved by Faraz in the claude.ai session.
+- 29 Oct: PR #12 merged by Ahsan (09:23 UTC) before the plan was set to Closed; closed in a follow-up PR (as BPA-37, PR #11).
