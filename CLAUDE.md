@@ -69,6 +69,10 @@ docs/09. Report the disagreement; do not resolve it silently.
 - Never move an item to Ready or Done. Faraz makes those moves in Jira as Product Owner, even when
   working as BA or developer in the session.
 
+## Tests
+Test-first rule (09 L15, ADR 0014), as written in 09:
+For each Gherkin scenario, first write a test named `BPA<n>_<camelCaseScenarioTitle>`, run it, and show it fails for the expected reason. Only then write code. One test per scenario. Don't edit a test to make it pass without saying so in the PR.
+
 ## Branches and pull requests
 - Never commit or push to main. All changes go through a pull request.
 - Guards (09 L13, BPA-38): deny rules in `.claude/settings.json` and `.claude/hooks/git-guard.sh`
@@ -83,7 +87,7 @@ docs/09. Report the disagreement; do not resolve it silently.
 - Stories: always one branch per story. Never combine stories.
 - Tasks: one branch per task that changes the repo. Small related tasks
   may share one branch: name it after the first key and list every key
-  in the PR title, e.g. "BPA-18, BPA-19: CLAUDE.md, Jira rules and ADR 0001".
+  in the PR title, e.g. "BPA-18, BPA-19: CLAUDE.md, Jira rules and ADR 0016".
   Tasks are related when they touch the same area and would be reviewed
   together. If unsure, ask before grouping.
 - Tasks that do not change the repo get no branch.
