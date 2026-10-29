@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BPA-25 spike model. THROWAWAY: not part of Epic 1, never deploy to a showcase.
+  Stands in for Process_PPC_WorkerReassignment's message start (check 7a/7b/7d).
+  The user task only keeps the instance active so a second correlate with the same key can be tried.
+  Message name is prefixed BPA25_ so it can never start a real reassignment.
+-->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:modeler="http://camunda.org/schema/modeler/1.0"
+                  id="Definitions_Spike_BPA25_Reassign"
+                  targetNamespace="http://bpmn.io/schema/bpmn"
+                  exporter="Claude (BPA-25 spike)" exporterVersion="1.0"
+                  modeler:executionPlatform="Camunda Cloud"
+                  modeler:executionPlatformVersion="8.10.1">
+
+  <bpmn:process id="Process_Spike_BPA25_Reassign" name="BPA-25 spike: reassignment start" isExecutable="true">
+    <bpmn:documentation>Throwaway model for Jira BPA-25, check 7. Started only by message BPA25_AssignmentFileReplaced.</bpmn:documentation>
+
+    <bpmn:startEvent id="StartEvent_Spike_FileReplaced" name="Assignment file replaced (spike)">
+      <bpmn:outgoing>Flow_Spike_ToHold</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_Spike_FileReplaced"
+                                   messageRef="Message_Spike_FileReplaced" />
+    </bpmn:startEvent>
+
+    <bpmn:userTask id="UserTask_Spike_HoldReassignment" name="Hold reassignment open (spike)">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="production-team" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Spike_ToHold</bpmn:incoming>
+      <bpmn:outgoing>Flow_Spike_ToReassignEnd</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:endEvent id="EndEvent_Spike_ReassignEnd" name="Reassignment ended (spike)">
+      <bpmn:incoming>Flow_Spike_ToReassignEnd</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_Spike_ToHold" sourceRef="StartEvent_Spike_FileReplaced" targetRef="UserTask_Spike_HoldReassignment" />
+    <bpmn:sequenceFlow id="Flow_Spike_ToReassignEnd" sourceRef="UserTask_Spike_HoldReassignment" targetRef="EndEvent_Spike_ReassignEnd" />
+  </bpmn:process>
+
+  <bpmn:message id="Message_Spike_FileReplaced" name="BPA25_AssignmentFileReplaced" />
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Spike_Reassign">
+    <bpmndi:BPMNPlane id="BPMNPlane_Spike_Reassign" bpmnElement="Process_Spike_BPA25_Reassign">
+      <bpmndi:BPMNShape id="StartEvent_Spike_FileReplaced_di" bpmnElement="StartEvent_Spike_FileReplaced">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_Spike_HoldReassignment_di" bpmnElement="UserTask_Spike_HoldReassignment">
+        <dc:Bounds x="240" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Spike_ReassignEnd_di" bpmnElement="EndEvent_Spike_ReassignEnd">
+        <dc:Bounds x="392" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Spike_ToHold_di" bpmnElement="Flow_Spike_ToHold">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="240" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Spike_ToReassignEnd_di" bpmnElement="Flow_Spike_ToReassignEnd">
+        <di:waypoint x="340" y="120" />
+        <di:waypoint x="392" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

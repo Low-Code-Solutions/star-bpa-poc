@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BPA-25 spike model. THROWAWAY: not part of Epic 1, never deploy to a showcase.
+  Exercises checks 1-5 (user task search/assign/complete, BPMN error loop-back) and 7c
+  (correlate to a waiting intermediate catch event).
+  Message name is prefixed BPA25_ so it can never correlate to a real Epic 1 instance.
+-->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:modeler="http://camunda.org/schema/modeler/1.0"
+                  id="Definitions_Spike_BPA25_TaskApi"
+                  targetNamespace="http://bpmn.io/schema/bpmn"
+                  exporter="Claude (BPA-25 spike)" exporterVersion="1.0"
+                  modeler:executionPlatform="Camunda Cloud"
+                  modeler:executionPlatformVersion="8.10.1">
+
+  <bpmn:process id="Process_Spike_BPA25_TaskApi" name="BPA-25 spike: task API" isExecutable="true">
+    <bpmn:documentation>Throwaway model for Jira BPA-25. Input variable: workpackNumber (string).</bpmn:documentation>
+
+    <bpmn:startEvent id="StartEvent_Spike_Start" name="Spike started">
+      <bpmn:outgoing>Flow_Spike_ToJoin</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:exclusiveGateway id="Gateway_Spike_JoinEdit" name="">
+      <bpmn:incoming>Flow_Spike_ToJoin</bpmn:incoming>
+      <bpmn:incoming>Flow_Spike_LoopBack</bpmn:incoming>
+      <bpmn:outgoing>Flow_Spike_ToEdit</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="UserTask_Spike_EditWorkPack" name="Edit Work Pack (spike)">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="time-method-analyst" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Spike_ToEdit</bpmn:incoming>
+      <bpmn:outgoing>Flow_Spike_ToSave</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="ServiceTask_Spike_SaveWorkPack" name="Save Work Pack (spike)">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="bpa25-save-workpack" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Spike_ToSave</bpmn:incoming>
+      <bpmn:outgoing>Flow_Spike_ToWaitFile</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:boundaryEvent id="BoundaryEvent_Spike_WorkPackInvalid" name="Work Pack invalid"
+                        attachedToRef="ServiceTask_Spike_SaveWorkPack">
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=validationMessages" target="validationMessages" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:outgoing>Flow_Spike_LoopBack</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_Spike_WorkPackInvalid"
+                                 errorRef="Error_Spike_WorkPackInvalid" />
+    </bpmn:boundaryEvent>
+
+    <bpmn:intermediateCatchEvent id="Event_Spike_WaitFileReceived" name="Assignment file received (spike)">
+      <bpmn:incoming>Flow_Spike_ToWaitFile</bpmn:incoming>
+      <bpmn:outgoing>Flow_Spike_ToEnd</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_Spike_FileReceived"
+                                   messageRef="Message_Spike_FileReceived" />
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:endEvent id="EndEvent_Spike_End" name="Spike ended">
+      <bpmn:incoming>Flow_Spike_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_Spike_ToJoin" sourceRef="StartEvent_Spike_Start" targetRef="Gateway_Spike_JoinEdit" />
+    <bpmn:sequenceFlow id="Flow_Spike_ToEdit" sourceRef="Gateway_Spike_JoinEdit" targetRef="UserTask_Spike_EditWorkPack" />
+    <bpmn:sequenceFlow id="Flow_Spike_ToSave" sourceRef="UserTask_Spike_EditWorkPack" targetRef="ServiceTask_Spike_SaveWorkPack" />
+    <bpmn:sequenceFlow id="Flow_Spike_LoopBack" sourceRef="BoundaryEvent_Spike_WorkPackInvalid" targetRef="Gateway_Spike_JoinEdit" />
+    <bpmn:sequenceFlow id="Flow_Spike_ToWaitFile" sourceRef="ServiceTask_Spike_SaveWorkPack" targetRef="Event_Spike_WaitFileReceived" />
+    <bpmn:sequenceFlow id="Flow_Spike_ToEnd" sourceRef="Event_Spike_WaitFileReceived" targetRef="EndEvent_Spike_End" />
+  </bpmn:process>
+
+  <bpmn:error id="Error_Spike_WorkPackInvalid" name="WORKPACK_INVALID" errorCode="WORKPACK_INVALID" />
+
+  <bpmn:message id="Message_Spike_FileReceived" name="BPA25_AssignmentFileReceived">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=workpackNumber" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Spike_TaskApi">
+    <bpmndi:BPMNPlane id="BPMNPlane_Spike_TaskApi" bpmnElement="Process_Spike_BPA25_TaskApi">
+      <bpmndi:BPMNShape id="StartEvent_Spike_Start_di" bpmnElement="StartEvent_Spike_Start">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_Spike_EditWorkPack_di" bpmnElement="UserTask_Spike_EditWorkPack">
+        <dc:Bounds x="340" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_Spike_SaveWorkPack_di" bpmnElement="ServiceTask_Spike_SaveWorkPack">
+        <dc:Bounds x="500" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BoundaryEvent_Spike_WorkPackInvalid_di" bpmnElement="BoundaryEvent_Spike_WorkPackInvalid">
+        <dc:Bounds x="532" y="142" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_Spike_WaitFileReceived_di" bpmnElement="Event_Spike_WaitFileReceived">
+        <dc:Bounds x="662" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Spike_End_di" bpmnElement="EndEvent_Spike_End">
+        <dc:Bounds x="762" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Spike_JoinEdit_di" bpmnElement="Gateway_Spike_JoinEdit" isMarkerVisible="true">
+        <dc:Bounds x="235" y="95" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Spike_ToJoin_di" bpmnElement="Flow_Spike_ToJoin">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="235" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Spike_ToEdit_di" bpmnElement="Flow_Spike_ToEdit">
+        <di:waypoint x="285" y="120" />
+        <di:waypoint x="340" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Spike_ToSave_di" bpmnElement="Flow_Spike_ToSave">
+        <di:waypoint x="440" y="120" />
+        <di:waypoint x="500" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Spike_LoopBack_di" bpmnElement="Flow_Spike_LoopBack">
+        <di:waypoint x="550" y="178" />
+        <di:waypoint x="550" y="230" />
+        <di:waypoint x="260" y="230" />
+        <di:waypoint x="260" y="145" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Spike_ToWaitFile_di" bpmnElement="Flow_Spike_ToWaitFile">
+        <di:waypoint x="600" y="120" />
+        <di:waypoint x="662" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Spike_ToEnd_di" bpmnElement="Flow_Spike_ToEnd">
+        <di:waypoint x="698" y="120" />
+        <di:waypoint x="762" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
