@@ -11,6 +11,7 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-18](BPA-17-claude-setup/plans/BPA-18.md) | Repo setup: CLAUDE.md with Jira rules and docs imports | Closed (2026-10-28; rebuilt under BPA-33) |
 | [BPA-27](BPA-17-claude-setup/plans/BPA-27.md) | Adopt the playbook artifact chain: intent → spec → plan → PR | Closed (2026-10-28) |
 | [BPA-38](BPA-17-claude-setup/plans/BPA-38.md) | Harness: protect main, shared Atlassian MCP config, plan-closed CI check | Closed (2026-10-28) |
+| [BPA-41](BPA-17-claude-setup/plans/BPA-41.md) | Fix require-plan.sh for Windows paths; create the demo/demo admin in compose | Closed (29 Oct 2026) |
 
 ## BPA-3-work-pack-assignment
 
@@ -19,10 +20,12 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 
 | Plan | Summary | Status |
 |---|---|---|
+| [BPA-25](BPA-3-work-pack-assignment/plans/BPA-25.md) | ? | ? |
 | [BPA-34](BPA-3-work-pack-assignment/plans/BPA-34.md) | Restructure repo to 09 L1 (layout only, no content) | Closed (2026-10-28) |
 | [BPA-35](BPA-3-work-pack-assignment/plans/BPA-35.md) | Copy design docs into the repo and make it master: 00, 01, 03, 09, data model | Closed (2026-10-28) |
 | [BPA-36](BPA-3-work-pack-assignment/plans/BPA-36.md) | Commit Epic 1 models with 09 fixes, bpmnlint config and lint CI; form specs to docs | Closed (2026-10-28) |
 | [BPA-37](BPA-3-work-pack-assignment/plans/BPA-37.md) | Write ADRs 0001-0014 and 0016 | Closed (2026-10-29) |
 | [BPA-39](BPA-3-work-pack-assignment/plans/BPA-39.md) | Docs catch-up after the ADRs: CLAUDE.md test-first rule and ADR reference, 09 stale rows | Closed (2026-10-29) |
 | [BPA-40](BPA-3-work-pack-assignment/plans/BPA-40.md) | Data model v0.5: approval fixes | Closed (2026-10-29) |
+| [BPA-42](BPA-3-work-pack-assignment/plans/BPA-42.md) | Generate V1__baseline_schema.sql and R__seed_reference_data.sql from data model v0.5 | Closed (2026-10-29) |
 
