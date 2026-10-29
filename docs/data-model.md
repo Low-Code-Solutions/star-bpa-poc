@@ -926,7 +926,7 @@ All items were decided on the PO call of 28 Oct 2026 (Faraz with Khitaba and Ahs
 | `06` | — | add D66–D69 for P1–P4 | Khitaba |
 | `09`, G7 | enum `AwaitingFile, Assigned, Replacing` | add a change-log line: amended by D61 (adds `Assigning`) | Ahsan/Usama |
 
-**Raised 29 Oct by the v0.5 review (Jira outranks the model; a confirmed Jira batch, with the PO's decision where marked):**
+**Raised 29 Oct by the v0.5 review; all applied in Jira the same day after the PO confirmed the batch** (BPA-12 Description and SOR Notes; BPA-13 Description, SOR Notes and a new D75 scenario, `BPA13_replacementStartFailureReverts`):
 
 | Item | Says | v0.5 says | Why |
 | --- | --- | --- | --- |

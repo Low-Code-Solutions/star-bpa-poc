@@ -53,8 +53,8 @@ Also: `docs/03-sor-matrix.md` gets one footnote line (A12). This plan; `intent/R
 3. 03 footnote.
 4. Proof checks; fresh-context review against Jira and the brief; PR; Jira linkage comment.
 5. Review fixes; plan Closed before Ahsan merges.
-6. After merge: Claude Project `claude/11-data-model.md` refreshed; Jira batch (confirmed first) for BPA-13 SOR Notes
-   (`wp_outcome`) and BPA-12 result columns (`wpOutcome`), per B1's ripple.
+6. After merge: Claude Project `claude/11-data-model.md` refreshed; spec.md design-sources line updated to v0.5.
+   (The BPA-12/BPA-13 Jira batch was confirmed and applied on 29 Oct, before merge.)
 
 ## Risks
 - **An edit drifts from a decision's wording.** Mitigation: each change cites its ID; the reviewer checks against the brief.
@@ -74,7 +74,7 @@ sequence MAXVALUE; N1 UNIQUE deferrable (A); `published_at` default; §7.3 CHECK
 text vs B1/C3) logged in §10.2 for a confirmed Jira batch. spec.md "v0.4" line updated after merge.
 
 ## Questions
-- Q1 (PO): BPA-13 and BPA-12 text still describe "publish … in the same transaction"; confirm the Jira batch in §10.2.
+- Q1: resolved 29 Oct. The PO confirmed the batch; BPA-12 and BPA-13 were aligned in Jira (incl. a D75 scenario on BPA-13).
 - Q2: resolved 29 Oct by the PO as D75, "Replacement could not be started; try again" (wording ASSUMPTION).
 
 ## Human-gap log
