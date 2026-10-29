@@ -1,7 +1,7 @@
 # Plan: BPA-40 Data model v0.5: approval fixes
 
 Jira: BPA-40 (Task, epic BPA-3)
-Story last updated: 2026-10-29T13:31:00+0400 (comments of 29 Oct up to 10411)
+Story last updated: 2026-10-29T13:32:00+0400 (comment 10411)
 Status: Approved (Faraz, 29 Oct 2026, in the claude.ai session: "Approve A, apply, start v0.5"; scope = BPA-40 description and comments 10408, 10409, 10411)
 Approver: Faraz (Product Owner and Architect)
 Branch: BPA-40-data-model-v0.5, from main 598814a
@@ -67,8 +67,15 @@ Also: `docs/03-sor-matrix.md` gets one footnote line (A12). This plan; `intent/R
 - Every table section still has the SOR column; no `TODO`.
 - Plan check and hook tests pass.
 
+## Review (qa-reviewer, fresh context, 29 Oct)
+0 BLOCKER, 6 IMPORTANT, 8 NIT. Fixed: §5.12 claim limited to groups that are sent; failure messages per path; "or fails"
+marked (A) and raised; `outcome` start value and writer wording; `published_message` out of audit scope; Q-DM14 row;
+sequence MAXVALUE; N1 UNIQUE deferrable (A); `published_at` default; §7.3 CHECK note. Story conflicts (BPA-12, BPA-13
+text vs B1/C3) logged in §10.2 for a confirmed Jira batch. spec.md "v0.4" line updated after merge.
+
 ## Questions
-- None blocking.
+- Q1 (PO): BPA-13 and BPA-12 text still describe "publish … in the same transaction"; confirm the Jira batch in §10.2.
+- Q2 (Khitaba or PO): message when the correlate call fails technically on the replacement path (§10.2).
 
 ## Human-gap log
 - 29 Oct: plan approved by Faraz in the claude.ai session as part of "start v0.5"; the scope was set by his

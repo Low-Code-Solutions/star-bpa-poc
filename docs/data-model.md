@@ -450,7 +450,7 @@ Matching key: **Design Dwgs = the Work Pack's drawing** (BPA-11). One row per dr
 **SOR reason:** the POC plays FMS's role for Work Packs. Real SOR FMS, copied to D365 via Int-4.1 (C2, D47). Batch/file if made live.
 
 Notes:
-- `workpack_number` is generated, read-only, gaps allowed (D15, ASSUMPTION). Generator (A2): `CREATE SEQUENCE bpa.workpack_number_seq`; `save-workpack` formats `'WP-' || lpad(nextval('bpa.workpack_number_seq')::text, 6, '0')`. A rolled-back save leaves a gap, which D15 allows. The format `CHECK` is safe because the POC generates every value.
+- `workpack_number` is generated, read-only, gaps allowed (D15, ASSUMPTION). Generator (A2): `CREATE SEQUENCE bpa.workpack_number_seq MAXVALUE 999999 NO CYCLE` (so `lpad` never truncates); `save-workpack` formats `'WP-' || lpad(nextval('bpa.workpack_number_seq')::text, 6, '0')`. A rolled-back save leaves a gap, which D15 allows. The format `CHECK` is safe because the POC generates every value.
 - **No `created_by` business column** (P4): the creator is the audit `created_by`, the Camunda username (D63).
 - `process_instance_key UNIQUE` is what makes `save-workpack` idempotent on retry (D65, 09 S7).
 - **No `project_ref` column.** A Work Pack's project is derived from its activity (BPA-16, C8a); storing it would create a second copy of one value.
@@ -480,7 +480,7 @@ Notes:
 **SOR reason:** part of the Work Pack, which the POC masters (C2, D47).
 The composite FK is defence in depth; `save-workpack` still checks D16 first so the user sees `Phase Finishing is not selected for this Work Pack` rather than a constraint violation (D56). It is **deferred to commit** (F13) so a correction that moves materials and removes a phase in one save does not depend on statement order.
 
-**Candidate key (N1, D74; accepted by the PO 29 Oct, amends Q-DM4).** `UNIQUE (workpack_id, phase, material_ref)`. A material may appear in several phases of a Work Pack but only once per phase. `save-workpack` checks first and throws `WORKPACK_INVALID` with `Material <material_ref> is listed twice for phase <phase>`, e.g. `Material MAT-PIPE-06 is listed twice for phase Cutting` (ASSUMPTION wording, BPA-6); the constraint is the backstop.
+**Candidate key (N1, D74; accepted by the PO 29 Oct, amends Q-DM4).** `UNIQUE (workpack_id, phase, material_ref) DEFERRABLE INITIALLY DEFERRED` **(A: deferred for the same statement-order reason as the composite FK, F13)**. A material may appear in several phases of a Work Pack but only once per phase. `save-workpack` checks first and throws `WORKPACK_INVALID` with `Material <material_ref> is listed twice for phase <phase>`, e.g. `Material MAT-PIPE-06 is listed twice for phase Cutting` (ASSUMPTION wording, BPA-6); the constraint is the backstop.
 
 **Updates in place (A4, F13).** Rows are matched by `id`, carried in the task variables: the React screen round-trips each material line's `id`. The worker updates lines that arrive with an `id`, inserts those without one, and deletes the Work Pack's other lines. `id` joins the S14 per-task variable allow-list (§6.3).
 
@@ -569,8 +569,8 @@ Every upload, duplicates included, gets its own row, so `GET /api/v1/assignment-
 Deliberate choices:
 - The four input columns are **raw text and nullable**, because a row must be logged even when invalid. `estimated_hours_raw` keeps `abc` so BPA-22 can answer `Estimated hours must be a number`; `badge_no` keeps `E9999` so it can answer `Worker not in worker master data`. Foreign keys here would make the unhappy paths unloggable.
 - `remarks` is **unbounded `text`**, unlike `worker_assignment.remarks`. A 251-character value must be stored to be rejected with `Remarks can be at most 250 characters`.
-- **Who writes `outcome` (B6).** The upload endpoint writes the required-field, routing and duplicate outcomes at intake. A row routed to its Work Pack starts `Pending` and is overwritten by `validate-worker-assignment` (D49) or, for a replacement, by `replace-worker-assignment`. The writer of each string is listed in §7.3.
-- **Two outcomes on one row (B1, Ahsan; C1, PO).** A row's own result is in `outcome`; the Work Pack-level `Replacement not applied: file has rejected rows` (D71) is in `wp_outcome`, shown after `outcome`. A rejected row of a Work Pack not applied carries both (BPA-13 scenario 9). A valid row of such a Work Pack keeps `outcome` NULL and carries only `wp_outcome`; it never reads `Assigned` **(A)**, no source states it. A joined single string was rejected because `"; "` already occurs inside three §7.3 strings. The API result gains `wpOutcome` after `outcome`.
+- **Who writes `outcome` (B6).** The upload endpoint writes `Workpack number is required` and the routing and duplicate outcomes at intake. A row routed to its Work Pack starts `Pending` and is overwritten by `validate-worker-assignment` (D49) or, for a replacement, by `replace-worker-assignment`, which also writes the other required-field outcomes (BPA-22). The writer of each string is listed in §7.3.
+- **Two outcomes on one row (B1, Ahsan; C1, PO).** A row's own result is in `outcome`; the Work Pack-level `Replacement not applied: file has rejected rows` (D71) is in `wp_outcome`, shown after `outcome`. A rejected row of a Work Pack not applied carries both (BPA-13 scenario 9). For a valid row of such a Work Pack, `replace-worker-assignment` sets `outcome` from `Pending` to NULL and writes only `wp_outcome`; it never reads `Assigned` **(A)**, no source states it. A joined single string was rejected because `"; "` already occurs inside three §7.3 strings. The API result gains `wpOutcome` after `outcome`.
 - **Synthetic rows (F1, ASSUMPTION).** When a replacement removes a Worker who has hours loaded, `replace-worker-assignment` writes a row with `row_number` NULL, the Work Pack number, the Worker's Badge No and outcome `Hours loaded; not removed`, so the rebuilt result shows it (BPA-13 scenario 2). The result lists synthetic rows after the file's rows. Partial unique index `UNIQUE (assignment_file_id, workpack_number, badge_no) WHERE row_number IS NULL`, written with `ON CONFLICT DO NOTHING`, so a retry does not duplicate them (B5).
 - **Worker name in the result (B15, D59; Khitaba, approved by the PO 29 Oct).** The result's `worker_name` column (BPA-12) is the master name, from joining `badge_no` to `worker.employee_ref` when the result is built; blank when the Badge No is not in the worker master **(A)**. It is not stored here.
 
@@ -718,12 +718,12 @@ Both scope columns are nullable because groups scope differently: `workpack-owne
 | `id` | `uuid` | NOT NULL | PK | — | 04-conventions |
 | `sha256` | `text` | NOT NULL | **UNIQUE (sha256, workpack_number)** | POC database | B3 (Usama); D73 |
 | `workpack_number` | `text` | NOT NULL | part of the unique key; not an FK **(A)** | POC database | B3; D73 |
-| `published_at` | `timestamptz` | NOT NULL | | POC database | B3 |
+| `published_at` | `timestamptz` | NOT NULL | default `now()`: the claim time, set before the send | POC database | B3 |
 
 **SOR reason:** the POC's own record of which file content it has sent to which Work Pack. It is the duplicate guard for D73 and replaces the per-file "published" idea (B3, Usama, 29 Oct).
 
-- **Claim, then send.** For each Work Pack group in an upload, the endpoint inserts `(sha256, workpack_number)` with `ON CONFLICT DO NOTHING` inside its transaction. Zero rows affected means the pair was already published: the rows read `Already processed in an earlier upload` and nothing is sent. Otherwise it commits and then sends the message.
-- **Undo on failure (C2, PO 29 Oct).** If the send fails or nothing correlates (D62), the endpoint deletes the claim in a compensating transaction before showing `Not processed: Work Pack not ready; resend the file`, so the resend D62 asks for is accepted (BPA-12).
+- **Claim, then send.** Only for a Work Pack group that will be sent (state `AwaitingFile` or `Assigned`, §8), the endpoint inserts `(sha256, workpack_number)` with `ON CONFLICT DO NOTHING` inside its transaction. Zero rows affected means the pair was already published: the rows read `Already processed in an earlier upload` and nothing is sent. Otherwise it commits and then sends the message. Groups answered at intake (not found, not Released, not ready, `Assigning`, `Replacing`) never claim, so they can be resent (D73).
+- **Undo on failure (C2, PO 29 Oct).** If nothing correlates, the endpoint deletes the claim in a compensating transaction before answering, so a resend is accepted (BPA-12): on the `AwaitingFile` path the rows read `Not processed: Work Pack not ready; resend the file` (D62); on the `Assigned` (replacement) path the state reverts and the rows read `Replacement already in progress` (C3, §8).
 - **At-most-once (accepted).** A crash between the commit and the send leaves a claim with no message. The user's resend would then read `Already processed in an earlier upload`. Closing that gap needs a transactional outbox: the production answer, not built for the POC.
 - **Concurrent uploads.** Two identical uploads at the same moment cannot both claim the pair; the UNIQUE constraint decides.
 - `assignment_file` has no `published` column: whether a file published anything is derived by joining on `sha256`.
@@ -760,7 +760,7 @@ Index: `(table_name, record_id)` (A15), the lookup the tests and any audit scree
 - `uuid`: canonical lower-case form
 - `bytea` (`workpack_print.file`): not logged by value; logged as `sha256:<hex>` of the content **(A)** (A3)
 
-Scope: the POC-mastered tables of domains B–E. Out of scope: reference-data copies (seed-only) and domain F (`app_user`, `user_role_scope`, written only by S22) — Q-DM11. BPA-23's worked example: table `workpack_phase`, column `manhours`, old `250`, new `300`.
+Scope: the POC-mastered tables of domains B–E. Out of scope: reference-data copies (seed-only), domain F (`app_user`, `user_role_scope`, written only by S22) — Q-DM11 — and `published_message` (itself a log, §5.12). BPA-23's worked example: table `workpack_phase`, column `manhours`, old `250`, new `300`.
 
 ### 6.2 Not a table: `lead_time_days`
 
@@ -808,7 +808,7 @@ Approved drawing statuses are `IFC` and `As-Built` only (D10). Any other value o
 
 ### 7.3 Outcome vocabularies
 
-Stored as the exact message string, because the result shows it verbatim (D49, D58). Not `CHECK`-constrained: the lists are long, two placements rest on judgement, and a wrong `CHECK` would reject valid rows. Tests assert the strings.
+Stored as the exact message string, because the result shows it verbatim (D49, D58). `outcome` is not `CHECK`-constrained (`wp_outcome` is, because it has a single value, B1): the lists are long, two placements rest on judgement, and a wrong `CHECK` would reject valid rows. Tests assert the strings.
 
 **Row outcomes (`assignment_file_row.outcome`)**, by writer (B6):
 - **Upload endpoint, at intake:** `Workpack number is required` · `Work Pack not found` · `Work Pack is not Released` · `Work Pack not ready for assignment yet` · `Not processed: Work Pack not ready; resend the file` · `Assignment still in progress; try again later` · `Replacement already in progress` (P2) · `Already processed in an earlier upload` (D73, ASSUMPTION) · `Pending` (routed, awaiting validation)
@@ -838,7 +838,7 @@ Why `Workpack number is required` is an intake outcome: a row with no Workpack n
 | `AwaitingFile` | `AwaitingFile` | `validate-worker-assignment` | **every** row rejected (loop back, D5) | D61, BPA-22 |
 | `Assigning` | `Assigned` | `create-digital-timesheets` | time sheets created | D61, BPA-22, BPA-15 |
 | `Assigned` | `Replacing` | the upload endpoint | a replacement file is uploaded: compare-and-set `UPDATE … SET assignment_state = 'Replacing' WHERE assignment_state = 'Assigned'`, commit, then correlate `AssignmentFileReplaced` (C3) | D61, BPA-13; B4, C3 |
-| `Replacing` | `Assigned` | the upload endpoint | the correlate call starts no instance (a reassignment with the same key is still ending) or fails: revert, rows read `Replacement already in progress` (C3) | B4, C3 |
+| `Replacing` | `Assigned` | the upload endpoint | the correlate call starts no instance (a reassignment with the same key is still ending): revert, rows read `Replacement already in progress` (C3). On a technical error from the call, the same revert applies **(A)**; the message for that case is a question in §10.2 | B4, C3 |
 | `Replacing` | `Assigned` | `replace-worker-assignment` | **both** outcomes — applied and not applied | D61, BPA-13 |
 
 **How the endpoint sends (B4, C3; PO 29 Oct).** Both messages are sent with Camunda's synchronous **correlate** call, not publish, so the endpoint knows whether an instance received the message. A Zeebe call cannot join the PostgreSQL transaction, so every state change is committed first and undone if nothing correlates. Correlate's "nothing correlated" response is not documented; BPA-25's seventh check records it, and the code is built against the observed response. D61 is unchanged: `replace-worker-assignment` still resets `Assigned` on both outcomes.
@@ -875,7 +875,7 @@ All items were decided on the PO call of 28 Oct 2026 (Faraz with Khitaba and Ahs
 | Q-DM11 | `audit_log` and domain F | Out of scope |
 | Q-DM12 | Message while `Replacing` | "Replacement already in progress" (P2 / D67) |
 | Q-DM13 | Replacement not applied: scope | Per Work Pack (D71) |
-| Q-DM14 | Duplicate files | Duplicate only if an earlier upload was routed; no unique constraint (D70, amends G10) |
+| Q-DM14 | Duplicate files | Duplicate only if an earlier upload was routed; no unique constraint (D70, amends G10). **Refined 29 Oct by D73:** per `(sha256, workpackNumber)` (§5.1, §5.12) |
 | Q-DM15 | Re-adding a removed Worker | Reopen line and time sheet (D72) |
 
 **Approval review of v0.4, 29 Oct 2026: all decided.** Every finding (B1–B15, A1–A15, N1–N4, C1–C5) is decided and listed in §0 v0.5. The record is the Claude Project's `audits/data-model-v0.4-approval-2026-10-29.md`.
@@ -925,6 +925,15 @@ All items were decided on the PO call of 28 Oct 2026 (Faraz with Khitaba and Ahs
 | `06`, D44 | `GET /api/v1/notifications?recipientId=` | `GET /api/v1/me/notifications` (BPA-16, 09 S6) | Khitaba |
 | `06` | — | add D66–D69 for P1–P4 | Khitaba |
 | `09`, G7 | enum `AwaitingFile, Assigned, Replacing` | add a change-log line: amended by D61 (adds `Assigning`) | Ahsan/Usama |
+
+**Raised 29 Oct by the v0.5 review (Jira outranks the model; a confirmed Jira batch, with the PO's decision where marked):**
+
+| Item | Says | v0.5 says | Why |
+| --- | --- | --- | --- |
+| BPA-13 Description | "the upload endpoint sets Replacing in the same transaction as publishing AssignmentFileReplaced" | compare-and-set, commit, then correlate; revert when no instance starts | B4, C3. **PO to confirm the story edit**: comment 10409 said C3 needs no BPA-13 change, but its text describes the old mechanism |
+| BPA-13 SOR Notes | "'Replacement not applied…' is a row outcome on the rows of the Work Pack" | held in `assignment_file_row.wp_outcome` | B1 (the ripple Ahsan named) |
+| BPA-12 Description and SOR Notes | "publish AssignmentFileReceived (… TTL 0, message ID per G10)"; result columns without `wpOutcome` | correlate, not publish; result gains `wpOutcome` after `outcome` | C3, B1 |
+| Message on a technical error from the correlate call (replacement path) | — | revert as for "no instance" **(A)**; message not decided | C3 covers only "no instance starts"; Khitaba or the PO to word it |
 
 ### 10.3 Assumptions this model carries
 
