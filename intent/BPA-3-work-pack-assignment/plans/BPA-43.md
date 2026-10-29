@@ -173,5 +173,9 @@ Not changed: `models/`, `templates/`, V1 and the seed, `docs/data-model.md`, Jir
 - 29 Oct: Jira BPA-43 read through the claude.ai Atlassian connector (the repo's `atlassian` server needs an interactive sign-in).
 - 29 Oct: no JDK or Maven on the machine; the Part A start depends on Q1.
 - 29 Oct: Maven Central checked for the Camunda 8.10.1 artifacts and their Spring Boot bases (3.5.16 for the `-3-` and `-boot-3` artifacts, 4.1.1 for the plain ones).
-- 29 Oct: Part A pieces committed while the worker process test (`BPA43_createHourJournalHeaderJobIsHandledByTheWorker`) is a **known failure**, not disabled: the engine hands the
-  job to the Spring `@JobWorker`, but the method body never runs and nothing is logged. Under investigation (dependency versions first, then uncaught-exception logging, then a plain Testcontainers Camunda without the Process Test library); timebox 30 minutes.
+- 29 Oct: Part A pieces were committed (1a1b9b4) while the worker process test was a known failure, not disabled. **Root cause found the same day:** with `micrometer-core`
+  on the classpath (it comes with `spring-boot-starter-actuator`), the Camunda Spring starter 8.10.1 (Boot 3 variant) activates the job and enters `JobHandlerInvokingBeans.handle`, but never
+  invokes the `@JobWorker` method or completes the job, and logs nothing. Reproduced with a plain Testcontainers Camunda 8.10.1 and no Process Test library; the same worker completes once
+  `micrometer-core` and `micrometer-jakarta9` are excluded from the actuator starter in `backend/pom.xml`. Dependency versions were clean (Boot 3.5.16, Framework 6.2.19, `-boot-3` Camunda artifacts).
+  Workaround in place; the underlying defect (starter metrics path or its executor wrapper) is not diagnosed and should be reported to Camunda or rechecked on a later 8.10.x patch. Consequence for the
+  app: no Micrometer metrics (actuator health is unaffected).
