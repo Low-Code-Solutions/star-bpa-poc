@@ -34,8 +34,13 @@ services:
       CAMUNDA_DATA_SECONDARY_STORAGE_RDBMS_URL: jdbc:postgresql://postgres:5432/${CAMUNDA_DB_NAME:-camunda}
       CAMUNDA_DATA_SECONDARY_STORAGE_RDBMS_USERNAME: ${CAMUNDA_DB_USER:-camunda}
       CAMUNDA_DATA_SECONDARY_STORAGE_RDBMS_PASSWORD: ${CAMUNDA_DB_PASSWORD:-camunda}
-      # Built-in basic authentication (default demo/demo user)
+      # Built-in basic authentication; creates the demo/demo admin (ADR 0005, S29)
       CAMUNDA_SECURITY_AUTHENTICATION_METHOD: basic
+      CAMUNDA_SECURITY_INITIALIZATION_USERS_0_USERNAME: demo
+      CAMUNDA_SECURITY_INITIALIZATION_USERS_0_PASSWORD: demo
+      CAMUNDA_SECURITY_INITIALIZATION_USERS_0_NAME: Demo
+      CAMUNDA_SECURITY_INITIALIZATION_USERS_0_EMAIL: demo@example.com
+      CAMUNDA_SECURITY_INITIALIZATION_DEFAULTROLES_ADMIN_USERS_0: demo
     volumes:
       - camunda-data:/usr/local/camunda/data
     depends_on:

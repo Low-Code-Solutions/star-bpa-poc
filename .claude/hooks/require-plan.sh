@@ -14,6 +14,26 @@ path=$(printf '%s' "$flat" | sed -n 's/.*"file_path"[[:space:]]*:[[:space:]]*"\(
   | sed -n 's/.*"notebook_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 [ -n "$path" ] || exit 0
 
+# Windows paths (BPA-41): d:\x\y, D:/x/y or mixed separators. JSON may carry "\\", so squeeze "//".
+# A drive-letter path is absolute; in Git Bash it becomes /d/x/y. POSIX paths skip this block.
+win=0
+case "$path" in
+  *\\*|[A-Za-z]:[/\\]*)
+    win=1
+    path=$(printf '%s' "$path" | tr '\\' '/' | sed 's|//*|/|g')
+    case "$path" in
+      [A-Za-z]:/*)
+        if command -v cygpath >/dev/null 2>&1; then
+          path=$(cygpath -u "$path")
+        else
+          drv=$(printf '%s' "$path" | cut -c1 | tr 'A-Z' 'a-z')
+          path="/$drv/${path#??/}"
+        fi
+        ;;
+    esac
+    ;;
+esac
+
 # Relative paths are relative to the session's project directory.
 case "$path" in
   /*) ;;
@@ -25,6 +45,25 @@ dir=$(dirname "$path")
 while [ ! -d "$dir" ] && [ "$dir" != "/" ]; do dir=$(dirname "$dir"); done
 root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || exit 0   # not in a repo
 [ -n "$root" ] || exit 0
+
+# Windows (BPA-41): git prints the root as C:/x/y; use the same /c/x/y form as the path, and match
+# the root prefix case-insensitively (Windows file systems ignore case), keeping the root's spelling.
+case "$root" in
+  [A-Za-z]:/*)
+    if command -v cygpath >/dev/null 2>&1; then
+      root=$(cygpath -u "$root")
+    else
+      drv=$(printf '%s' "$root" | cut -c1 | tr 'A-Z' 'a-z')
+      root="/$drv/${root#??/}"
+    fi
+    ;;
+esac
+if [ "$win" = 1 ]; then
+  lp=$(printf '%s' "$path" | tr 'A-Z' 'a-z'); lr=$(printf '%s' "$root" | tr 'A-Z' 'a-z')
+  case "$lp" in
+    "$lr"/*) path="$root/$(printf '%s' "$path" | cut -c$((${#root}+2))-)" ;;
+  esac
+fi
 
 branch=$(git -C "$root" branch --show-current 2>/dev/null)
 key=$(printf '%s' "$branch" | sed -n 's/^\(BPA-[0-9][0-9]*\)-.*/\1/p')
