@@ -1,6 +1,6 @@
 # Data model: STAR BPA POC
 
-Status: **v0.5, 29 Oct 2026, for approval.** Approval review of v0.4 done; every finding decided (Khitaba; Ahsan/Usama; Faraz as PO and Architect). Prepared by Claude (BA/solution designer) under Jira BPA-40. Formal approval for V1 generation: see §9.
+Status: **v0.5, approved 29 Oct 2026; delivered as V1 under BPA-42.** Approval review of v0.4 done; every finding decided (Khitaba; Ahsan/Usama; Faraz as PO and Architect). Prepared by Claude (BA/solution designer) under Jira BPA-40. Formal approval for V1 generation: see §9.
 Repo path when committed: `docs/data-model.md`. Schema: `bpa` (04-conventions).
 Approval chain (09 §4 item 3): Claude drafts → **Khitaba checks SORs** → **Faraz and Ahsan/Usama approve** → **Usama generates `V1__baseline_schema.sql` and `R__seed_reference_data.sql`** (09 S17).
 
