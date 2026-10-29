@@ -75,7 +75,7 @@ text vs B1/C3) logged in §10.2 for a confirmed Jira batch. spec.md "v0.4" line 
 
 ## Questions
 - Q1 (PO): BPA-13 and BPA-12 text still describe "publish … in the same transaction"; confirm the Jira batch in §10.2.
-- Q2 (Khitaba or PO): message when the correlate call fails technically on the replacement path (§10.2).
+- Q2: resolved 29 Oct by the PO as D75, "Replacement could not be started; try again" (wording ASSUMPTION).
 
 ## Human-gap log
 - 29 Oct: plan approved by Faraz in the claude.ai session as part of "start v0.5"; the scope was set by his
