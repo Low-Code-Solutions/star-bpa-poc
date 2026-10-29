@@ -1,7 +1,7 @@
 # Plan: BPA-42 Generate V1__baseline_schema.sql and R__seed_reference_data.sql from data model v0.5
 Jira: BPA-42 (Task, epic BPA-3)
-Story last updated: 2026-10-29T16:36:44.579+0400 (comment 10423)
-Status: Approved (Ahsan, 29 Oct 2026, answers to Q1-Q8 below)
+Story last updated: 2026-10-29T16:36:44.579+0400
+Status: Closed (2026-10-29)
 Approver: Ahsan (Build Lead); Usama (Lead Developer) to confirm in Jira (comment 10423 asks for it)
 Branch: BPA-42-baseline-schema, from main 718c6f9
 
@@ -81,7 +81,7 @@ Table label = `COMMENT ON TABLE`. "Column comments" = `COMMENT ON COLUMN` (label
 | 27 | `digital_timesheet_line` | D.4 | POC database | none |
 | 28 | `app_user` | F.1 | POC database | `username`: Camunda identity; `employee_ref`: myPeople; `email`: Corporate email system |
 | 29 | `user_role_scope` | F.2 | POC database | `username`, `group_id`: Camunda identity; `department_ref`: D365 F&O Organisation; `project_ref`: D365 F&O Project Management |
-| 30 | `notification` | E.1 | POC database | `drawing_ref`: D365 F&O Document Control; `recipient_username`: Camunda identity |
+| 30 | `notification` | E.1 | POC database | `drawing_ref`, `revision`: D365 F&O Document Control; `recipient_username`: Camunda identity |
 | 31 | `audit_log` | G.1 | POC database | `username`: Camunda identity |
 
 `id` columns have no SOR and get no comment (§1.3). The 19 tables with column comments are exactly the §7.2 list; `cbs_activity` comments `cbs_code_ref` (Q2).
@@ -161,6 +161,9 @@ All eight answered by Ahsan on 29 Oct 2026 (approval of this plan).
 - **Q4 (seed without UNIQUE): accepted**, no schema change. `material_reservation` matched on `(traceability_number, drawing_ref, material_ref)`
   (reservations keyed by drawing + material, C5); `cutting_sheet` matched on `(cutting_sheet_ref, drawing_ref)`. Both: `UPDATE` then
   `INSERT ... WHERE NOT EXISTS`.
+  **Departure in the build:** both tables got `INSERT ... WHERE NOT EXISTS` only, matching the whole row, because every non-key column is
+  part of the match, so an `UPDATE` would have nothing to change. Consequence: changing a value in the seed (for example a traceability
+  number) adds a row and leaves the old one; such a change needs a V2 or a manual cleanup.
 - **Q5 (look-ahead): accepted.** 6 of 8 drawings have a row, dates spread over three weeks (§3.11). DWG-118 has a row (BPA-11); at least one drawing has none (§11).
 - **Q6 (workers): accepted.** 12 ordinary workers; "inactive" seeded as ordinary, "another department" not seedable (§11, Q-DM5, recorded ASSUMPTION). Named rows:
   E1021, E1099, E1150 (no cost centre), E2001 (agency). E9999 does not exist.
@@ -171,8 +174,30 @@ All eight answered by Ahsan on 29 Oct 2026 (approval of this plan).
   `published_message.published_at now()`. `created_by` and `updated_by` have no default.
 - **Verification (Ahsan, 29 Oct):** do not run `docker compose down -v`; use a throwaway database in the compose PostgreSQL (see Proof).
 
+## Proof results (29 Oct 2026, Flyway 11.20.3, PostgreSQL 17.11, throwaway database `bpa_v1_check`, dropped afterwards)
+- Run 1 applied V1 and R__; run 2: "Schema bpa is up to date. No migration necessary". Repeated after the review fix below, same result.
+- 31 tables in schema `bpa` (excluding `flyway_schema_history`), 0 without a table comment. 19 tables with column comments (37 column comments).
+- Scripted comparison of all 31 tables with the model: 171 columns, names, types, nullability: no differences; audit columns present on 30 tables.
+- Scripted per-column SOR check (141 columns with a SOR label in the model vs `COMMENT ON COLUMN` and the Q2/Q3 rules): no differences.
+- Constraints read back from `pg_constraint`: every UNIQUE, CHECK and FK matches the model; all FKs `ON DELETE NO ACTION`; only the two
+  deferrable items of section 4.3; `workpack_number_seq` MAXVALUE 999999 NO CYCLE; stated defaults present; the three named indexes.
+- Seed: row counts 3/2/3/10/5/10/8/8/5/3/6/12 (department, project_job_code, wbs, activity, cbs_activity, material, drawing,
+  drawing_revision, material_reservation, cutting_sheet, lookahead_item, worker); `app_user` and `user_role_scope` empty; DWG-999 and E9999 absent.
+  Re-running the seed SQL changed nothing (`updated_at` = `created_at` everywhere); a runtime `drawing_revision` row survived a re-run.
+- `docker compose down -v` was not run; the `bpa` and `camunda` databases were untouched.
+
+## Review (qa-reviewer, fresh context, 29 Oct, at f044b8d)
+0 BLOCKER, 1 IMPORTANT, 4 NIT. Fixed: `notification.revision` column comment added (V1 and plan row 30), after which a per-column script replaced the
+table-count check. Plan updated for the Q4 departure. Header timestamp now timestamp-only. `drawing_revision` has 8 rows (within "about 10"). Accepted: the
+data-model status line says "approved" while Usama's Jira confirmation (comment 10423) is still open; the line was set as Ahsan instructed.
+Not checked by the reviewer: Jira (no sign-in in the session).
+
 ## Human-gap log
 - 29 Oct: this session read Jira BPA-42 (description and its one comment) through the claude.ai Atlassian connector, because the repo's `atlassian`
   MCP server needs a sign-in that cannot be done in a non-interactive session. Content equals what the repo-registered server would return.
 - 29 Oct: plan mode was not entered through the tool (it needs interactive approval); the plan was written directly as the first step and the
   session stopped for approval, as the instruction requires.
+- 29 Oct: plan approved by Ahsan (answers to Q1-Q8 recorded above; Approved status in commit ef13298). The data-model.md status line says "approved 29 Oct 2026" on Ahsan's instruction while Usama's reply on Jira comment 10423 is still
+  outstanding; the approval record in Jira is Ahsan's, relayed from Faraz.
+- 29 Oct: the table-level check (31 of 31 commented) passed while one column comment was missing; only the reviewer's per-column read found it.
+  Lesson: check the column rule by script, not by count.

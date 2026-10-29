@@ -79,3 +79,15 @@ Newest last. One entry per review; the full report goes in the PR description.
   - `test-require-plan.sh` is mode 100644, `require-plan.sh` is 100755;
   - "Problem" and "Task as given" are sections outside the docs/04 list.
 - Not verified by the reviewer: `test-hooks.sh` (120 passed per the plan), the compose stack, and the claim that the Windows cases failed before the fix (test and fix landed in one commit).
+
+### BPA-42 at f044b8d, 29 Oct 2026 (qa-reviewer)
+- Code: 0 BLOCKER, 1 Important, 4 Nits. V1 matches the data model; the seed is within L8 and section 11; the diff stays inside the plan.
+- Important (fixed): `notification.revision` (D365 F&O Document Control) had no column comment although `notification` is on the section 7.2 list; added to V1
+  and the plan. The 31/31 and 19-table counts could not detect it; a per-column script now checks the rule (141 columns, no differences).
+- Nits (4), none changed the work except the plan:
+  - `cutting_sheet` and `material_reservation` use `INSERT ... WHERE NOT EXISTS` only, not `UPDATE` then `INSERT` as plan Q4 said (no non-key column to update): plan updated; editing a seeded value adds a row.
+  - `drawing_revision` has 8 rows against "about 10": left, all required cases covered.
+  - Plan header "Story last updated" carried a comment note: timestamp only now.
+  - data-model.md says "approved" while Usama's Jira confirmation is open: set on Ahsan's instruction, recorded in the plan's Human-gap log.
+- Not verified by the reviewer: Jira (no sign-in in the session). Flyway itself was run by the author; the reviewer applied both files with psql to a separate throwaway database and got the same counts.
+

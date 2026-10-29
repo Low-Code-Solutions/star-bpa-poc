@@ -617,6 +617,7 @@ CREATE TABLE bpa.notification (
 );
 COMMENT ON TABLE bpa.notification IS 'POC database';
 COMMENT ON COLUMN bpa.notification.drawing_ref IS 'D365 F&O Document Control';
+COMMENT ON COLUMN bpa.notification.revision IS 'D365 F&O Document Control';
 COMMENT ON COLUMN bpa.notification.recipient_username IS 'Camunda identity';
 
 -- =====================================================================================================
