@@ -1,0 +1,4 @@
+# Test profile (BPA-43). Camunda Process Test runs the engine in Testcontainers; pin it to the compose version.
+camunda:
+  process-test:
+    camunda-docker-image-version: 8.10.1

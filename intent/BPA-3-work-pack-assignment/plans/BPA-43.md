@@ -173,3 +173,5 @@ Not changed: `models/`, `templates/`, V1 and the seed, `docs/data-model.md`, Jir
 - 29 Oct: Jira BPA-43 read through the claude.ai Atlassian connector (the repo's `atlassian` server needs an interactive sign-in).
 - 29 Oct: no JDK or Maven on the machine; the Part A start depends on Q1.
 - 29 Oct: Maven Central checked for the Camunda 8.10.1 artifacts and their Spring Boot bases (3.5.16 for the `-3-` and `-boot-3` artifacts, 4.1.1 for the plain ones).
+- 29 Oct: Part A pieces committed while the worker process test (`BPA43_createHourJournalHeaderJobIsHandledByTheWorker`) is a **known failure**, not disabled: the engine hands the
+  job to the Spring `@JobWorker`, but the method body never runs and nothing is logged. Under investigation (dependency versions first, then uncaught-exception logging, then a plain Testcontainers Camunda without the Process Test library); timebox 30 minutes.

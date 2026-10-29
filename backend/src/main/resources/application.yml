@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: bpa
+  datasource:
+    url: ${BPA_DB_URL:jdbc:postgresql://localhost:5432/bpa}
+    username: ${BPA_DB_USER:bpa}
+    password: ${BPA_DB_PASSWORD:}
+  flyway:
+    # V1 and the repeatable seed use schema-qualified names; the history table lives in bpa too (BPA-43 plan, Q1 of BPA-42).
+    schemas: bpa
+
+server:
+  servlet:
+    session:
+      timeout: 30m # S27 (ASSUMPTION), configurable
+
+camunda:
+  client:
+    mode: self-managed
+    grpc-address: ${CAMUNDA_GRPC_ADDRESS:http://localhost:26500}
+    rest-address: ${CAMUNDA_REST_ADDRESS:http://localhost:8080}
+    auth:
+      method: basic
+      username: bpa-service # S25: the one technical user, created by the S22 job
+      password: ${BPA_SERVICE_PASSWORD:}
