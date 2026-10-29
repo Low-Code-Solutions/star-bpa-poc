@@ -17,6 +17,7 @@ Task BPA-41 on branch BPA-41-windows-hook-demo-admin. Follow the committed plan 
 
 - 29 Oct: the Camunda variable names (`CAMUNDA_SECURITY_INITIALIZATION_USERS_0_*`, `..._DEFAULTROLES_ADMIN_USERS_0`) match the 8.8 docs and the 8.10 "next" docs. The 8.10 property reference could not be read in full and 8.10 is marked unreleased, so the fresh-stack test is the proof.
 - Human step (L19): run `docker compose down -v && docker compose up -d`, then `curl -u demo:demo http://localhost:8080/v2/topology`. Expect HTTP 200, not 401. Claude did not run `down -v`.
+- 29 Oct: Faraz ran the fresh-stack test; Camunda 8.10.1 became healthy and `curl -u demo:demo http://localhost:8080/v2/topology` returned HTTP 200 (checked by Claude after the run).
 - Human step: confirm in a real Claude Code session on Windows that a write under `backend/` is blocked on a branch with no plan and that a write under `intent/` is allowed.
 - shellcheck is not installed on this machine; only `bash -n` was run on the two scripts.
 - `.claude/hooks/test-hooks.sh` takes over two minutes on Windows (git worktree steps), so it ran in the background: 120 passed, 0 failed after the fix.
