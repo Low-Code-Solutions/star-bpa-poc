@@ -1,10 +1,10 @@
 # 0016 Jira as source of truth for requirements
 
 - Status: Accepted
-- Date: 2026-10-22 (decided; Jira BPA-19, Done 2026-10-23); L7, L13, L14 on 2026-10-27 (09 LOCKED);
-  written 2026-10-29 (BPA-37)
-- Deciders: the team (Faraz, Khitaba, Ahsan), recorded by Faraz in BPA-19; L7, L13, L14 by Ahsan (Build
-  Lead) and Usama (Lead Developer)
+- Date: decision date not recorded in the sources (BPA-19 created 2026-10-22, Done 2026-10-23); L7, L13,
+  L14 on 2026-10-27 (09 LOCKED); written 2026-10-29 (BPA-37)
+- Deciders: "the team" (Product Owner statement; BPA-19 records no deciders; BPA-19 was raised by Faraz);
+  L7, L13, L14 by Ahsan (Build Lead) and Usama (Lead Developer)
 - Jira: BPA-19 (Done, no file until now), BPA-37
 - 09 rows: L7, L13, L14 (the `.mcp.json` part; the plan.md part is replaced by ADR 0015)
 

@@ -76,6 +76,9 @@ tests and in the showcase.
 
 ## Consequences
 
+- `DEMO_PASSWORD` and `BPA_SERVICE_PASSWORD` are not in `.env.example` yet (29 Oct); they are added with
+  the S22 startup job.
+
 - The walking skeleton includes the React login (L4): login, `GET /api/v1/me`, logout, and one denied call
   returning 403 to prove backend enforcement; users and groups come from `personas.yaml` via the S22 job.
 - BPA-25 is reduced to confirming the 8.10.1 API calls (S15), plus a fifth check for `bpa-service` (S25).

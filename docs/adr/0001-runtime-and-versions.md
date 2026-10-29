@@ -37,7 +37,7 @@ A hosted environment (VM) had also been raised without measured figures (S24).
   `plugin:camunda-compat/camunda-cloud-8-10` (L10; see ADR 0014).
 - Confirming that the compose stack boots with PostgreSQL secondary storage is a hands-on step for
   Ahsan/Usama (L19), logged as a human step for the POC measure.
-- S24 is revisited together with S28 and S29 (ADR 0005) when a shared or showcase environment is set up.
+- S24 is revisited together with S29 (ADR 0005) when a shared or showcase environment is set up.
 
 ## Sources
 

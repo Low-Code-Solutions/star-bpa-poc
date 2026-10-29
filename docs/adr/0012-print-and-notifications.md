@@ -37,10 +37,11 @@ and whether the print needs Arabic text was asked (S3).
 - Viewing the print in React is in ADR 0004 (S4).
 - The notice content (one email per recipient per revision, the in-system `notification` rows) is a
   business decision in 06 D44, not repeated here; idempotency of the send uses the notification unique key
-  (07 §4; ADR 0007).
+  `UNIQUE(workpack_id, drawing_ref, revision, recipient_username, channel)` (`docs/data-model.md` §5.9;
+  ADR 0007).
 - Mailpit is added to the compose stack when the notification work is built; it is not in
   `docker-compose.yml` as of 29 Oct.
 
 ## Sources
 
-09 S1, S3, S4, S7, S8; 06 D29, D44 and follow-ups; 07 §4.
+09 S1, S3, S4, S7, S8; 06 D29, D44 and follow-ups; `docs/data-model.md` §5.9.

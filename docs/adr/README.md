@@ -27,6 +27,8 @@ options considered. Where an ADR and 09 disagree, report it; precedence is in CL
 ## Every 09 row and its ADR
 
 09 §1 (decisions), §2 (items owned by others) and §5 (delivery decisions). 09 has no S11 or S12.
+The unnumbered §2 rows (template-layout confirmation, FMS template request, GitHub plan, per-story PO
+approval) are actions, not decisions: they are referenced from 0009 and 0016 and need no row here.
 Rows marked "no ADR" are not architecture decisions; the reason says where they live (09 L3 does the same
 for S10).
 

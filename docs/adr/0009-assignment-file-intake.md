@@ -34,7 +34,8 @@ template (10 §2.1).
 - **Intake (S19, D58).** The Production Team user uploads the Excel file with an **Upload** button in the
   portal (`POST /api/v1/assignment-files`); results are shown on screen and downloadable
   (`GET /api/v1/assignment-files/{id}/result`), rebuilt from `assignment_file_row` (D49; ADR 0008). No
-  watched folder. Only the `production-team` group may upload (S6, ADR 0005). The real Int-5 hand-off to
+  watched folder. Only the `production-team` group may upload (D58; BPA-12 "Other roles cannot upload", ASSUMPTION;
+  enforced by the backend per S6, ADR 0005). The real Int-5 hand-off to
   FMS stays batch/file.
 - **Kept from D33:** rules 1-7, 9, 10 and 12 (the `assignment_file` intake log), with D32, D49, D50 and
   G10. **Retired:** rule 8 (5-second stability) and rule 11 (processed/failed folders) (D58, as corrected
@@ -63,5 +64,5 @@ template (10 §2.1).
 
 ## Sources
 
-09 S6, S10, S18, S19, L6, L12, L19, L20, §2; 10 §1, §2.1, §2.4; 06 D32, D33, D49, D50, D58, D59;
+Jira BPA-12; 09 S6, S10, S18, S19, L6, L12, L19, L20, §2; 10 §1, §2.1, §2.4; 06 D32, D33, D49, D50, D58, D59;
 08 Gate 1; 00-context.

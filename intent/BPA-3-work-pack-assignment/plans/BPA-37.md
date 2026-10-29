@@ -36,7 +36,7 @@ Branch: BPA-37-write-adrs, from main 119a557
 2. **G2 is not a 09 row.** L3 lists G2 under 0006, but 09 §1 has no G2 row: G2 is in 07 §11, decided as D56,
    and its form part is superseded by S14. 0006 cites 07 G2 / D56 plus S14, and the index notes it.
 3. **Rows L3 does not place.** L3 predates S25-S29 and does not map most L rows. Mapping below; S25-S27 go to
-   0005 as BPA-37 says. Four rows are not architecture decisions and get "no ADR" with the reason, as L3
+   0005 as BPA-37 says. Five rows are not architecture decisions and get "no ADR" with the reason, as L3
    already does for S10: S10, S13, L3, L16, L19. L13 (protect main) is mapped to 0016 with L7 (see Q1).
 4. **No S11 or S12** in 09 (numbering gap); nothing to map.
 5. **Amendments after 09.** G7 is amended by D61, G10 by D70, and D62 replaced the PT1H TTL. The ADRs state
@@ -78,7 +78,7 @@ Branch: BPA-37-write-adrs, from main 119a557
 Not changed: `docs/09-architecture-decisions.md` (finding 1 is raised, not fixed), ADR 0015.
 
 ## Order of work
-1. This plan (Draft); approval recorded in the next commit.
+1. This plan, committed as Approved (approval given in the session before the first commit).
 2. ADRs 0001-0014, then 0016.
 3. README index; spec.md row; intent/README.md regenerated.
 4. Proof checks; qa-reviewer pass in a fresh context; open the PR; Jira comment with PR, plan path, SHA.
@@ -107,6 +107,24 @@ Not changed: `docs/09-architecture-decisions.md` (finding 1 is raised, not fixed
 - Q2 (non-blocking): 0016's options. BPA-19 records none. The Project memory records that the team chose Jira as
   source of truth "over linkage-only"; 0016 lists that one option and cites it as a PO statement. Confirm.
   **Resolved 29 Oct (Faraz): cite it.**
+
+- Found while writing (raised in the PR and in Jira, not resolved here):
+  - Q3: with TTL 0 (D62) the G10 message ID likely no longer stops a double publish (Camunda docs: uniqueness
+    applies only to buffered messages). Proposed: add a check to BPA-25. ADR 0007 records it as an open point.
+  - Q4: 09 L6 names the template column "Employee ID"; D59 (later) names it "Badge No". ADR 0009 follows D59
+    and notes the difference.
+  - Q5: 09 L15 is "CLAUDE.md wording" but CLAUDE.md does not contain it; CLAUDE.md's branch example still says
+    "ADR 0001" for Jira as source of truth (now 0016). Follow-up item proposed.
+  - Q6: 09 §2 still lists S19 as awaiting Khitaba (stale since D58); L7's subtask scheme differs from how the
+    09 §4 work was created (Tasks BPA-34 to 37). Both noted in the ADRs.
+
+## Review (qa-reviewer, fresh context, 29 Oct)
+4 Important, 8 nits. Fixed: 0007 message-ID quoted from 09 and 07 §5 verbatim, and the TTL-0 point made an
+open point (checked against the Camunda messages docs); 0009 upload-group rule cited to D58 and BPA-12 with
+its ASSUMPTION label; 0016 date and deciders limited to what the sources record; 0001 S28 removed from the
+S24 trigger; 0012 cites the data-model unique key; 0005 notes the missing `.env.example` placeholders;
+README notes the unnumbered 09 §2 rows; this plan's row count and step 1 corrected.
+Not fixed: CLAUDE.md example (outside this item; Q5).
 
 ## Human-gap log
 - 29 Oct: the 06, 07, 08 and 10 sources live only in the Claude Project; Claude read them there (no copy needed).
