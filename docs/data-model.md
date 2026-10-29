@@ -1,21 +1,41 @@
 # Data model: STAR BPA POC
 
-Status: **v0.4, 28 Oct 2026 — every open item decided** on the PO call of 28 Oct (Faraz with Khitaba and Ahsan/Usama). Prepared by Claude (BA/solution designer). Formal approval for V1 generation: see §9.
+Status: **v0.5, 29 Oct 2026, for approval.** Approval review of v0.4 done; every finding decided (Khitaba; Ahsan/Usama; Faraz as PO and Architect). Prepared by Claude (BA/solution designer) under Jira BPA-40. Formal approval for V1 generation: see §9.
 Repo path when committed: `docs/data-model.md`. Schema: `bpa` (04-conventions).
 Approval chain (09 §4 item 3): Claude drafts → **Khitaba checks SORs** → **Faraz and Ahsan/Usama approve** → **Usama generates `V1__baseline_schema.sql` and `R__seed_reference_data.sql`** (09 S17).
 
 This is the **single** domain data model for the POC (09 S16). It is not per epic and not per story. Stories' SOR Notes reference it; Flyway only delivers it. An enterprise canonical model was considered and set aside by the PO on 28 Oct 2026; this model stays scoped to the POC (S16).
 
 Sources, in the authority order set by D57:
-1. Jira stories BPA-6 to BPA-16, BPA-22, BPA-23, BPA-26 — SOR Notes and acceptance criteria (re-read 28 Oct 2026 after the 07:34–07:37 UTC updates).
+1. Jira stories BPA-6 to BPA-16, BPA-22, BPA-23, BPA-26 — SOR Notes and acceptance criteria (re-read 28 Oct 2026 after the 07:34–07:37 UTC updates; re-checked 29 Oct after the approval-review edits to BPA-6, 12, 15, 16).
 2. Knowledge files `03-sor-matrix.md`, `04-conventions.md`, `00-context.md`.
-3. `claude/06-epic1-decisions-draft.md` (C, D1–D65), `claude/09-architecture-decisions-2026-10-27.md` (S/G/L), and the PO decisions P1–P4 of 28 Oct recorded in §0.
+3. `claude/06-epic1-decisions-draft.md` (C, D1–D74), `claude/09-architecture-decisions-2026-10-27.md` (S/G/L), and the PO decisions P1–P4 of 28 Oct recorded in §0.
 
 **Nothing here is a new business rule.** Every column, type and constraint is traced to a story or a numbered decision. Where a story left something unstated it is marked **(A)** for ASSUMPTION, or raised in §9.
 
 ---
 
 ## 0. Change log
+
+### v0.5 (29 Oct 2026, approval review; Jira BPA-40)
+
+Two fresh-context reviewers checked v0.4 against all 14 stories, 03, 04, 09 and the ADRs. Decisions: Khitaba (SOR labels and business wording, approved by the PO), Ahsan (B1), Usama (the rest of the DDL and runtime items, plus N1–N4), Faraz as PO and Architect (C1–C5). Record: Claude Project `audits/data-model-v0.4-approval-2026-10-29.md`; 06 D73, D74.
+
+| ID | Change | Where |
+| --- | --- | --- |
+| B1, C1 | `assignment_file_row.wp_outcome` holds the Work Pack-level "Replacement not applied"; `outcome` may be NULL only when `wp_outcome` is set (ASSUMPTION: valid rows of a Work Pack not applied keep `outcome` NULL) | §5.2, §7.3 |
+| B2, B3, C2 | The sentence "G10's message ID still prevents a double publish" is removed (false at TTL 0). New table `published_message`: the duplicate guard is committed database state. A failed or uncorrelated publish deletes its claim. At-most-once publish is accepted; a transactional outbox is the production answer | §5.1, §5.12, §8 |
+| B4, C3 | Upload uses Camunda's synchronous correlate call. Replacement: compare-and-set `Assigned → Replacing`, commit, correlate; revert with "Replacement already in progress" when no instance starts. D61 and the BPMN are unchanged | §8 |
+| D73 (B11) | Duplicate check per `(sha256, workpackNumber)`; new row outcome "Already processed in an earlier upload"; "File already processed" only when every Work Pack in the file was published before | §5.1, §7.3, §8 |
+| N1, D74 | `UNIQUE (workpack_id, phase, material_ref)`; worker message "Material <material_ref> is listed twice for phase <phase>"; **amends Q-DM4** (accepted by the PO) | §4.3, §9 |
+| A4 | `workpack_material` rows matched on update by `id` carried in task variables | §4.3 |
+| A1, B12, A14, N3, N4 | DB defaults and FK delete rule; `bpa-service` when no user is in context; Camunda usernames without `_ref`; deliberate snapshots and candidate keys documented | §1.1, §1.2 |
+| A9, A11, A12 | One SOR label per system; per-column labels kept (row-level reason stays); look-ahead label explained | §1.3, §3–§7 |
+| B5, B6, B15 | Partial unique index for synthetic rows; writer named for every outcome; `worker_name` in the result | §5.2, §7.3 |
+| B7 | Test fixtures write `app_user` and `user_role_scope`; L2's "only writer" applies at runtime | §5.10, §5.11 |
+| A2, A3, A5, A8, A10, A13, A15, B10, B13, B14 | Sequence named; audit-log rules; duplicate-phase check order; seed upsert; ERD; stale lines and citations | various |
+| A6, A7, B8 | Tests own scenario data; the seed holds the named reference rows | §11 |
+| N2 / C5 | `worker_assignment_history.source_file` **kept** (BPA-13 asserts it); documented as a snapshot (N3) | §5.4 |
 
 ### v0.4 (28 Oct 2026, PO call)
 
@@ -27,7 +47,7 @@ Decided by Faraz with Khitaba and Ahsan/Usama on the call; recorded in 06 as D70
 | Q-DM2 | Accepted as drafted (Khitaba): `department.name`, `material.description`, `drawing.title` NOT NULL; `department_ref` seeded with the readable value used in stories. |
 | Q-DM5, Q-DM8, Q-DM11 | Accepted as proposed. |
 | Q-DM13 (D71) | `Replacement not applied: file has rejected rows` is judged **per Work Pack**: a row outcome on that Work Pack's rows; other Work Packs in the file are unaffected. |
-| Q-DM14 (D70, amends G10) | No unique constraint on `assignment_file.sha256` (indexed only). An upload is a duplicate — `File already processed` — only when an earlier upload with the same `sha256` published at least one message. Every upload gets its own `assignment_file` row. A file whose rows were routed has `outcome` NULL; its rows carry the outcomes. G10's message ID still prevents a double publish. |
+| Q-DM14 (D70, amends G10) | No unique constraint on `assignment_file.sha256` (indexed only). An upload is a duplicate — `File already processed` — only when an earlier upload with the same `sha256` published at least one message. Every upload gets its own `assignment_file` row. A file whose rows were routed has `outcome` NULL; its rows carry the outcomes. *(v0.5: amended per Work Pack by D73; the message-ID sentence that stood here was removed, B2.)* |
 | Q-DM15 (D72) | A Worker removed by one replacement and re-added by a later one: the existing journal line is reopened (`Open`, new hours) and the time sheet reset to `Draft`, instead of inserting new rows. |
 
 ### v0.3 (28 Oct 2026)
@@ -86,6 +106,17 @@ Sceptical QA pass against the Jira stories and the decision logs; 17 defects in 
 | Timestamps | `timestamptz`, stored UTC (09 S9) |
 | Business dates | `date`, evaluated in **Asia/Riyadh** by the application clock, never by the database (09 S9, D28) |
 | Enumerations | `text` + `CHECK (col IN (…))` (Q-DM1, decided 28 Oct) |
+| Defaults (A1) | `id uuid DEFAULT gen_random_uuid()`; `created_at`, `updated_at` `DEFAULT now()` |
+| Foreign keys (A1) | every FK `ON DELETE NO ACTION` (rows are deleted explicitly by the worker that owns them) |
+| Camunda usernames (A14) | `scheduled_by`, `signed_off_by`, `uploaded_by`, `recipient_username`, `username`, `created_by`, `updated_by` hold Camunda usernames and carry **no** `_ref` suffix, as the stories name them; recorded for 04-conventions under L16 |
+
+**Candidate keys (N4).** Every table has `id uuid` (04-conventions). Where a table also has a UNIQUE constraint, that UNIQUE is the real candidate key and the business key the workers use: `workpack_schedule(workpack_id)`, `workpack_print(workpack_id)`, `hour_journal_header(workpack_id)`, `cbs_activity(activity_ref)` and the others marked UNIQUE in §3–§6.
+
+**Deliberate snapshots (N3).** The model is in 3NF except for these copies, each kept on purpose and traced to a story:
+- `digital_timesheet.project_ref`, `wbs_ref`, `activity_ref` — the time sheet keeps the coding it was issued with (§5.7; BPA-15). `project_ref` is also reachable through `wbs_ref`.
+- `hour_journal_line.role`, `designation` — copied at creation, never refreshed (§5.6; BPA-14).
+- `assignment_file_row` raw text columns — the file as uploaded, including invalid values (§5.2; BPA-12, BPA-22).
+- `worker_assignment_history.source_file` — the file name as shown in history; derivable from `assignment_file_id`, kept because BPA-13 names and asserts it (§5.4; PO, 29 Oct, C5).
 
 ### 1.2 Audit columns (Q-DM9, decided 28 Oct)
 
@@ -94,8 +125,8 @@ Every table in §3–§6 carries these four; they are **not repeated** in the co
 | Column | Type | Null | Note |
 | --- | --- | --- | --- |
 | `created_at` | `timestamptz` | NOT NULL | UTC |
-| `created_by` | `text` | NOT NULL | Camunda username (D63); literal `'seed'` for rows written by `R__seed_reference_data.sql`; `'system'` for the S22 start-up job |
-| `updated_at` | `timestamptz` | NOT NULL | UTC; equals `created_at` on insert |
+| `created_by` | `text` | NOT NULL | Camunda username (D63) of the user whose action wrote the row (for a save worker, the user who completed the task); `bpa-service` (S25) when a job worker writes with no user in context (B12); literal `'seed'` for rows written by `R__seed_reference_data.sql`; `'system'` for the S22 start-up job |
+| `updated_at` | `timestamptz` | NOT NULL | UTC; default `now()`, so it equals `created_at` on insert; set by the writer on update |
 | `updated_by` | `text` | NOT NULL | as `created_by` |
 
 `04-conventions.md` names the four columns only; types, nullability and the seed value are decided here (Q-DM9) and go into 04 with the L16 update (Ahsan).
@@ -111,6 +142,26 @@ Every field has exactly one SOR. The SOR column names:
 **Surrogate keys.** `id uuid` primary keys have no SOR: POC-internal row identifiers that exist only because 04-conventions requires them and are never exchanged with another system. Shown as `—`.
 
 **Foreign keys** (F7, F15). A column pointing at another table — a `uuid` to its `id` or a `text` `_ref` to its business key — carries the SOR of **the entity it identifies**, as the stories state it: `worker_id` → myPeople (BPA-14, BPA-15, BPA-22); `workpack_id`, `header_id`, `journal_line_id` → POC database; any `drawing_ref` → D365 F&O Document Control.
+
+**Rows and columns (A11, Khitaba, approved by the PO 29 Oct).** The rule above applies to every table, including those whose rows the POC owns. A table's **SOR reason** line says why the POC holds the *row*; the SOR column says who owns each *value*. Jira BPA-15 and BPA-16 SOR Notes and the 09 change log were aligned to this on 29 Oct.
+
+**Canonical labels (A9).** The SOR cell starts with exactly one of these labels; `COMMENT ON TABLE` / `COMMENT ON COLUMN` and the S17 CI test use the label only. Anything after the label (in brackets or after a dash) is a note, not part of the label.
+
+| Label | Used for |
+| --- | --- |
+| `POC database` | values the POC owns |
+| `Camunda identity` | usernames and group IDs |
+| `myPeople` | Worker identity and attributes |
+| `D365 F&O Project Management` | project, WBS |
+| `D365 F&O Document Control` | drawings and revisions |
+| `D365 F&O Product Information Management` | material master |
+| `D365 F&O PPC` | material reservation (Traceability Number) |
+| `D365 F&O Cost Control Report` | CBS code |
+| `D365 F&O Project Control (PCON)` | Look-Ahead plan dates |
+| `D365 F&O Organisation` | department |
+| `FMS` | Job Code, cutting sheet |
+| `P6 via D365 PMS` | activity and its plan fields |
+| `Corporate email system` | `app_user.email` (ASSUMPTION) |
 
 ### 1.4 Markers used in the column tables
 
@@ -139,16 +190,16 @@ The seven Camunda groups (09 S6, BPA-25): `time-method-analyst`, `project-engine
 
 ## 2. Domain map
 
-Six domains (09 S16), plus one cross-cutting audit table. **30 tables.**
+Six domains (09 S16), plus one cross-cutting audit table. **31 tables** (v0.5 adds `published_message`).
 
 | # | Domain | Tables | Count | SOR |
 | --- | --- | --- | --- | --- |
 | A | Reference data copies | `project_job_code`, `wbs`, `activity`, `cbs_activity`, `department`, `material`, `drawing`, `drawing_revision`, `material_reservation`, `cutting_sheet`, `lookahead_item`, `worker` | 12 | Real systems (copies) |
 | B | Work Pack | `workpack`, `workpack_phase`, `workpack_material`, `workpack_schedule`, `workpack_print`, `release_signoff` | 6 | POC database |
-| C | Assignment | `assignment_file`, `assignment_file_row`, `worker_assignment`, `worker_assignment_history` | 4 | POC database |
+| C | Assignment | `assignment_file`, `assignment_file_row`, `worker_assignment`, `worker_assignment_history`, `published_message` | 5 | POC database |
 | D | Hours | `hour_journal_header`, `hour_journal_line`, `digital_timesheet`, `digital_timesheet_line` | 4 | POC database |
 | E | Notification | `notification` | 1 | POC database |
-| F | Access scope | `app_user`, `user_role_scope` | 2 | Camunda identity (`app_user.username`, `group_id`); POC database (the scope rows) |
+| F | Access scope | `app_user`, `user_role_scope` | 2 | POC database (the rows); columns per §1.3: Camunda identity, myPeople, D365 F&O, corporate email |
 | G | Audit | `audit_log` | 1 | POC database |
 
 ### 2.1 ERD — the Work Pack spine
@@ -163,7 +214,7 @@ erDiagram
     workpack ||--o| workpack_schedule : "scheduled once"
     workpack ||--o| workpack_print : "printed once"
     workpack ||--o{ release_signoff : "sign-off attempts"
-    workpack ||--|| hour_journal_header : "one header"
+    workpack ||--o| hour_journal_header : "one header, created after save"
     material ||--o{ workpack_material : "material_ref"
     workpack_phase ||--o{ workpack_material : "phase must exist"
 ```
@@ -177,7 +228,7 @@ erDiagram
     activity ||--o| cbs_activity : "activity_ref"
     drawing ||--o{ drawing_revision : "drawing_ref"
     drawing ||--o{ cutting_sheet : "drawing_ref"
-    drawing ||--o{ lookahead_item : "design_dwg_ref"
+    drawing ||--o| lookahead_item : "design_dwg_ref (UNIQUE)"
     drawing ||--o{ material_reservation : "drawing_ref"
     material ||--o{ material_reservation : "material_ref"
     department {
@@ -199,16 +250,20 @@ erDiagram
     worker ||--o{ worker_assignment : "worker_id"
     workpack ||--o{ worker_assignment_history : "workpack_id"
     worker ||--o{ worker_assignment_history : "worker_id"
-    workpack ||--|| hour_journal_header : "one header"
+    workpack ||--o| hour_journal_header : "one header, created after save"
     hour_journal_header ||--|{ hour_journal_line : "header_id"
     worker ||--o{ hour_journal_line : "worker_id"
-    hour_journal_line ||--o| digital_timesheet : "journal_line_id"
+    hour_journal_line ||--o{ digital_timesheet : "journal_line_id (no UNIQUE)"
     workpack ||--o{ digital_timesheet : "workpack_id"
     worker ||--o{ digital_timesheet : "worker_id"
     digital_timesheet ||--o{ digital_timesheet_line : "Epic 2 fills"
+    published_message {
+        text sha256
+        text workpack_number
+    }
 ```
 
-`worker_assignment_history.worker_assignment_id` is deliberately **not** drawn: it has no FK (F3).
+`worker_assignment_history.worker_assignment_id` is deliberately **not** drawn: it has no FK (F3). `published_message` has no FKs (§5.12).
 
 ### 2.4 ERD — access scope and notification (domains E, F)
 
@@ -228,13 +283,15 @@ erDiagram
 
 All seeded by `R__seed_reference_data.sql` (09 S17, L2). None is written at runtime, with one exception: `drawing_revision` is seeded and then also written by the drawing-revisions endpoint from D365 events (D45, D53, G6).
 
+**Seed reloads (A8).** Flyway re-runs the repeatable seed whenever its checksum changes. It therefore **upserts on each table's business key** (`INSERT … ON CONFLICT (<key>) DO UPDATE`), never deletes, and never touches `drawing_revision` rows that are not in the seed (rows written at runtime from events).
+
 ### 3.1 `project_job_code`
 
 | Column | Type | Null | Constraint | SOR | Source |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | NOT NULL | PK | — (§1.3) | 04-conventions |
 | `project_ref` | `text` | NOT NULL | **UNIQUE** | D365 F&O Project Management | BPA-6; C8a |
-| `job_code_ref` | `text` | NOT NULL **(A)** | | FMS (created by PCON Planner) | BPA-6; C8b |
+| `job_code_ref` | `text` | NOT NULL **(A)** | | FMS (created by the PCON Planner) | BPA-6; C8b |
 
 `UNIQUE(project_ref)` enforces "one Job Code per project" — **ASSUMPTION** (D13). Two SORs in one table is deliberate; each *column* still has exactly one. Needs a column comment (§7.2).
 
@@ -253,16 +310,16 @@ All seeded by `R__seed_reference_data.sql` (09 S17, L2). None is written at runt
 | Column | Type | Null | Constraint | SOR | Source |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | NOT NULL | PK | — | |
-| `activity_ref` | `text` | NOT NULL | UNIQUE | P6, read through the D365 PMS database | BPA-6; C13 |
-| `activity_name` | `text` | NOT NULL **(A)** | | P6 | BPA-6; C13 |
+| `activity_ref` | `text` | NOT NULL | UNIQUE | P6 via D365 PMS | BPA-6; C13 |
+| `activity_name` | `text` | NOT NULL **(A)** | | P6 via D365 PMS | BPA-6; C13 |
 | `wbs_ref` | `text` | NOT NULL **(A)** | FK → `wbs(wbs_ref)` | D365 F&O Project Management | BPA-6; C8c |
-| `fac_crpo` | `text` | NULL | | P6 — **contradicted**: FRD-10 §10.8.1 calls it a D365-only field (C13) | BPA-6 |
-| `fac_type` | `text` | NULL | | P6 | BPA-6 |
-| `fac_name` | `text` | NULL | | P6 | BPA-6 |
-| `discipline` | `text` | NULL | | P6 | BPA-6 |
-| `baseline_start` | `date` | NULL | | P6 | BPA-6 |
-| `baseline_end` | `date` | NULL | | P6 | BPA-6 |
-| `budgeted_units` | `numeric(9,2)` | NULL | | P6 | BPA-6 |
+| `fac_crpo` | `text` | NULL | | P6 via D365 PMS — **contradicted**: FRD-10 §10.8.1 calls it a D365-only field (C13) | BPA-6 |
+| `fac_type` | `text` | NULL | | P6 via D365 PMS | BPA-6 |
+| `fac_name` | `text` | NULL | | P6 via D365 PMS | BPA-6 |
+| `discipline` | `text` | NULL | | P6 via D365 PMS | BPA-6 |
+| `baseline_start` | `date` | NULL | | P6 via D365 PMS | BPA-6 |
+| `baseline_end` | `date` | NULL | | P6 via D365 PMS | BPA-6 |
+| `budgeted_units` | `numeric(9,2)` | NULL | | P6 via D365 PMS | BPA-6 |
 
 The last seven are nullable on evidence: BPA-6 has an activity with no plan data (A-2299) and the Work Pack is still created. Nothing is validated against them (D17). Needs a column comment — `wbs_ref` has a different SOR from the table.
 
@@ -271,7 +328,7 @@ The last seven are nullable on evidence: BPA-6 has an activity with no plan data
 | Column | Type | Null | Constraint | SOR | Source |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | NOT NULL | PK | — | |
-| `activity_ref` | `text` | NOT NULL **(A)** | FK → `activity(activity_ref)`; **UNIQUE** (derived **(A)**, F5) | P6 | BPA-15 |
+| `activity_ref` | `text` | NOT NULL **(A)** | FK → `activity(activity_ref)`; **UNIQUE** (derived **(A)**, F5) | P6 via D365 PMS | BPA-15 |
 | `cbs_code_ref` | `text` | NOT NULL **(A)** | | D365 F&O Cost Control Report | BPA-15; D40 |
 
 `UNIQUE(activity_ref)`: BPA-15 derives a single `cbs_code_ref` per time sheet from the activity, so an activity has at most one CBS code. An activity with **no** row gives a blank CBS (BPA-15, A-2299).
@@ -281,8 +338,8 @@ The last seven are nullable on evidence: BPA-6 has an activity with no plan data
 | Column | Type | Null | Constraint | SOR | Source |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | NOT NULL | PK | — | |
-| `department_ref` | `text` | NOT NULL | UNIQUE | D365 F&O (organisation / financial dimension) | BPA-6; D18; 09 S20 |
-| `name` | `text` | NOT NULL **(A)** | | D365 F&O | **(A)** |
+| `department_ref` | `text` | NOT NULL | UNIQUE | D365 F&O Organisation (financial dimension) | BPA-6; D18; 09 S20 |
+| `name` | `text` | NOT NULL **(A)** | | D365 F&O Organisation | **(A)** |
 
 Required by BPA-6 (option list; background "department Fabrication"), the `workpack.department_ref` FK, BPA-15/BPA-16 scope checks, and the locked `GET /api/v1/departments` (S20). Stories refer to departments by a readable value ("Fabrication", "Painting"); whether that value is the `department_ref` or the `name` is a seed choice — **(A)**: seed `department_ref` = the readable value, so story data works unchanged.
 
@@ -292,7 +349,7 @@ Required by BPA-6 (option list; background "department Fabrication"), the `workp
 | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | NOT NULL | PK | — | |
 | `material_ref` | `text` | NOT NULL | UNIQUE | D365 F&O Product Information Management | BPA-6; C12, D54; 09 S20 |
-| `description` | `text` | NOT NULL **(A)** | | D365 F&O PIM | **(A)** |
+| `description` | `text` | NOT NULL **(A)** | | D365 F&O Product Information Management | **(A)** |
 
 ### 3.7 `drawing` — sourced table, non-key columns ASSUMPTION (Q-DM2)
 
@@ -328,9 +385,9 @@ Required by BPA-16: `POST /api/v1/drawing-revisions` returns **404 `Drawing not 
 | Column | Type | Null | Constraint | SOR | Source |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | NOT NULL | PK | — | |
-| `traceability_number` | `text` | NOT NULL **(A)** | | D365 F&O (PPC) | BPA-8; C12, D54 |
+| `traceability_number` | `text` | NOT NULL **(A)** | | D365 F&O PPC | BPA-8; C12, D54 |
 | `drawing_ref` | `text` | NOT NULL **(A)** | FK → `drawing(drawing_ref)` | D365 F&O Document Control | BPA-8; C5 |
-| `material_ref` | `text` | NOT NULL **(A)** | FK → `material(material_ref)` | D365 F&O PIM | BPA-8; C12 |
+| `material_ref` | `text` | NOT NULL **(A)** | FK → `material(material_ref)` | D365 F&O Product Information Management | BPA-8; C12 |
 
 Reservations are keyed by **drawing + material** (C5), not by Work Pack. `materialsReserved` is true when every `workpack_material` has a reservation for `(workpack.drawing_ref, material_ref)` — worker-checked, cross-table (BPA-8). Three different D365 modules appear here; all three columns need comments.
 
@@ -339,7 +396,7 @@ Reservations are keyed by **drawing + material** (C5), not by Work Pack. `materi
 | Column | Type | Null | Constraint | SOR | Source |
 | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | NOT NULL | PK | — | |
-| `cutting_sheet_ref` | `text` | NOT NULL **(A)** | | FMS nesting | BPA-10; D30 |
+| `cutting_sheet_ref` | `text` | NOT NULL **(A)** | | FMS (nesting) | BPA-10; D30 |
 | `drawing_ref` | `text` | NOT NULL **(A)** | FK → `drawing(drawing_ref)` | D365 F&O Document Control | BPA-10; D30 |
 
 Linked **by drawing**, not by Work Pack — the key and the empty case are ASSUMPTION (D30). No cutting sheet → the print shows `No cutting sheet available`.
@@ -350,10 +407,11 @@ Linked **by drawing**, not by Work Pack — the key and the empty case are ASSUM
 | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | NOT NULL | PK | — | |
 | `design_dwg_ref` | `text` | NOT NULL **(A)** | FK → `drawing(drawing_ref)`; **UNIQUE** **(A)** (F14) | D365 F&O Document Control (§1.3) | BPA-11; D48 |
-| `shop_drg_mark_plan_date` | `date` | NULL | | D365 F&O PCON | BPA-11; D48 |
-| `assembly_plan_date` | `date` | NULL | | D365 F&O PCON | BPA-11; D48 |
-| `weld_map_plan_date` | `date` | NULL | | D365 F&O PCON | BPA-11; D48 |
+| `shop_drg_mark_plan_date` | `date` | NULL | | D365 F&O Project Control (PCON) | BPA-11; D48 |
+| `assembly_plan_date` | `date` | NULL | | D365 F&O Project Control (PCON) | BPA-11; D48 |
+| `weld_map_plan_date` | `date` | NULL | | D365 F&O Project Control (PCON) | BPA-11; D48 |
 
+**Labels (A12, Khitaba, approved by the PO 29 Oct).** 03-sor-matrix and BPA-11 label the Look-Ahead *entity* PCON, which is right for the plan dates. `design_dwg_ref` identifies a drawing, so under §1.3 it carries Document Control; drawing numbers have one SOR across the model.
 Matching key: **Design Dwgs = the Work Pack's drawing** (BPA-11). One row per drawing, because BPA-11 reads "the Look-Ahead row for DWG-118". No row → `No Look-Ahead plan dates for <drawing>` and scheduling proceeds. Read-only labels: Shop Drg Mark, Assembly / Integration, Weld Map Drawing. L8's "3 weeks per project" is met by spreading the seeded plan dates over three weeks; there is no week or project column.
 
 ### 3.12 `worker`
@@ -365,7 +423,7 @@ Matching key: **Design Dwgs = the Work Pack's drawing** (BPA-11). One row per dr
 | `name` | `text` | NOT NULL **(A)** | | myPeople | BPA-22; C14 |
 | `role` | `text` | NOT NULL **(A)** | | myPeople | BPA-22, BPA-14 |
 | `designation` | `text` | NOT NULL **(A)** | | myPeople | BPA-22, BPA-14 |
-| `agency_flag` | `boolean` | **NOT NULL** (stated) | | myPeople (agency tag) | BPA-22; C11 — **ASSUMPTION**, field name and values unconfirmed (STAR question 7) |
+| `agency_flag` | `boolean` | **NOT NULL** (stated) | | myPeople (the agency tag) | BPA-22; C11 — **ASSUMPTION**, field name and values unconfirmed (STAR question 7) |
 | `cost_centre_ref` | `text` | NULL | | myPeople — **ASSUMPTION** that myPeople carries it; the code values are D365 financial-dimension codes, which does not change the SOR | BPA-15; D40 |
 
 - `employee_ref` **holds the Badge No** (D59). Contradiction C17 is recorded in §10.1. Stories label it "Employee ID" on screen (BPA-15); the value is the Badge No.
@@ -383,7 +441,7 @@ Matching key: **Design Dwgs = the Work Pack's drawing** (BPA-11). One row per dr
 | `workpack_number` | `text` | NOT NULL | **UNIQUE**; `CHECK (workpack_number ~ '^WP-[0-9]{6}$')` | POC database (real SOR FMS, D47) | BPA-6; D15 |
 | `activity_ref` | `text` | NOT NULL | FK → `activity(activity_ref)` | P6 via D365 PMS | BPA-6; C13 |
 | `drawing_ref` | `text` | NOT NULL | FK → `drawing(drawing_ref)` | D365 F&O Document Control | BPA-6; C15 |
-| `department_ref` | `text` | NOT NULL | FK → `department(department_ref)` | D365 F&O | BPA-6; D18 |
+| `department_ref` | `text` | NOT NULL | FK → `department(department_ref)` | D365 F&O Organisation | BPA-6; D18 |
 | `completion_date` | `date` | NOT NULL | **worker-checked**: not before today, Asia/Riyadh | POC database (C2) | BPA-6; D20, D28 |
 | `status` | enum (§7.1) `[Draft, Released, In Progress, Completed]` | NOT NULL | default `Draft` **(A)** | POC database (C2) | BPA-6, BPA-9 |
 | `assignment_state` | enum (§7.1) `[AwaitingFile, Assigning, Assigned, Replacing]` | **NULL** until the print is stored (stated) | | POC database | BPA-10, BPA-12, BPA-13; **D61** |
@@ -392,7 +450,7 @@ Matching key: **Design Dwgs = the Work Pack's drawing** (BPA-11). One row per dr
 **SOR reason:** the POC plays FMS's role for Work Packs. Real SOR FMS, copied to D365 via Int-4.1 (C2, D47). Batch/file if made live.
 
 Notes:
-- `workpack_number` is generated, read-only, gaps allowed (D15, ASSUMPTION). The format `CHECK` is safe because the POC generates every value.
+- `workpack_number` is generated, read-only, gaps allowed (D15, ASSUMPTION). Generator (A2): `CREATE SEQUENCE bpa.workpack_number_seq MAXVALUE 999999 NO CYCLE` (so `lpad` never truncates); `save-workpack` formats `'WP-' || lpad(nextval('bpa.workpack_number_seq')::text, 6, '0')`. A rolled-back save leaves a gap, which D15 allows. The format `CHECK` is safe because the POC generates every value.
 - **No `created_by` business column** (P4): the creator is the audit `created_by`, the Camunda username (D63).
 - `process_instance_key UNIQUE` is what makes `save-workpack` idempotent on retry (D65, 09 S7).
 - **No `project_ref` column.** A Work Pack's project is derived from its activity (BPA-16, C8a); storing it would create a second copy of one value.
@@ -408,7 +466,7 @@ Notes:
 
 **SOR reason:** part of the Work Pack, which the POC masters (C2, D47).
 **Corrections update rows in place** (F13): `save-workpack` on a BPA-23 correction updates an existing `(workpack_id, phase)` row, inserts new phases, and deletes only phases no longer selected. Delete-and-reinsert would change `id` and break the BPA-23 audit row (old value 250 → new 300 on the same record).
-`UNIQUE(workpack_id, phase)` produces `Phase Cutting is listed twice`. Boundaries proven in BPA-6: 0 rejected, 0.01 accepted, 0.001 rejected (2 dp), 99999.99 accepted, 100000 rejected. The worker checks the 2-decimal rule before saving so the message is exact; `numeric(7,2)` would otherwise round silently.
+`save-workpack` checks for a duplicate phase first and throws `WORKPACK_INVALID` with `Phase Cutting is listed twice` (BPA-6; D56); `UNIQUE(workpack_id, phase)` is the backstop, not the source of the message (A5). Boundaries proven in BPA-6: 0 rejected, 0.01 accepted, 0.001 rejected (2 dp), 99999.99 accepted, 100000 rejected. The worker checks the 2-decimal rule before saving so the message is exact; `numeric(7,2)` would otherwise round silently.
 
 ### 4.3 `workpack_material`
 
@@ -416,12 +474,15 @@ Notes:
 | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | NOT NULL | PK | — | |
 | `workpack_id` | `uuid` | NOT NULL | FK → `workpack(id)`; part of the composite FK below | POC database | BPA-6 |
-| `material_ref` | `text` | NOT NULL | FK → `material(material_ref)` | D365 F&O PIM | BPA-6; C12 |
+| `material_ref` | `text` | NOT NULL | FK → `material(material_ref)`; part of **UNIQUE (workpack_id, phase, material_ref)** (N1) | D365 F&O Product Information Management | BPA-6; C12; D74 |
 | `phase` | enum (§7.1) | NOT NULL | composite FK `(workpack_id, phase)` → `workpack_phase(workpack_id, phase)` `DEFERRABLE INITIALLY DEFERRED` (Q-DM6, decided 28 Oct) | POC database | BPA-6; **D16** |
 
 **SOR reason:** part of the Work Pack, which the POC masters (C2, D47).
-The composite FK is defence in depth; `save-workpack` still checks D16 first so the user sees `Phase Finishing is not selected for this Work Pack` rather than a constraint violation (D56). It is **deferred to commit** (F13) so a correction that moves materials and removes a phase in one save does not depend on statement order. Material rows are also updated in place.
-**No unique constraint on `(workpack_id, material_ref)`** — no story forbids the same material twice (Q-DM4, not blocking).
+The composite FK is defence in depth; `save-workpack` still checks D16 first so the user sees `Phase Finishing is not selected for this Work Pack` rather than a constraint violation (D56). It is **deferred to commit** (F13) so a correction that moves materials and removes a phase in one save does not depend on statement order.
+
+**Candidate key (N1, D74; accepted by the PO 29 Oct, amends Q-DM4).** `UNIQUE (workpack_id, phase, material_ref) DEFERRABLE INITIALLY DEFERRED` **(A: deferred for the same statement-order reason as the composite FK, F13)**. A material may appear in several phases of a Work Pack but only once per phase. `save-workpack` checks first and throws `WORKPACK_INVALID` with `Material <material_ref> is listed twice for phase <phase>`, e.g. `Material MAT-PIPE-06 is listed twice for phase Cutting` (ASSUMPTION wording, BPA-6); the constraint is the backstop.
+
+**Updates in place (A4, F13).** Rows are matched by `id`, carried in the task variables: the React screen round-trips each material line's `id`. The worker updates lines that arrive with an `id`, inserts those without one, and deletes the Work Pack's other lines. `id` joins the S14 per-task variable allow-list (§6.3).
 
 ### 4.4 `workpack_schedule`
 
@@ -474,15 +535,20 @@ Many rows per Work Pack — decline history lives here while `confirmMessage` ke
 | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | NOT NULL | PK | — | |
 | `file_name` | `text` | NOT NULL **(A)** | | POC database | BPA-12 |
-| `sha256` | `text` | NOT NULL | **indexed, not unique** (D70) | POC database | BPA-12; D33 r7; D70 |
+| `sha256` | `text` | NOT NULL | **indexed, not unique** (D70) | POC database | BPA-12; D33 r7; D70; D73 |
 | `uploaded_by` | `text` | NOT NULL | Camunda username | Camunda identity | BPA-12; D63 |
 | `received_at` | `timestamptz` | NOT NULL | | POC database | BPA-12 |
-| `outcome` | `text` | NULL | file-level result line (§7.3); **NULL when the rows were routed** — the rows carry the outcomes (D70) | POC database | BPA-12; D49; D70 |
+| `outcome` | `text` | NULL | file-level result line (§7.3); **NULL when the rows carry the outcomes** (D70, D73) | POC database | BPA-12; D49; D70; D73 |
 
 **SOR reason:** POC intake log of uploaded assignment files (FRD-7 §7.3.3 audit trail; D49, D58; BPA-12 "Upload is recorded") (F9).
 **No `workpack_id`** — one file may carry rows for several Work Packs (D33 rule 3).
 
-**Duplicate files (D70, Q-DM14).** An upload is a duplicate — file-level outcome `File already processed`, nothing published — only when an earlier `assignment_file` with the same `sha256` published at least one message (routed at least one row). A file whose rows were all "Not processed", "not ready" or rejected at routing can be resent unchanged, as D62 tells the user to. Every upload, duplicates included, gets its own row, so `GET /api/v1/assignment-files/{id}/result` always has something to show. G10's message ID (`sha256:workpackNumber`) still prevents a double publish if two identical uploads race.
+**Duplicate files (D73, amends D70; Khitaba, approved by the PO 29 Oct; ASSUMPTION).** The check is **per Work Pack**, on `(sha256, workpackNumber)`, the same pair as the G10 message ID:
+- A Work Pack already published from an earlier upload with the same `sha256` (a row in `published_message`, §5.12) gets the **row** outcome `Already processed in an earlier upload`, and nothing is published for it.
+- Other Work Packs in the file are processed normally, so a file that was not routed, or only partly routed, can be resent unchanged, as D62 tells the user.
+- The **file-level** outcome `File already processed` applies only when every Work Pack in the file was published before; then `outcome` holds it and no row outcome is needed.
+
+Every upload, duplicates included, gets its own row, so `GET /api/v1/assignment-files/{id}/result` always has something to show. "Has this file published for this Work Pack" is read from committed database state (`published_message`), never from the engine (B3; Usama's requirement).
 
 ### 5.2 `assignment_file_row` (C)
 
@@ -495,16 +561,18 @@ Many rows per Work Pack — decline history lives here while `confirmMessage` ke
 | `badge_no` | `text` | NULL | **raw** — not an FK | POC database | BPA-12; D59 |
 | `estimated_hours_raw` | `text` | NULL | **raw**, unparsed | POC database | BPA-12; D59 |
 | `remarks` | `text` | NULL | **unbounded** — see note | POC database | BPA-12 |
-| `outcome` | `text` | NOT NULL | one of the row outcomes in §7.3 | POC database | BPA-12, BPA-13, BPA-22; D49 |
+| `outcome` | `text` | **NULL** | one of the row outcomes in §7.3; `CHECK (outcome IS NOT NULL OR wp_outcome IS NOT NULL)` (C1) | POC database | BPA-12, BPA-13, BPA-22; D49 |
+| `wp_outcome` | `text` | NULL | `CHECK (wp_outcome IS NULL OR wp_outcome = 'Replacement not applied: file has rejected rows')` (B1) | POC database | BPA-13 scenarios 3 and 9; D71 |
 
 **SOR reason:** per-row intake log and the source the result is rebuilt from (D49).
 
-Four deliberate choices:
+Deliberate choices:
 - The four input columns are **raw text and nullable**, because a row must be logged even when invalid. `estimated_hours_raw` keeps `abc` so BPA-22 can answer `Estimated hours must be a number`; `badge_no` keeps `E9999` so it can answer `Worker not in worker master data`. Foreign keys here would make the unhappy paths unloggable.
 - `remarks` is **unbounded `text`**, unlike `worker_assignment.remarks`. A 251-character value must be stored to be rejected with `Remarks can be at most 250 characters`.
-- `outcome` starts `Pending` and is overwritten by `validate-worker-assignment` (D49).
-- **Synthetic rows (F1, ASSUMPTION).** When a replacement removes a Worker who has hours loaded, `replace-worker-assignment` writes a row with `row_number` NULL, the Work Pack number, the Worker's Badge No and outcome `Hours loaded; not removed`, so the rebuilt result shows it (BPA-13 scenario 2). The result lists synthetic rows after the file's rows.
-- The result's Worker name (D59: master name shown, file name ignored) comes from joining `badge_no` to `worker.employee_ref` when the result is built; it is not stored here.
+- **Who writes `outcome` (B6).** The upload endpoint writes `Workpack number is required` and the routing and duplicate outcomes at intake. A row routed to its Work Pack starts `Pending` and is overwritten by `validate-worker-assignment` (D49) or, for a replacement, by `replace-worker-assignment`, which also writes the other required-field outcomes (BPA-22). The writer of each string is listed in §7.3.
+- **Two outcomes on one row (B1, Ahsan; C1, PO).** A row's own result is in `outcome`; the Work Pack-level `Replacement not applied: file has rejected rows` (D71) is in `wp_outcome`, shown after `outcome`. A rejected row of a Work Pack not applied carries both (BPA-13 scenario 9). For a valid row of such a Work Pack, `replace-worker-assignment` sets `outcome` from `Pending` to NULL and writes only `wp_outcome`; it never reads `Assigned` **(A)**, no source states it. A joined single string was rejected because `"; "` already occurs inside three §7.3 strings. The API result gains `wpOutcome` after `outcome`.
+- **Synthetic rows (F1, ASSUMPTION).** When a replacement removes a Worker who has hours loaded, `replace-worker-assignment` writes a row with `row_number` NULL, the Work Pack number, the Worker's Badge No and outcome `Hours loaded; not removed`, so the rebuilt result shows it (BPA-13 scenario 2). The result lists synthetic rows after the file's rows. Partial unique index `UNIQUE (assignment_file_id, workpack_number, badge_no) WHERE row_number IS NULL`, written with `ON CONFLICT DO NOTHING`, so a retry does not duplicate them (B5).
+- **Worker name in the result (B15, D59; Khitaba, approved by the PO 29 Oct).** The result's `worker_name` column (BPA-12) is the master name, from joining `badge_no` to `worker.employee_ref` when the result is built; blank when the Badge No is not in the worker master **(A)**. It is not stored here.
 
 ### 5.3 `worker_assignment` (C)
 
@@ -512,7 +580,7 @@ Four deliberate choices:
 | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | NOT NULL | PK | — | |
 | `workpack_id` | `uuid` | NOT NULL | FK → `workpack(id)`; **UNIQUE(workpack_id, worker_id)** | POC database | BPA-22; D32 |
-| `worker_id` | `uuid` | NOT NULL | FK → `worker(id)`; part of the unique key | myPeople (§1.3) | BPA-22; C1, C14 |
+| `worker_id` | `uuid` | NOT NULL | FK → `worker(id)`; part of the unique key | myPeople (§1.3) | BPA-22; BPA-14, BPA-15 (SOR); C1, C14 |
 | `estimated_hours` | `numeric(7,2)` | NOT NULL | `CHECK (estimated_hours > 0 AND estimated_hours <= 99999.99)` | POC database | BPA-22; D14 |
 | `remarks` | `text` | NULL | `CHECK (char_length(remarks) <= 250)` (F6) | POC database | BPA-22; D59 |
 | `flag` | enum (§7.1) `[HoursLoadedNotRemoved]` | NULL | set by BPA-13 only | POC database | BPA-13 |
@@ -520,7 +588,7 @@ Four deliberate choices:
 
 **SOR reason:** POC workflow state; the real equivalent is FMS via Int-5 (D38).
 `UNIQUE(workpack_id, worker_id)` carries D32 — the same worker twice on one Work Pack rejects **both** rows; the same worker on two Work Packs is valid. It is also the idempotency key for `validate-worker-assignment` (09 S7).
-On a replacement, `assignment_file_id` is updated to the replacement file for Workers it adds or replaces **(A)**. A removed Worker's row is **deleted** after its `Removed` history row is written — **(A)**: BPA-13 says only "no longer assigned"; deletion is chosen so the history table, not a status column, is the record of removals. A removed Worker with hours loaded keeps the row and gets `flag = HoursLoadedNotRemoved` (BPA-13).
+On a replacement, `assignment_file_id` is updated to the replacement file for Workers it adds or replaces **(A)**. A removed Worker's row is **deleted** after its `Removed` history row is written — **(A)**: BPA-13 says only "no longer assigned"; deletion is chosen so the history table, not a status column, is the record of removals. A removed Worker with hours loaded keeps the row and gets `flag = HoursLoadedNotRemoved` (BPA-13). No story clears the flag; it stays until a later replacement removes the Worker once no hours are loaded **(A)** (B14).
 **Re-adding a removed Worker** (D72, ASSUMPTION): a new `worker_assignment` row is inserted (the old one was deleted), the existing journal line is reopened (`Open`, new estimated hours) and the time sheet reset to `Draft`; the unique keys in §5.6 and §5.7 are therefore never hit. History records `Added`.
 
 ### 5.4 `worker_assignment_history` (C)
@@ -534,7 +602,7 @@ On a replacement, `assignment_file_id` is updated to the replacement file for Wo
 | `old_estimated_hours` | `numeric(7,2)` | **NOT NULL** | `CHECK (>= 0)`; **0 on `Added`** | POC database | BPA-13 AC; D38 |
 | `new_estimated_hours` | `numeric(7,2)` | **NOT NULL** | `CHECK (>= 0)`; **0 on `Removed`** | POC database | BPA-13 AC; D38 |
 | `change_type` | enum (§7.1) `[Added, Replaced, Removed]` | NOT NULL | | POC database | BPA-13; D38 |
-| `source_file` | `text` | NOT NULL **(A)** | the replacement file's `file_name` (display) | POC database | BPA-13; D38 |
+| `source_file` | `text` | NOT NULL **(A)** | the replacement file's `file_name`; deliberate snapshot (N3), kept because BPA-13 asserts it (C5) | POC database | BPA-13 scenario 1; D38 |
 | `assignment_file_id` | `uuid` | NOT NULL **(A)** | FK → `assignment_file(id)`; part of the idempotency key (F12) | POC database | BPA-13 scenario 8 |
 
 **SOR reason:** audit of POC workflow state (FRD-7 §7.3.3; FRD-5-12 §5.12.5.5).
@@ -563,8 +631,8 @@ On a replacement, `assignment_file_id` is updated to the replacement file for Wo
 | `id` | `uuid` | NOT NULL | PK | — | |
 | `header_id` | `uuid` | NOT NULL | FK → `hour_journal_header(id)`; **UNIQUE(header_id, worker_id)** | POC database | BPA-14 |
 | `worker_id` | `uuid` | NOT NULL | FK → `worker(id)`; part of the unique key | myPeople (§1.3) | BPA-14; C1, C14 |
-| `role` | `text` | NOT NULL **(A)** | **snapshot**, not refreshed | myPeople (the value) | BPA-14; C14 |
-| `designation` | `text` | NOT NULL **(A)** | **snapshot**, not refreshed | myPeople (the value) | BPA-14; C14 |
+| `role` | `text` | NOT NULL **(A)** | **snapshot**, not refreshed (N3) | myPeople (the value) | BPA-14; C14 |
+| `designation` | `text` | NOT NULL **(A)** | **snapshot**, not refreshed (N3) | myPeople (the value) | BPA-14; C14 |
 | `estimated_hours` | `numeric(7,2)` | NOT NULL | | POC database | BPA-14 |
 | `status` | enum (§7.1) `[Open, Closed]` | NOT NULL | default `Open`; `Closed` set **only** by BPA-13 | POC database | BPA-14, BPA-13 |
 
@@ -623,10 +691,11 @@ Epic 1 creates no rows; tests seed them. "Hours loaded" = at least one line with
 | --- | --- | --- | --- | --- | --- |
 | `username` | `text` | NOT NULL | **PRIMARY KEY** (the 04-conventions exception) | Camunda identity | BPA-6/9/11/16; D63, 09 S5/S6 |
 | `employee_ref` | `text` | NOT NULL **(A)** | Badge No; **no FK** (Q-DM8) | myPeople | BPA-16; D19, D59 |
-| `email` | `text` | NOT NULL **(A)** | | corporate email system — **ASSUMPTION** | BPA-16; D19 |
+| `email` | `text` | NOT NULL **(A)** | | Corporate email system — **ASSUMPTION** | BPA-16; D19 |
 
 **SOR reason for the row's existence:** it links a Camunda username to a myPeople worker and an email address; neither Camunda nor myPeople holds both.
-Written **only** by the S22 start-up job from `personas.yaml` (L2), as an **upsert** — never delete-and-insert, because `notification` and `user_role_scope` reference it. Outside `audit_log` (Q-DM11).
+At runtime written **only** by the S22 start-up job from `personas.yaml` (L2), as an **upsert** — never delete-and-insert, because `notification` and `user_role_scope` reference it. Outside `audit_log` (Q-DM11).
+**Tests (B7, Usama).** The S22 job runs only with profile `local` or `showcase`, so tests write the `app_user` and `user_role_scope` rows they need (for example BPA-16's U-11, U-12, P-201) as fixtures, with a setup assertion that fails loudly when they are absent. A skip was rejected: CI would go green with the behaviour untested. L2's "only writer" applies at runtime.
 
 ### 5.11 `user_role_scope` (F)
 
@@ -635,11 +704,31 @@ Written **only** by the S22 start-up job from `personas.yaml` (L2), as an **upse
 | `id` | `uuid` | NOT NULL | PK | — | 04-conventions |
 | `username` | `text` | NOT NULL | FK → `app_user(username)` | Camunda identity | BPA-16, BPA-26; 09 S6 |
 | `group_id` | `text` | NOT NULL | `CHECK` in the seven group IDs (§1.6) | Camunda identity | BPA-16; 09 S6 |
-| `department_ref` | `text` | **NULL** | FK → `department(department_ref)` | D365 F&O | BPA-16; 09 S6 |
-| `project_ref` | `text` | **NULL** | FK → `project_job_code(project_ref)` | D365 F&O PM | BPA-15, BPA-16; 09 S6 |
+| `department_ref` | `text` | **NULL** | FK → `department(department_ref)` | D365 F&O Organisation | BPA-16; 09 S6 |
+| `project_ref` | `text` | **NULL** | FK → `project_job_code(project_ref)` | D365 F&O Project Management | BPA-15, BPA-16; 09 S6 |
 
 **SOR reason:** department/project scope that Camunda groups cannot express (09 S6). Replaces `user_role`.
-Both scope columns are nullable because groups scope differently: `workpack-owner` by department, `project-engineer` by project (BPA-16). `UNIQUE NULLS NOT DISTINCT (username, group_id, department_ref, project_ref)` **(A)** keeps the S22 job idempotent (PostgreSQL 15+, G1). Written **only** by the S22 start-up job (L2).
+Both scope columns are nullable because groups scope differently: `workpack-owner` by department, `project-engineer` by project (BPA-16). `UNIQUE NULLS NOT DISTINCT (username, group_id, department_ref, project_ref)` **(A)** keeps the S22 job idempotent (PostgreSQL 15+, G1). At runtime written **only** by the S22 start-up job (L2); tests write fixtures (B7, §5.10).
+**SOR (A11).** The row is held in the POC database for the reason above; each column carries the SOR of what it identifies (§1.3), as Jira BPA-15 and BPA-16 now state.
+
+### 5.12 `published_message` (C) — new in v0.5
+
+| Column | Type | Null | Constraint | SOR | Source |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `uuid` | NOT NULL | PK | — | 04-conventions |
+| `sha256` | `text` | NOT NULL | **UNIQUE (sha256, workpack_number)** | POC database | B3 (Usama); D73 |
+| `workpack_number` | `text` | NOT NULL | part of the unique key; not an FK **(A)** | POC database | B3; D73 |
+| `published_at` | `timestamptz` | NOT NULL | default `now()`: the claim time, set before the send | POC database | B3 |
+
+**SOR reason:** the POC's own record of which file content it has sent to which Work Pack. It is the duplicate guard for D73 and replaces the per-file "published" idea (B3, Usama, 29 Oct).
+
+- **Claim, then send.** Only for a Work Pack group that will be sent (state `AwaitingFile` or `Assigned`, §8), the endpoint inserts `(sha256, workpack_number)` with `ON CONFLICT DO NOTHING` inside its transaction. Zero rows affected means the pair was already published: the rows read `Already processed in an earlier upload` and nothing is sent. Otherwise it commits and then sends the message. Groups answered at intake (not found, not Released, not ready, `Assigning`, `Replacing`) never claim, so they can be resent (D73).
+- **Undo on failure (C2, PO 29 Oct).** If nothing correlates, the endpoint deletes the claim in a compensating transaction before answering, so a resend is accepted (BPA-12): on the `AwaitingFile` path the rows read `Not processed: Work Pack not ready; resend the file` (D62); on the `Assigned` (replacement) path the state reverts and the rows read `Replacement already in progress` (C3, §8).
+- **At-most-once (accepted).** A crash between the commit and the send leaves a claim with no message. The user's resend would then read `Already processed in an earlier upload`. Closing that gap needs a transactional outbox: the production answer, not built for the POC.
+- **Concurrent uploads.** Two identical uploads at the same moment cannot both claim the pair; the UNIQUE constraint decides.
+- `assignment_file` has no `published` column: whether a file published anything is derived by joining on `sha256`.
+- Written by the upload endpoint as the result of a user's upload, so `created_by` holds the uploader (§1.2). Not audited (it is itself a log).
+- `published_message` is **not** the G10 message ID mechanism: with TTL 0 (D62) Camunda does not reject a duplicate message ID (ADR 0007), so the database is the guard.
 
 ---
 
@@ -655,11 +744,12 @@ Both scope columns are nullable because groups scope differently: `workpack-owne
 | `column_name` | `text` | NOT NULL | | POC database | BPA-23; D64 |
 | `old_value` | `text` | NULL | null on insert | POC database | BPA-23; D64 |
 | `new_value` | `text` | NULL | null on delete | POC database | BPA-23; D64 |
-| `username` | `text` | NOT NULL | Camunda username | Camunda identity | BPA-23; D63 |
+| `username` | `text` | NOT NULL | Camunda username of the user whose action made the change; `bpa-service` when no user is in context (B12, §1.2) | Camunda identity | BPA-23; D63 |
 | `changed_at` | `timestamptz` | NOT NULL | **UTC** | POC database | BPA-23; D64 |
 
 **SOR reason:** audit trail of POC-mastered data (FRD-7 §7.3.3).
-One row **per changed column**, written by the save workers in the same transaction, readable by tests (D64).
+One row **per changed business column**, written by the save workers in the same transaction, readable by tests (D64). The four audit columns (§1.2) are **not** logged (A3); otherwise every update would add `updated_at` and `updated_by` rows and BPA-23's single-row assertion would fail.
+Index: `(table_name, record_id)` (A15), the lookup the tests and any audit screen use.
 
 **Value format (F11, ASSUMPTION).** `old_value` and `new_value` hold a canonical text form so tests can assert BPA-23's `250` → `300`:
 - numbers: plain decimal, trailing zeros and a trailing point removed (Java `BigDecimal.stripTrailingZeros().toPlainString()`): `250.00` → `250`, `0.50` → `0.5`
@@ -667,7 +757,10 @@ One row **per changed column**, written by the save workers in the same transact
 - timestamps: ISO 8601 UTC with `Z`
 - booleans: `true` / `false`
 - enums and text: as stored
-- `uuid`: canonical lower-case form Scope: the POC-mastered tables of domains B–E. Out of scope: reference-data copies (seed-only) and domain F (`app_user`, `user_role_scope`, written only by S22) — Q-DM11. BPA-23's worked example: table `workpack_phase`, column `manhours`, old `250`, new `300`.
+- `uuid`: canonical lower-case form
+- `bytea` (`workpack_print.file`): not logged by value; logged as `sha256:<hex>` of the content **(A)** (A3)
+
+Scope: the POC-mastered tables of domains B–E. Out of scope: reference-data copies (seed-only), domain F (`app_user`, `user_role_scope`, written only by S22) — Q-DM11 — and `published_message` (itself a log, §5.12). BPA-23's worked example: table `workpack_phase`, column `manhours`, old `250`, new `300`.
 
 ### 6.2 Not a table: `lead_time_days`
 
@@ -675,7 +768,7 @@ BPA-11: *"lead_time_days — POC configuration parameter, default 7 (D9, PO)"*. 
 
 ### 6.3 Not a table: the per-task variable allow-list
 
-BPA-26: *"Per-task variable allow-list — backend configuration (not data)."* Lives in config (09 S14).
+BPA-26: *"Per-task variable allow-list — backend configuration (not data)."* Lives in config (09 S14). Includes each `workpack_material` line's `id` for the create and correct tasks (A4, §4.3).
 
 ### 6.4 Not a table: `supersededRevision`
 
@@ -707,7 +800,7 @@ Approved drawing statuses are `IFC` and `As-Built` only (D10). Any other value o
 
 ### 7.2 SOR comments (09 S17)
 
-`COMMENT ON TABLE` on every table, plus a **column comment wherever a column's SOR differs from its table's**. The rule is mechanical: every column whose SOR cell in §3–§6 differs from the table's own SOR gets a comment. The generator derives this from the SOR column; the CI test (09 S17) checks both. Tables needing column comments:
+`COMMENT ON TABLE` on every table, plus a **column comment wherever a column's SOR differs from its table's**. The rule is mechanical: every column whose SOR **label** (§1.3 canonical list; notes after the label ignored) in §3–§6 differs from the table's own SOR gets a comment. The generator derives this from the SOR column; the CI test (09 S17) checks both. Tables needing column comments:
 
 `project_job_code`, `activity`, `cbs_activity`, `material_reservation`, `cutting_sheet`, `lookahead_item`, `workpack`, `workpack_material`, `workpack_schedule`, `release_signoff`, `assignment_file`, `worker_assignment`, `worker_assignment_history`, `hour_journal_line`, `digital_timesheet`, `notification`, `app_user`, `user_role_scope`, `audit_log`.
 
@@ -715,15 +808,22 @@ Approved drawing statuses are `IFC` and `As-Built` only (D10). Any other value o
 
 ### 7.3 Outcome vocabularies
 
-Stored as the exact message string, because the result shows it verbatim (D49, D58). Not `CHECK`-constrained: the lists are long, two placements rest on judgement, and a wrong `CHECK` would reject valid rows. Tests assert the strings.
+Stored as the exact message string, because the result shows it verbatim (D49, D58). `outcome` is not `CHECK`-constrained (`wp_outcome` is, because it has a single value, B1): the lists are long, two placements rest on judgement, and a wrong `CHECK` would reject valid rows. Tests assert the strings.
 
-**Row outcomes (`assignment_file_row.outcome`)** — routing (intake step), validation (`validate-worker-assignment`) and replacement (`replace-worker-assignment`):
-`Pending` · `Assigned` · `Worker not in worker master data` · `Worker listed twice for this Work Pack` · `Workpack number is required` · `Badge No is required` · `Remarks can be at most 250 characters` · `Estimated hours is required` · `Estimated hours must be a number` · `Estimated hours must be greater than 0` · `Estimated hours can have at most 2 decimal places` · `Estimated hours cannot exceed 99,999.99` · `Work Pack not found` · `Work Pack is not Released` · `Work Pack not ready for assignment yet` · `Not processed: Work Pack not ready; resend the file` · `Assignment still in progress; try again later` · `Replacement already in progress` (P2, moved from file level) · `Hours loaded; not removed` (synthetic row, F1) · `Replacement not applied: file has rejected rows` (per Work Pack, D71)
+**Row outcomes (`assignment_file_row.outcome`)**, by writer (B6):
+- **Upload endpoint, at intake:** `Workpack number is required` · `Work Pack not found` · `Work Pack is not Released` · `Work Pack not ready for assignment yet` · `Not processed: Work Pack not ready; resend the file` · `Assignment still in progress; try again later` · `Replacement already in progress` (P2) · `Replacement could not be started; try again` (D75, ASSUMPTION) · `Already processed in an earlier upload` (D73, ASSUMPTION) · `Pending` (routed, awaiting validation)
+- **`validate-worker-assignment` and `replace-worker-assignment`:** the rest of the list below.
 
-**File-level outcomes (`assignment_file.outcome`):**
-`File has no rows` · `File cannot be read` · `File layout not recognised` · `File already processed`
+Full list: `Pending` · `Assigned` · `Worker not in worker master data` · `Worker listed twice for this Work Pack` · `Workpack number is required` · `Badge No is required` · `Remarks can be at most 250 characters` · `Estimated hours is required` · `Estimated hours must be a number` · `Estimated hours must be greater than 0` · `Estimated hours can have at most 2 decimal places` · `Estimated hours cannot exceed 99,999.99` · `Work Pack not found` · `Work Pack is not Released` · `Work Pack not ready for assignment yet` · `Not processed: Work Pack not ready; resend the file` · `Assignment still in progress; try again later` · `Replacement already in progress` (P2, moved from file level) · `Hours loaded; not removed` (synthetic row, F1) · `Already processed in an earlier upload` (D73) · `Replacement could not be started; try again` (D75)
 
-`Replacement not applied: file has rejected rows` is a **row** outcome, written on every row of the Work Pack whose replacement was not applied; other Work Packs in the same file are processed independently (D71, consistent with D33 rule 3).
+**Work Pack outcome (`assignment_file_row.wp_outcome`, B1):** `Replacement not applied: file has rejected rows` (per Work Pack, D71), written by `replace-worker-assignment`.
+
+**File-level outcomes (`assignment_file.outcome`)**, written by the upload endpoint:
+`File has no rows` · `File cannot be read` · `File layout not recognised` · `File already processed` (only when every Work Pack in the file was published before, D73)
+
+`Replacement not applied: file has rejected rows` is written in `wp_outcome` on every row of the Work Pack whose replacement was not applied; other Work Packs in the same file are processed independently (D71, consistent with D33 rule 3).
+
+Why `Workpack number is required` is an intake outcome: a row with no Workpack number reaches no instance, so a validator would never see it and it would stay `Pending` (B6).
 
 ---
 
@@ -736,18 +836,22 @@ Stored as the exact message string, because the result shows it verbatim (D49, D
 | *(null)* | `AwaitingFile` | `generate-workpack-print` | the print is stored | D50, BPA-10 |
 | `AwaitingFile` | `Assigning` | `validate-worker-assignment` | at least one row accepted | D61, BPA-22 |
 | `AwaitingFile` | `AwaitingFile` | `validate-worker-assignment` | **every** row rejected (loop back, D5) | D61, BPA-22 |
-| `Assigning` | `Assigned` | `create-digital-timesheets` | time sheets created | D61, BPA-22 (BPA-15 AC says the prior state is `AwaitingFile` — stale, §10.2) |
-| `Assigned` | `Replacing` | the upload endpoint | a replacement file is uploaded, in the same transaction as publishing `AssignmentFileReplaced` | D61, BPA-13 |
+| `Assigning` | `Assigned` | `create-digital-timesheets` | time sheets created | D61, BPA-22, BPA-15 |
+| `Assigned` | `Replacing` | the upload endpoint | a replacement file is uploaded: compare-and-set `UPDATE … SET assignment_state = 'Replacing' WHERE assignment_state = 'Assigned'`, commit, then correlate `AssignmentFileReplaced` (C3) | D61, BPA-13; B4, C3 |
+| `Replacing` | `Assigned` | the upload endpoint | the correlate call starts no instance (a reassignment with the same key is still ending): revert, rows read `Replacement already in progress` (C3). On a technical error from the call, the same revert applies and the rows read `Replacement could not be started; try again` (**D75**, PO 29 Oct, wording ASSUMPTION) | B4, C3; D75 |
 | `Replacing` | `Assigned` | `replace-worker-assignment` | **both** outcomes — applied and not applied | D61, BPA-13 |
 
-Gates on upload, per row's Work Pack:
+**How the endpoint sends (B4, C3; PO 29 Oct).** Both messages are sent with Camunda's synchronous **correlate** call, not publish, so the endpoint knows whether an instance received the message. A Zeebe call cannot join the PostgreSQL transaction, so every state change is committed first and undone if nothing correlates. Correlate's "nothing correlated" response is not documented; BPA-25's seventh check records it, and the code is built against the observed response. D61 is unchanged: `replace-worker-assignment` still resets `Assigned` on both outcomes.
+
+Gates on upload, per row's Work Pack, in this order:
 
 | State | Result | Source |
 | --- | --- | --- |
+| any | if `(sha256, workpack_number)` is in `published_message`: `Already processed in an earlier upload` (or the file-level `File already processed` when every Work Pack is a duplicate) | D73, BPA-12 |
 | *(null)*, Work Pack Released | `Work Pack not ready for assignment yet` | D50, BPA-12 |
-| `AwaitingFile` | publish `AssignmentFileReceived` (TTL 0); if it cannot correlate, `Not processed: Work Pack not ready; resend the file` | D62, BPA-12 |
+| `AwaitingFile` | claim `published_message`, commit, correlate `AssignmentFileReceived`; if nothing correlates, delete the claim and the rows read `Not processed: Work Pack not ready; resend the file` | D62, BPA-12; B3, C2 |
 | `Assigning` | `Assignment still in progress; try again later` | D61, BPA-12, BPA-13 |
-| `Assigned` | publish `AssignmentFileReplaced`, set `Replacing` | D61, BPA-13 |
+| `Assigned` | claim `published_message`, compare-and-set `Replacing`, commit, correlate `AssignmentFileReplaced`; on no instance, revert to `Assigned`, delete the claim, rows read `Replacement already in progress` | D61, BPA-13; B4, C2, C3 |
 | `Replacing` | `Replacement already in progress` | **P2**, BPA-13 |
 
 ---
@@ -761,7 +865,7 @@ All items were decided on the PO call of 28 Oct 2026 (Faraz with Khitaba and Ahs
 | Q-DM1 | Native `ENUM` vs `text` + `CHECK` | `text` + `CHECK` |
 | Q-DM2 | `department`, `material`, `drawing` columns | As drafted (§3.5–§3.7) |
 | Q-DM3 | `workpack.created_by` | Dropped (P4 / D69) |
-| Q-DM4 | Missing uniqueness rules | `cbs_activity` unique by activity; others unconstrained / Epic 2 |
+| Q-DM4 | Missing uniqueness rules | `cbs_activity` unique by activity; others unconstrained / Epic 2. **Amended 29 Oct by N1 / D74:** `workpack_material` UNIQUE `(workpack_id, phase, material_ref)` (PO accepted) |
 | Q-DM5 | Inactive worker in L8 | Seeded as an ordinary worker |
 | Q-DM6 | D16 composite FK | Added, deferred |
 | Q-DM7 | `supersededRevision` | Process variable only (P3 / D68) |
@@ -771,10 +875,12 @@ All items were decided on the PO call of 28 Oct 2026 (Faraz with Khitaba and Ahs
 | Q-DM11 | `audit_log` and domain F | Out of scope |
 | Q-DM12 | Message while `Replacing` | "Replacement already in progress" (P2 / D67) |
 | Q-DM13 | Replacement not applied: scope | Per Work Pack (D71) |
-| Q-DM14 | Duplicate files | Duplicate only if an earlier upload was routed; no unique constraint (D70, amends G10) |
+| Q-DM14 | Duplicate files | Duplicate only if an earlier upload was routed; no unique constraint (D70, amends G10). **Refined 29 Oct by D73:** per `(sha256, workpackNumber)` (§5.1, §5.12) |
 | Q-DM15 | Re-adding a removed Worker | Reopen line and time sheet (D72) |
 
-**Nothing blocks V1.** The approval chain step (09 §4 item 3) is: Khitaba confirms the SOR labels, Faraz and Ahsan/Usama approve, then Usama generates `V1__baseline_schema.sql` and `R__seed_reference_data.sql`.
+**Approval review of v0.4, 29 Oct 2026: all decided.** Every finding (B1–B15, A1–A15, N1–N4, C1–C5) is decided and listed in §0 v0.5. The record is the Claude Project's `audits/data-model-v0.4-approval-2026-10-29.md`.
+
+**Approval step (09 §4 item 3).** Faraz and Ahsan/Usama approve v0.5 by merging its PR (BPA-40); Usama then generates `V1__baseline_schema.sql` and `R__seed_reference_data.sql`. B2/B3/B4 rest on Camunda documentation until BPA-25 (checks 6 and 7) runs on the 8.10.1 stack.
 
 ---
 
@@ -789,8 +895,8 @@ All items were decided on the PO call of 28 Oct 2026 (Faraz with Khitaba and Ahs
 | **C13** | `activity.fac_crpo` SOR | P6: FRD-10 §10.3.2; FRD-21 §21.5.2 row 9 | D365-only: FRD-10 §10.8.1 | Labelled P6. |
 | **C12 / D54** | Material reservation and master | legacy today (03-sor-matrix) | D365 F&O after cutover (FRD-7, FRD-6-1) | Labelled D365 F&O. |
 | **C8c / P1** | WBS | D365 F&O PM: FRD-7 §7.7, FRD-22, FRD-5-7 | FMS: FRD-7 §7.4, §7.6 s1 | Labelled D365 F&O; FMS → D365 creation feed and D365 → FMS update flow recorded (P1). |
-| **NEW** | D33 rule 12 (`assignment_file` intake log) | **retired**: 06 D58 keep-list (1–7, 9–10) and 06 "Superseded" paragraph ("D33 rules 8, 11, 12 … by D58") | **live**: BPA-12 SOR Notes and AC cite "D33 rule 12"; D49 and D58 themselves require the log | Table kept, sourced to D49, D58, BPA-12. 06 to be corrected (§10.2). |
-| **Resolved** | Duplicate file | G10, L20: unique `sha256` | D62, BPA-12: "resend the file" | Resolved by D70 (Q-DM14). |
+| **Resolved** | D33 rule 12 (`assignment_file` intake log) | 06 D58 once retired it | BPA-12, D49, D58 require the log | Resolved 28 Oct: 06 D58 corrected, rule 12 kept (ADR 0009). |
+| **Resolved** | Duplicate file | G10, L20: unique `sha256` | D62, BPA-12: "resend the file" | Resolved by D70 (Q-DM14), refined per Work Pack by D73 (29 Oct). |
 
 ### 10.2 Stale or conflicting statements to correct
 
@@ -820,6 +926,15 @@ All items were decided on the PO call of 28 Oct 2026 (Faraz with Khitaba and Ahs
 | `06` | — | add D66–D69 for P1–P4 | Khitaba |
 | `09`, G7 | enum `AwaitingFile, Assigned, Replacing` | add a change-log line: amended by D61 (adds `Assigning`) | Ahsan/Usama |
 
+**Raised 29 Oct by the v0.5 review; all applied in Jira the same day after the PO confirmed the batch** (BPA-12 Description and SOR Notes; BPA-13 Description, SOR Notes and a new D75 scenario, `BPA13_replacementStartFailureReverts`):
+
+| Item | Says | v0.5 says | Why |
+| --- | --- | --- | --- |
+| BPA-13 Description | "the upload endpoint sets Replacing in the same transaction as publishing AssignmentFileReplaced" | compare-and-set, commit, then correlate; revert when no instance starts | B4, C3. **PO to confirm the story edit**: comment 10409 said C3 needs no BPA-13 change, but its text describes the old mechanism |
+| BPA-13 SOR Notes | "'Replacement not applied…' is a row outcome on the rows of the Work Pack" | held in `assignment_file_row.wp_outcome` | B1 (the ripple Ahsan named) |
+| BPA-12 Description and SOR Notes | "publish AssignmentFileReceived (… TTL 0, message ID per G10)"; result columns without `wpOutcome` | correlate, not publish; result gains `wpOutcome` after `outcome` | C3, B1 |
+| Message on a technical error from the correlate call (replacement path) | — | revert; rows read `Replacement could not be started; try again` | **Decided by the PO 29 Oct as D75** (wording ASSUMPTION); add to BPA-13 in the same Jira batch |
+
 ### 10.3 Assumptions this model carries
 
 | What | Basis |
@@ -830,6 +945,10 @@ All items were decided on the PO call of 28 Oct 2026 (Faraz with Khitaba and Ahs
 | D14 numeric rule (`> 0`, `<= 99,999.99`, 2 dp) | No FRD states a cap; applied to the input columns, **not** to `worker_assignment_history` |
 | D15 Work Pack number format | FRD-7 §7.5.5 #13 says auto-generated; the format is ours |
 | Synthetic result rows (F1), history uniqueness (§5.4), one email per recipient per revision recorded per Work Pack (§5.9), copied coding on time sheets (§5.7) | Derived from the story assertions they make pass |
+| Valid rows of a Work Pack whose replacement is not applied keep `outcome` NULL (§5.2) | B1 detail (Ahsan); no source states it |
+| Row outcome wording `Already processed in an earlier upload`; message `Material <ref> is listed twice for phase <phase>` | D73, D74 (PO approved; wording ASSUMPTION) |
+| `bytea` audit form `sha256:<hex>`; `published_message.workpack_number` not an FK; flag never cleared by a story | §6.1, §5.12, §5.3 |
+| At-most-once message send (a crash between commit and send) | B3 (Usama), accepted for the POC |
 | Every column marked **(A)** in §3–§6 | Nullability or meaning not stated by any story |
 
 ---
@@ -846,9 +965,22 @@ All items were decided on the PO call of 28 Oct 2026 (Faraz with Khitaba and Ahs
 | `drawing` | ~8, one with a superseded revision |
 | `material` | ~10 |
 | `lookahead_item` | 3 weeks per project |
-| `worker` | ~12 — one agency, one inactive (no distinguishing column, Q-DM5), one in another department |
+| `worker` | ~12 — one agency, one inactive (no distinguishing column, Q-DM5), one in another department (**cannot be seeded as stated**: `worker` has no department column; recorded as ASSUMPTION that L8 meant a Worker who is not assigned to the department's Work Packs) |
 
-**Derived from the Gherkin unhappy paths — ASSUMPTION, not L8** (Khitaba to nod):
+**Seed versus test data (A6, A7, B8; Usama, 29 Oct).** Tests own their **scenario** data: each test inserts the rows and states its Gherkin needs (for example BPA-8 and BPA-16 need different revision states for DWG-130 and DWG-118, which one seed cannot hold). The seed holds only the **named reference rows** the stories' backgrounds use, so every test starts from the same master data:
+
+| Kind | Named keys (from the stories' backgrounds) |
+| --- | --- |
+| Projects | PRJ-139 (Job Code JC-139, WBS 11031), PRJ-140 (BPA-26 keeps it) |
+| Activities | A-2201 (FAC CRPO 139, Module, M-01, Piping, baseline 01–30 Nov 2026, 1200 units; CBS CBS-139-PIP-01), A-2299 (no plan data) |
+| Departments | Fabrication, Painting |
+| Drawings | DWG-118, DWG-119, DWG-121, DWG-130, DWG-140, DWG-141; DWG-999 must **not** exist |
+| Materials, reservations, cutting sheets | MAT-PIPE-06, MAT-FLG-02, MAT-PLATE-12; TR-5531; CS-3310 |
+| Workers | E1021 (Welder, Grade 3, STRP01), E1099 (Fitter, Grade 2, STRP01), E1150 (no cost centre), E2001 (agency); E9999 must **not** exist |
+
+Values not listed here come from the stories' text when Usama generates the seed; a key missing from this table is added in the story's own PR (spec.md shared contracts).
+
+**Derived from the Gherkin unhappy paths — ASSUMPTION, not L8:**
 
 | Table | Rows | Which scenario needs it |
 | --- | --- | --- |
@@ -860,9 +992,9 @@ All items were decided on the PO call of 28 Oct 2026 (Faraz with Khitaba and Ahs
 | `cutting_sheet` | partial | **at least one drawing with none** — BPA-10 |
 | `lookahead_item` | — | **at least one drawing with no row** — BPA-11 |
 | `worker` | — | **one with no `cost_centre_ref`** — BPA-15 (E1150) |
-| `project_job_code` | the 2 of L8 | must include every project a `personas.yaml` scope row names (e.g. PRJ-139, and PRJ-140 if BPA-26 keeps it), or the `user_role_scope` FK fails at start-up |
+| `project_job_code` | the 2 of L8 | must include every project a `personas.yaml` scope row names (PRJ-139, PRJ-140), or the `user_role_scope` FK fails at start-up |
 
-All values obviously fake (L8). `app_user` and `user_role_scope` are **not** seeded here — `personas.yaml` is their only writer (L2, 09 S22).
+All values obviously fake (L8). `app_user` and `user_role_scope` are **not** seeded here — `personas.yaml` is their only runtime writer (L2, 09 S22); tests write their own fixtures (B7).
 
 ---
 
@@ -874,3 +1006,7 @@ All values obviously fake (L8). `app_user` and `user_role_scope` are **not** see
 4. **C17 is still unanswered by STAR.** No tool closes it; Faraz has to get an answer.
 5. **Source coverage**: FRD-3, FRD-23 scans and the image-only tables in FRD-10 §10.11, FRD-21 §21.5.2.2, FRD-22 §22.5.x are still unread. None is needed for Epic 1.
 6. **Second-pass review** of v0.3: done by a fresh-context reviewer against Jira (BPA-6 to 16, 22, 23, 26), 03, 04, 06 and 09. All 3 High findings were verified by the author against the stories before being applied. Five "unconfirmed" reviewer points were applied where cheap (§5.2 name join, §5.4 unchanged hours, §5.9 dedupe, §5.10 upsert, §11 seed projects).
+7. **Third review (v0.4 approval, 29 Oct)** found a blocker (B1) that a scenario added on the PO call of 28 Oct (D71) had introduced. **Rule: re-review the model after every story edit made during an approval call.**
+8. **A review recommendation was itself wrong.** The brief proposed a per-file `published` boolean (B3); Usama showed one file can carry several Work Packs (D33 rule 3), so the guard became `published_message`. Then checking Usama's design against the stories found that it broke two BPA-12 resend scenarios (C2), fixed by deleting the claim on failure. Each layer of review caught something the previous one missed.
+9. **Decisions spread across sessions.** Ahsan and Usama decided B1 independently in separate sessions; Khitaba's answers arrived in Teams in pieces and were only readable after a search lag; Usama's copy of the brief predated Khitaba's answers. The Project brief was the one place the record was merged.
+10. **Runtime facts still unverified.** B2, B4 and C3 rest on Camunda documentation; BPA-25 checks 6 and 7 must run on the 8.10.1 stack (a hands-on step for Ahsan/Usama).
