@@ -89,6 +89,10 @@ tests and in the showcase.
 - **Revisit triggers:** S28 if the POC is exposed beyond the team's machines or a showcase environment;
   S29 and S24 when a shared or showcase environment is set up.
 - 03-sor-matrix records Camunda as the SOR for login and group membership (09 §4 item 6, done).
+- **Amended 29 Oct 2026 (A11, Khitaba, approved by Faraz; recorded under BPA-39):** `user_role_scope` keeps its rows in
+  the POC database, but each column carries the SOR of the entity it identifies (`docs/data-model.md` §1.3):
+  username and group_id Camunda identity, department_ref D365 F&O, project_ref D365 F&O Project Management.
+  The "SOR POC database" wording under Decision refers to the row.
 
 ## Sources
 
