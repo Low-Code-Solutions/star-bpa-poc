@@ -42,6 +42,10 @@ Branch: BPA-39-docs-catch-up, from main f60294b
 - `git diff` on 09 touches only the change-log block.
 - Plan check and hook tests pass.
 
+## Review (qa-reviewer, fresh context, 29 Oct)
+1 Important, 2 nits; all fixed: the ADR 0009 L20 line is now a condition (demo files do not exist yet); the D73
+notes mark rule and wording ASSUMPTION as BPA-12 does; the A11 notes cite BPA-15/16 SOR Notes.
+
 ## Questions
 - None blocking.
 

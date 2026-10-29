@@ -53,7 +53,7 @@ an incident" pending convention A8 (07 §6, G8), and a message ID of `sha256:wor
 - **Amended 29 Oct 2026 (06 D73, Khitaba, approved by Faraz; recorded under BPA-39):** D73 amends D70. A resent
   file is checked per `(sha256, workpackNumber)`, the same pair as the G10 message ID. A Work Pack already
   published from an earlier upload with the same sha256 gets the row outcome "Already processed in an earlier
-  upload" (wording ASSUMPTION) and nothing is published for it; other Work Packs in the file are processed
+  upload" (rule and wording ASSUMPTION, Jira BPA-12) and nothing is published for it; other Work Packs in the file are processed
   normally. "File already processed" applies only when every Work Pack in the file was published before.
 
 ## Sources
