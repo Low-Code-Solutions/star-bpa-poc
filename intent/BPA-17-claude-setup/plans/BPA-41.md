@@ -1,3 +1,5 @@
+Status: Closed (29 Oct 2026)
+
 Task BPA-41 on branch BPA-41-windows-hook-demo-admin. Follow the committed plan intent/*/plans/BPA-41.md exactly.
 
 1. Read .claude/hooks/require-plan.sh and .claude/settings.json. Explain in 3 lines why a Windows path (d:\... or d:/...) is not recognised as absolute, before changing anything.
@@ -21,3 +23,4 @@ Task BPA-41 on branch BPA-41-windows-hook-demo-admin. Follow the committed plan 
 - Human step: confirm in a real Claude Code session on Windows that a write under `backend/` is blocked on a branch with no plan and that a write under `intent/` is allowed.
 - shellcheck is not installed on this machine; only `bash -n` was run on the two scripts.
 - `.claude/hooks/test-hooks.sh` takes over two minutes on Windows (git worktree steps), so it ran in the background: 120 passed, 0 failed after the fix.
+- 29 Oct: verified from a real Claude Code session on Windows (D:\ paths). On a plan-less branch, the backend/ write was blocked with the ADR 0015 message and the intent/ write was allowed.
