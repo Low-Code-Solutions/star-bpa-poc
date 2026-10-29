@@ -2,7 +2,7 @@
 
 Jira: BPA-40 (Task, epic BPA-3)
 Story last updated: 2026-10-29T13:32:00+0400 (comment 10411)
-Status: Approved (Faraz, 29 Oct 2026, in the claude.ai session: "Approve A, apply, start v0.5"; scope = BPA-40 description and comments 10408, 10409, 10411)
+Status: Closed (2026-10-29)
 Approver: Faraz (Product Owner and Architect)
 Branch: BPA-40-data-model-v0.5, from main 598814a
 
@@ -53,7 +53,7 @@ Also: `docs/03-sor-matrix.md` gets one footnote line (A12). This plan; `intent/R
 3. 03 footnote.
 4. Proof checks; fresh-context review against Jira and the brief; PR; Jira linkage comment.
 5. Review fixes; plan Closed before Ahsan merges.
-6. After merge: Claude Project `claude/11-data-model.md` refreshed; spec.md design-sources line updated to v0.5.
+6. After merge: Claude Project `claude/11-data-model.md` refreshed. (spec.md design-sources line updated to v0.5 in the final commit.)
    (The BPA-12/BPA-13 Jira batch was confirmed and applied on 29 Oct, before merge.)
 
 ## Risks
@@ -80,3 +80,8 @@ text vs B1/C3) logged in §10.2 for a confirmed Jira batch. spec.md "v0.4" line 
 ## Human-gap log
 - 29 Oct: plan approved by Faraz in the claude.ai session as part of "start v0.5"; the scope was set by his
   BPA-40 decisions, so no separate plan review took place.
+- 29 Oct: PR #14 reviewed by Faraz (PO and Architect), who authorised Claude to merge it. This is an explicit exception to
+  CLAUDE.md "Never merge a PR. Ahsan approves and merges", given by the PO in the claude.ai session and recorded here
+  for the POC measure. Ahsan confirmed the BPA-12 (8) and BPA-13 (5) estimates, relayed by Faraz.
+- 29 Oct: PR #13 merged first and touched the generated `intent/README.md`; main was merged into the branch (no rebase,
+  so no force push) and the index regenerated.

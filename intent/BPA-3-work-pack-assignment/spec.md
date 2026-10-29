@@ -16,7 +16,7 @@ precedence in CLAUDE.md applies.
 | ADRs | `docs/adr/` (index in `docs/adr/README.md`) | 0001–0016 written (0001–0014 and 0016 under BPA-37); the index maps every 09 row |
 | Business decisions D1–D65 | Claude Project `claude/06-epic1-decisions-draft.md` | not copied (rationale; cited by D-number) |
 | Process design (elements, workers, messages, errors) | Claude Project `claude/07-epic1-design-pack.md` §2–§7 | not copied; §1 forms, §8, §9 user_role, §10 and Flyway names are superseded by 09 |
-| Domain data model, SOR per field, assignment_state transitions | `docs/data-model.md` (S16) | v0.4, awaiting the approval chain (09 §4 item 3) |
+| Domain data model, SOR per field, assignment_state transitions | `docs/data-model.md` (S16) | v0.5, approved 29 Oct 2026 (BPA-40, PR #14); V1 and the R__ seed are generated from it (09 §4 item 3) |
 | Assignment file layout | Claude Project `claude/10-s18-s19-assignment-file.md` | `templates/README.md` (L6) |
 | SOR matrix | `docs/03-sor-matrix.md` | ACTIVE 28 Oct, master in the repo since BPA-35 |
 | Models | `models/bpmn/`, `models/dmn/` | master in the repo since BPA-36; linted on every PR (`npm run lint:bpmn`) |
