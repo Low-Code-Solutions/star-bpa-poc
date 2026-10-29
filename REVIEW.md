@@ -63,3 +63,19 @@ Scenarios: <n> in Jira, <n> tests found, missing: <list>
 
 When a review flags the same mistake a second time, propose a CLAUDE.md change in the PR
 (playbook, Stage 5).
+
+## Review log
+Newest last. One entry per review; the full report goes in the PR description.
+
+### BPA-41 at 36aed9e, 29 Oct 2026 (qa-reviewer)
+- Code: no Important findings. `test-require-plan.sh` 26 passed, 0 failed when the reviewer ran it.
+- Important (2, both on the plan; neither is a BLOCKER, none touched the code):
+  - REVIEW.md was listed in the plan but absent from the diff: fixed by this entry; the rewritten plan is committed with it.
+  - Plan header: placeholder summary (the Jira item is being created), `Story last updated` is a date not a Jira timestamp, no approval record, `Status: Closed` set before review ended. Accepted as set by the Product Owner's instruction; to be completed once the Jira item exists. `epic BPA-17` form corrected.
+- Nits (5), not fixed in this commit:
+  - the Windows block also fires on any path containing a backslash, so a POSIX filename with a literal backslash is rewritten;
+  - `/d/...` paths with different case and UNC paths are not matched case-insensitively (fails open, as before);
+  - the no-`cygpath` fallback is untested;
+  - `test-require-plan.sh` is mode 100644, `require-plan.sh` is 100755;
+  - "Problem" and "Task as given" are sections outside the docs/04 list.
+- Not verified by the reviewer: `test-hooks.sh` (120 passed per the plan), the compose stack, and the claim that the Windows cases failed before the fix (test and fix landed in one commit).
