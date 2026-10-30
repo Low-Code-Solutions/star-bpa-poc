@@ -1,8 +1,8 @@
 # Plan: BPA-43 Walking skeleton: Spring Boot backend, Flyway, model deploy, one worker, login and CI
 Jira: BPA-43 (Task, epic BPA-3)
 Story last updated: 2026-10-29T19:19:11.850+0400
-Status: Approved (Ahsan, 29 Oct 2026, answers to Q1-Q12 below)
-Approver: Ahsan (Build Lead)
+Status: Closed (2026-10-30)
+Approver: Ahsan (Build Lead); approved 29 Oct 2026 (answers to Q1-Q12 below)
 Branch: BPA-43-walking-skeleton, from main 965a386
 
 ## Readiness check (Task, so a light check)
@@ -278,3 +278,6 @@ Not changed: `templates/`, V1 and the seed, `docs/data-model.md`, Jira. (`models
   `bpa-app` fail its first start on a fresh compose stack; `restart: unless-stopped` retries it. Probe on the compose stack with the fixed model:
   `WORKPACK_INVALID` thrown without `validationMessages` raises no incident, and the task comes back.
 
+- 30 Oct: final run at 511b611: `./mvnw -B verify` in `eclipse-temurin:21-jdk`, 31 tests, 0 failures, BUILD SUCCESS; frontend `npm test`, 3 tests passed.
+  Plan closed before the PR. CI has not run yet (no `gh` in the session; Usama opens the PR in the browser). If CI or review needs fixes, they
+  update this plan in the same commit and it stays Closed with a dated line here.
