@@ -3,6 +3,7 @@
 !backend/
 !models/
 !templates/
+!api/
 **/target/
 backend/mocks/
 backend/postgres/

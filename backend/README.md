@@ -21,6 +21,15 @@ From the repo root: copy `.env.example` to `.env`, then `docker compose up -d --
 (`/actuator/health`). On start-up Flyway applies `src/main/resources/db/migration/` to schema `bpa`, and the BPMN and DMN files
 in the top-level `models/` folder deploy to Camunda.
 
+## Login and personas (ADR 0005)
+- With profile `local` or `showcase` (compose sets `local`), the S22 persona sync runs at start-up as the Camunda admin
+  (`CAMUNDA_ADMIN_*`): it creates the seven S6 groups, the 9 users in `src/main/resources/personas.yaml` (password
+  `DEMO_PASSWORD`) and `bpa-service` (password `BPA_SERVICE_PASSWORD`, kept if the user exists), and writes `app_user` and
+  `user_role_scope`. The app then deploys the models and runs its workers as `bpa-service`.
+- API contract: `api/openapi.yaml` (S20). The Spring interfaces are generated at build time into
+  `target/generated-sources/openapi` (S21); controllers in `com.lcs.star.bpa.api` implement them.
+- Tests tagged `integration` (`PersonaSyncTest`, `Bpa25CamundaChecksTest`) start their own Camunda 8.10.1 configured like compose.
+
 ## Layout
 - `models/` and `templates/` are resource directories in `pom.xml` (ADR 0003, L1). Never copy them into `backend/`.
 - Base package `com.lcs.star.bpa`, sub-packages `api`, `task`, `worker`, `domain`, `persistence`, `adapter`, `config` (S23).

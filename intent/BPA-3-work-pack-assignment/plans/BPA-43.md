@@ -127,6 +127,14 @@ Part B
 | `api/openapi.yaml` | new (Q7): OpenAPI 3.1 with only POST `/api/v1/auth/login`, POST `/api/v1/auth/logout`, GET `/api/v1/me`, POST `/api/v1/workpacks` (403 and 501); session-cookie security scheme; RFC 9457 errors; the `workpacks` request body marked `x-assumption: defined by BPA-6` |
 | `backend/pom.xml` | also: `openapi-generator-maven-plugin` (`spring`, interface-only) generating the interfaces from `../api/openapi.yaml` |
 | `.github/workflows/backend.yml` | also: a Redocly lint step for `api/openapi.yaml` |
+| `backend/src/main/java/com/lcs/star/bpa/adapter/CamundaIdentityClient.java`, `CamundaAdminClient.java` | new (as built): login check (`GET /v2/authentication/me`) and the admin calls of the S22 sync |
+| `backend/src/main/java/com/lcs/star/bpa/config/PersonaFile.java`, `PersonaSync.java`, `PersonaSyncConfig.java`, `SecurityConfig.java` | new (as built) |
+| `backend/src/main/java/com/lcs/star/bpa/api/AuthController.java`, `MeController.java`, `WorkPackController.java` | new (as built); the `api`, `config` and `adapter` `package-info.java` files removed now that classes live there |
+| `backend/src/test/java/com/lcs/star/bpa/{IntegrationCamunda,CamundaRest}.java`, `api/TestBrowser.java` | new (as built): test support |
+| `backend/Dockerfile`, `.dockerignore` | also: `api/` copied into the build stage (the generator reads `../api/openapi.yaml`) |
+| `docker-compose.yml`, `.env.example` | also: the Part A admin identity removed; `SPRING_PROFILES_ACTIVE=local`, `CAMUNDA_ADMIN_*` passed to the app |
+| `docs/adr/0005-identity-and-authorisation.md` | change (as built): Consequences: `.env.example` placeholders done; `bpa-service` deploys the models and holds RESOURCE CREATE (ASSUMPTION) |
+| `frontend/README.md`, `frontend/.gitignore` | new (as built); `src/api/schema.d.ts` is generated, not committed |
 Both
 | File | Change |
 |---|---|
@@ -172,6 +180,11 @@ Not changed: `models/`, `templates/`, V1 and the seed, `docs/data-model.md`, Jir
 - **Q11 (React runtime): decided.** The Vite dev server for local work, proxying `/api` to `bpa-app` so the session cookie stays same-origin. A compose `frontend` service comes with the showcase environment (08 Gate 6), not now.
 - **Q12 (reviews): decided.** Two qa-reviewer runs, one after Part A is green and one at the end, both recorded in REVIEW.md. One PR.
 
+- **Q13 (open, 30 Oct): the real model's error boundary events lose `validationMessages`.** BPA-25 check 4 fails on the real model (Human-gap log, 30 Oct).
+  Options: (a) add `<zeebe:ioMapping><zeebe:output source="=validationMessages" target="validationMessages" /></zeebe:ioMapping>` to the three
+  boundary events on this branch (as the BPA-25 spike model had); (b) a new Jira item for the model, with check 4 failing or disabled here until then.
+  For Usama / Ahsan to decide.
+
 ## Human-gap log
 - 29 Oct: Jira BPA-43 read through the claude.ai Atlassian connector (the repo's `atlassian` server needs an interactive sign-in).
 - 29 Oct: no JDK or Maven on the machine; the Part A start depends on Q1.
@@ -206,3 +219,38 @@ Not changed: `models/`, `templates/`, V1 and the seed, `docs/data-model.md`, Jir
   needs updating by its owner in its own change.
 - Open nits for later (not fixed): Dockerfile runs as root; no compose healthcheck for `bpa-app`; `../models` as a resource root puts any non-model file at
   the jar root; the CPT container logs "Expected to handle request, but an unexpected error occurred" during green runs (not investigated).
+- 30 Oct: **Part A CI gate not yet met when Part B started.** Usama chose a draft PR for the Part A CI run, but `gh` is not installed here and the
+  session may not read the stored GitHub credential, so the PR could not be opened from the session. On Usama's instruction ("just get it done")
+  Part B went ahead on the local green run; CI runs once the PR is opened. Departure from the plan's "Part B starts only when every Part A test is
+  green locally and in CI".
+- 30 Oct: Part B built test-first. Every new test was run against stubs first and failed for the expected reason (default Spring Security 401
+  and no XSRF-TOKEN cookie; `PersonaSyncConfig` without `@Profile`; the stubbed sync created nothing, so `bpa-service` could not deploy, 401),
+  except `BPA43_personasYamlHoldsNoPasswords`, which passed at once because `personas.yaml` was written first. One test edit after the first
+  green run: `BPA43_personaSyncCreatesUsersGroupsAndScopeRows` expected `planner-1` before `pe-1`; the query sorts by username, so the
+  expected order was wrong, not the code. React: 2 Vitest tests failed first (no form), then passed.
+- 30 Oct: **Departures from the plan, as built:**
+  (1) `bpa-service` also holds RESOURCE `CREATE` on `*` (**ASSUMPTION**): the app auto-deploys the models (Part A step 4) and, connected as
+  `bpa-service` (S25), needs it. BPA-25 deployed as admin, so its set lacks it. Proved by `Bpa25CamundaChecksTest` (deploys as `bpa-service`) and
+  on the compose stack. Recorded in ADR 0005.
+  (2) The sync runs as a `SmartInitializingSingleton`, not a start-up runner, so it finishes before the Camunda client deploys and opens workers.
+  (3) `personas.yaml` also carries `name`, `employeeRef` and `email`, because the sync is the only runtime writer of `app_user` (data model
+  5.10; NOT NULL columns). Values synthetic, ASSUMPTION.
+  (4) The sync makes `bpa-service`'s authorizations complete on every run (adds missing ones; the user and its password are left as they are),
+  so an existing `bpa-service` from the BPA-25 kit still gets the full set.
+  (5) The integration Camunda uses one PostgreSQL database for Camunda (schema public) and Flyway's schema `bpa`; compose uses two databases.
+  (6) Personas get no Camunda authorizations; the backend acts for them as `bpa-service` (S14). `BPA25_check2` grants `tma-1` its own
+  permissions in the test, as the BPA-25 kit did.
+  (7) `GET /api/v1/me` also hands out the XSRF-TOKEN cookie (every response does), so no extra CSRF endpoint was added to the contract.
+- 30 Oct: **Found by `BPA25_check4BpmnErrorReturnsTheTaskWithValidationMessages`: the real model does not carry `validationMessages` back.**
+  `BoundaryEvent_WorkPackInvalid` (and `BoundaryEvent_CorrectionInvalid`, `BoundaryEvent_ScheduleInvalid`) in
+  `models/bpmn/Process_PPC_WorkPackAssignment.bpmn` have no `zeebe:ioMapping` output for `validationMessages`; the BPA-25 spike model had one.
+  On 8.10.1 the error variables stay in the boundary event's scope, so the returned `UserTask_CreateWorkPack` cannot read them (reproduced on
+  the compose stack: the variable has the boundary event's `scopeKey`). ADR 0006 / D56 depend on it. The task does return. `models/` is out of
+  this plan's scope; see Questions.
+- 30 Oct: Proof on the compose stack (rebuilt from this branch): `bpa-app` starts with profile `local`; "Persona sync done: 9 personas, 7 groups,
+  bpa-service"; models deployed as `bpa-service`; through the Vite dev server proxy: `/me` 401 anonymous, `tma-1` login 200 with its groups,
+  `/me` 200, `POST /api/v1/workpacks` 501, logout 204 then `/me` 401, `pt-1` gets 403 problem+json on the Work Pack start. A real instance started
+  by `bpa-service`, task completed on `tma-1`'s behalf, `save-workpack` completed by hand: the app's worker completed
+  `ServiceTask_CreateHourJournalHeader` as `bpa-service`. The Part A admin-identity deviation (review 1) is closed. Port 5173 was taken by another
+  project on this machine, so Vite ran on 5190. Not done: clicking through the React screen in a browser (covered by the component test and the
+  proxy calls).
