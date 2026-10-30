@@ -185,3 +185,9 @@ Not changed: `models/`, `templates/`, V1 and the seed, `docs/data-model.md`, Jir
   Micrometer is excluded and banned; recheck on the next 8.10.x patch and then report it to Camunda."; (3) the Part B integration Camunda matches `docker-compose.yml` as closely as practical:
   API protected, authorizations on, the demo admin initialisation and **PostgreSQL** secondary storage (ADR 0001). H2 only if PostgreSQL makes the setup unreasonable; if so it is stated here.
   Rule from Ahsan: any single failure that takes more than 20 minutes is stopped and reported.
+- 30 Oct (Usama with Claude Code): Jira re-read; `updated` 29 Oct 19:19 is newer than this plan, but the only change is the assignee (Ahsan → Usama). Scope unchanged.
+- 30 Oct: this session runs on Linux with no JDK and no sudo, so Q1's winget install does not apply. Maven runs through the wrapper inside `eclipse-temurin:21-jdk`
+  with the host Docker socket for Testcontainers (command in `backend/README.md`). Part A `./mvnw -B verify`: 8 tests, 0 failures, BUILD SUCCESS.
+- 30 Oct: step 7 proved: `docker compose up -d --build` from a390017 brings `bpa-app` up (`/actuator/health` UP); Flyway applied V1 and the seed to an empty `bpa`
+  schema; the three processes and `Decision_WorkpackReleaseCheck` deployed; the `create-hour-journal-header` worker started. `backend/mvnw` was committed
+  without the executable bit (the Dockerfile calls `sh ./mvnw`, CI calls `./mvnw`); fixed. The S23 `package-info.java` files and `backend/README.md` added.
