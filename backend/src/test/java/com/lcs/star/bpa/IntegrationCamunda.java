@@ -51,10 +51,28 @@ final class IntegrationCamunda {
     static synchronized void start() {
         if (!CAMUNDA.isRunning()) {
             CAMUNDA.start();
+            awaitAdminLogin();
         }
         if (!migrated) {
             Flyway.configure().dataSource(dataSource()).schemas("bpa").load().migrate();
             migrated = true;
+        }
+    }
+
+    /** Health is UP before the demo admin initialisation has finished; until then the admin gets 401 (seen in a full run). */
+    private static void awaitAdminLogin() {
+        var admin = new CamundaRest(restUrl(), ADMIN, ADMIN_PASSWORD);
+        long until = System.nanoTime() + Duration.ofMinutes(2).toNanos();
+        while (admin.get("/v2/authentication/me").status() != 200) {
+            if (System.nanoTime() > until) {
+                throw new IllegalStateException("Camunda admin cannot log in two minutes after the container became healthy");
+            }
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
         }
     }
 

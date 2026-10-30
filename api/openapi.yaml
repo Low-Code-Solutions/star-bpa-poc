@@ -47,10 +47,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Me'
+        '400':
+          description: Username or password missing
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Camunda cannot be reached to check the login; nothing about the password is implied
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /api/v1/auth/logout:
     post:
       tags: [auth]

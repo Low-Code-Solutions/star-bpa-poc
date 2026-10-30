@@ -120,7 +120,7 @@ Part B
 |---|---|
 | `backend/src/main/resources/personas.yaml` | new: 9 users, groups, scope; no passwords |
 | `backend/src/main/java/com/lcs/star/bpa/config/` (security, persona sync), `adapter/` (Camunda REST client), `api/` (auth, me, one guarded call) | new |
-| `backend/src/main/resources/application-local.yml`, `application-showcase.yml` | new: profile settings |
+| `backend/src/main/resources/application-local.yml`, `application-showcase.yml` | **not needed (as built)**: the profiles change nothing but whether `PersonaSyncConfig` loads (`@Profile`); every setting is in `application.yml` with `.env` overrides |
 | `backend/src/test/java/com/lcs/star/bpa/...` | new: BPA-25 JUnit checks, persona sync, login tests |
 | `frontend/` (`package.json`, `package-lock.json`, `index.html`, `vite.config.ts` with the `/api` proxy, `tsconfig*.json`, `src/*`, tests) | new: Vite + React + TypeScript login screen; `openapi-typescript` + `openapi-fetch` (S21). Vite is Ahsan's choice (Q8); the sources are silent |
 | `.github/workflows/backend.yml` | change: add `frontend-tests` |
@@ -135,6 +135,7 @@ Part B
 | `docker-compose.yml`, `.env.example` | also: the Part A admin identity removed; `SPRING_PROFILES_ACTIVE=local`, `CAMUNDA_ADMIN_*` passed to the app |
 | `docs/adr/0005-identity-and-authorisation.md` | change (as built): Consequences: `.env.example` placeholders done; `bpa-service` deploys the models and holds RESOURCE CREATE (ASSUMPTION) |
 | `frontend/README.md`, `frontend/.gitignore` | new (as built); `src/api/schema.d.ts` is generated, not committed |
+| `frontend/.gitkeep` | deleted (as built): the folder now holds the app |
 Both
 | File | Change |
 |---|---|
@@ -257,3 +258,23 @@ Not changed: `templates/`, V1 and the seed, `docs/data-model.md`, Jira. (`models
   `ServiceTask_CreateHourJournalHeader` as `bpa-service`. The Part A admin-identity deviation (review 1) is closed. Port 5173 was taken by another
   project on this machine, so Vite ran on 5190. Not done: clicking through the React screen in a browser (covered by the component test and the
   proxy calls).
+- 30 Oct: qa-reviewer review 2 (whole Task, at 2ebb550): 0 blocker, 6 Important, 8 nits. Handled in code, test-first:
+  login against an unreachable or oddly answering Camunda now returns a 503 problem, not a 401 that React showed as "Wrong username or password"
+  (`BPA43_camundaUnreachableAtLoginReturns503`, React `BPA43_loginServiceDownIsNotShownAsWrongPassword`; both failed first: 401, and the generic
+  message); `/error` is permitted so error dispatches keep their status; the CSRF token is renewed at login and cleared at logout
+  (`BPA43_csrfTokenAndSessionChangeAtLogin` failed first: same token). Tests strengthened, passing at once because the code was already right:
+  the 403 test asserts the group reason (not a CSRF 403), and `BPA43_loggedInPostWithoutCsrfTokenIsRejected` covers a logged-in POST without the
+  token. Contract: login declares 400 and 503. Login returns the groups sorted, as `/me` does. Check 4 sends `validationMessages` as strings
+  (ADR 0006). Files table: the two profile yml files marked "not needed (as built)", `.gitkeep` deletion listed, `intent/README.md` regenerated.
+  Documented, not changed: the sync only adds group memberships and never deletes users; removing a persona or one of its groups from
+  `personas.yaml` needs a manual step in Camunda Admin (scope rows are pruned).
+  **Open, for people with the authority:** RESOURCE CREATE on `*` for `bpa-service` (Faraz and Ahsan to accept, or deploy with another identity);
+  Q13 model change (Ahsan to accept in the PR; BPA-6 to be told); the CI-gate departure (Ahsan); Jira comments for the ASSUMPTIONs and the
+  spec.md/L5 disagreement (drafted for Usama's yes); CI green on the PR. Left as nits: job activation in checks 4/5 can lock another instance's
+  job for 60 s (one test JVM, no clash seen); Dockerfile runs as root; no `bpa-app` healthcheck; `bpa-service` and `demo` can open portal
+  sessions (both are Camunda users; no rule excludes them).
+- 30 Oct: after the review-2 fixes, a full run had one setup error: Camunda reports healthy before its demo-admin initialisation finishes, so
+  the first admin call got 401. `IntegrationCamunda` now waits until the admin can log in (test support only). The same race can make
+  `bpa-app` fail its first start on a fresh compose stack; `restart: unless-stopped` retries it. Probe on the compose stack with the fixed model:
+  `WORKPACK_INVALID` thrown without `validationMessages` raises no incident, and the task comes back.
+

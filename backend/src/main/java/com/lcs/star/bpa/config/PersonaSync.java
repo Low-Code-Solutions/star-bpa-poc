@@ -16,7 +16,8 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 
 /**
  * S22 persona sync (ADR 0005, L2, L9; BPA-43 Q4, Q5). The only runtime writer of Camunda users and groups, {@code app_user} and
- * {@code user_role_scope}. Idempotent: existing groups, users and memberships are kept, missing permissions are added.
+ * {@code user_role_scope}. Idempotent: existing groups, users and memberships are kept, missing permissions are added. It only adds:
+ * removing a persona or one of its groups from {@code personas.yaml} needs a manual step in Camunda Admin (scope rows are pruned).
  *
  * <p>Runs once the singletons exist and before the Camunda client starts (SmartLifecycle), so {@code bpa-service} exists and holds
  * its permissions before the app deploys the models and opens its job workers as that user.

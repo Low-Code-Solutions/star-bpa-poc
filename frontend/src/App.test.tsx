@@ -21,6 +21,9 @@ function fakeBackend() {
     }
     if (path === '/api/v1/auth/login') {
       const { username, password } = body as { username: string; password: string };
+      if (username === 'camunda-down') {
+        return json(503, { status: 503, detail: 'Login is not available right now; try again later' }, 'application/problem+json');
+      }
       if (username === 'tma-1' && password === 'right') {
         session = { username, groups: ['time-method-analyst'] };
         return json(200, session);
@@ -78,5 +81,20 @@ describe('App', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Wrong username or password');
     expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
+  });
+
+  it('BPA43_loginServiceDownIsNotShownAsWrongPassword', async () => {
+    const { fetchMock } = fakeBackend();
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByLabelText('Username'), 'camunda-down');
+    await user.type(screen.getByLabelText('Password'), 'any');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Login is not available right now');
+    expect(alert).not.toHaveTextContent('Wrong username or password');
   });
 });

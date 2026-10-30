@@ -3,6 +3,7 @@ package com.lcs.star.bpa.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.web.client.ResourceAccessException;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -108,6 +110,39 @@ class AuthApiTest {
 
         assertThat(response.statusCode()).isEqualTo(403);
         assertThat(response.headers().firstValue("Content-Type")).hasValueSatisfying(t -> assertThat(t).startsWith("application/problem+json"));
+        assertThat(response.body()).as("refused for the group, not for a missing CSRF token").contains("groups do not allow");
+    }
+
+    @Test
+    void BPA43_camundaUnreachableAtLoginReturns503() {
+        doThrow(new ResourceAccessException("Connection refused")).when(camunda).verify("tma-1", "any");
+
+        HttpResponse<String> response = browser.login("tma-1", "any");
+
+        assertThat(response.statusCode()).isEqualTo(503);
+        assertThat(response.headers().firstValue("Content-Type")).hasValueSatisfying(t -> assertThat(t).startsWith("application/problem+json"));
+        assertThat(response.body()).doesNotContain("Connection refused");
+    }
+
+    @Test
+    void BPA43_csrfTokenAndSessionChangeAtLogin() {
+        browser.get("/api/v1/me");
+        String tokenBefore = browser.cookie("XSRF-TOKEN");
+
+        browser.post("/api/v1/auth/login", "{\"username\":\"tma-1\",\"password\":\"right\"}");
+        String sessionAfterFirst = browser.cookie("JSESSIONID");
+        browser.post("/api/v1/auth/login", "{\"username\":\"pt-1\",\"password\":\"right\"}");
+
+        assertThat(browser.cookie("XSRF-TOKEN")).isNotBlank().isNotEqualTo(tokenBefore);
+        assertThat(browser.cookie("JSESSIONID")).isNotBlank().isNotEqualTo(sessionAfterFirst);
+        assertThat(browser.get("/api/v1/me").body()).contains("pt-1");
+    }
+
+    @Test
+    void BPA43_loggedInPostWithoutCsrfTokenIsRejected() {
+        browser.login("tma-1", "right");
+
+        assertThat(browser.postWithoutCsrfToken("/api/v1/workpacks", "{}").statusCode()).isEqualTo(403);
     }
 
     @Test

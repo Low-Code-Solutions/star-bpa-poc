@@ -61,7 +61,13 @@ function LoginForm({ api, onLogin }: { api: ReturnType<typeof apiClient>; onLogi
     if (data) {
       onLogin(data);
     } else {
-      setError(response.status === 401 ? 'Wrong username or password' : `Login failed (${response.status})`);
+      setError(
+        response.status === 401
+          ? 'Wrong username or password'
+          : response.status === 503
+            ? 'Login is not available right now; try again later'
+            : `Login failed (${response.status})`,
+      );
     }
   }
 

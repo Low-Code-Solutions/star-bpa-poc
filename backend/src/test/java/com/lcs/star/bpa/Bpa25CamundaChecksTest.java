@@ -105,7 +105,7 @@ class Bpa25CamundaChecksTest {
 
         String job = activateSaveWorkPackJob(instance);
         Reply thrown = service.post("/v2/jobs/" + job + "/error", Map.of("errorCode", "WORKPACK_INVALID", "errorMessage", "BPA-43 check 4",
-                "variables", Map.of("validationMessages", List.of(Map.of("field", "phase", "message", "Phase is required")))));
+                "variables", Map.of("validationMessages", List.of("Phase is required"))));
         assertThat(thrown.status()).isEqualTo(204);
 
         Reply back = service.pollPost("/v2/user-tasks/search",
