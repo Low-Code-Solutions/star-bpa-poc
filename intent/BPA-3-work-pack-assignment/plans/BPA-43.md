@@ -1,6 +1,6 @@
 # Plan: BPA-43 Walking skeleton: Spring Boot backend, Flyway, model deploy, one worker, login and CI
 Jira: BPA-43 (Task, epic BPA-3)
-Story last updated: 2026-10-29T17:33:15.248+0400
+Story last updated: 2026-10-29T19:19:11.850+0400
 Status: Approved (Ahsan, 29 Oct 2026, answers to Q1-Q12 below)
 Approver: Ahsan (Build Lead)
 Branch: BPA-43-walking-skeleton, from main 965a386
@@ -67,7 +67,7 @@ Order of work, each test written and shown failing before its code:
    `BPA43_applicationStartsAndFlywayAppliesV1AndSeed`: Testcontainers PostgreSQL 17; asserts the Flyway history shows V1 and the repeatable seed succeeded, 31 tables, 12 workers.
 2. `BPA43_everyTableInBpaHasSorComment` (S17): every base table in schema `bpa` except `flyway_schema_history` has a table comment (same query as BPA-42). It fails first against a
    temporarily uncommented table in the test's own setup (a deliberate negative case), then passes against V1.
-3. pom resource directories `../models` and `../templates`; `BPA43_modelsAndTemplatesAreReadFromTheTopLevelFolders`: the classpath holds `bpmn/Process_PPC_WorkPackAssignment.bpmn`,
+3. pom resource directories `../models` and `../templates`; `BPA43_modelsAreReadFromTheTopLevelFolders` (as built; planned as one test `..ModelsAndTemplates..`): the classpath holds `bpmn/Process_PPC_WorkPackAssignment.bpmn`,
    the other two BPMN files and `dmn/Decision_WorkpackReleaseCheck.dmn`, and `backend/` contains no `.bpmn`, `.dmn` or `templates` copy.
 4. Auto-deploy: `@Deployment(resources = {"classpath*:bpmn/*.bpmn", "classpath*:dmn/*.dmn"})` on the application. `BPA43_modelsDeployToCamunda` (CPT): the three processes and the decision are deployed.
 5. `BPA43_releaseCheckDecisionDeploysAndEvaluates` (CPT, L10): the DMN is deployed and `Decision_WorkpackReleaseCheck` returns its three documented results for the three input combinations
@@ -112,6 +112,9 @@ Part A
 | `.github/workflows/backend.yml` | new: `backend-tests` (P4) |
 | `docs/adr/0002-application-stack.md` | change: Consequences record P1, the Boot 4 production item and the Micrometer finding |
 | `backend/README.md` | new: how to build, test and run (short) |
+| `.gitattributes` | new: LF for `mvnw` and `.sh` (Risks, Windows line endings) |
+| `backend/src/test/java/com/lcs/star/bpatest/ProcessTestApplication.java` | new: Camunda Process Test application (workers and models only, no database), in its own package as the CPT documentation asks |
+| `backend/src/test/java/com/lcs/star/bpa/SorComments.java` | new: test support, the S17 table-comment query shared by the SOR tests |
 Part B
 | File | Change |
 |---|---|
@@ -191,3 +194,15 @@ Not changed: `models/`, `templates/`, V1 and the seed, `docs/data-model.md`, Jir
 - 30 Oct: step 7 proved: `docker compose up -d --build` from a390017 brings `bpa-app` up (`/actuator/health` UP); Flyway applied V1 and the seed to an empty `bpa`
   schema; the three processes and `Decision_WorkpackReleaseCheck` deployed; the `create-hour-journal-header` worker started. `backend/mvnw` was committed
   without the executable bit (the Dockerfile calls `sh ./mvnw`, CI calls `./mvnw`); fixed. The S23 `package-info.java` files and `backend/README.md` added.
+- 30 Oct: qa-reviewer review 1 (Part A, at a8bb6f2): 0 blocker, 2 Important, 10 nits. Handled:
+  (1) **Deviation, recorded:** a390017 (Ahsan) makes `bpa-app` connect to Camunda as the admin (`CAMUNDA_CLIENT_AUTH_USERNAME/PASSWORD` from `CAMUNDA_ADMIN_*`),
+  not `bpa-service` (S25, ADR 0005), because the S22 job that creates `bpa-service` is Part B. The env vars override `application.yml` permanently, so the
+  compose comment now says so, and **Part B deletes both lines** and proves the stack runs as `bpa-service`. Step 7's proof was therefore obtained as admin.
+  (2) CI gate: `backend.yml` runs on PRs only; a draft PR is opened for the Part A CI run (Usama, 30 Oct). Part B starts after it is green.
+  Nits: header `Story last updated` bumped; step 3 test names and the file table brought in line with the code; the copy check also catches `.xlsx`;
+  `camunda.process-test.camunda-docker-image-version` confirmed in the 8.10.1 starter's configuration metadata.
+- 30 Oct: **disagreement reported, not resolved here:** the epic `spec.md` (Delivery order item 5 and the V1 row) still says the walking skeleton has the
+  `workpack` table only (L5), while Jira BPA-43 and this plan apply the full merged V1 and seed from BPA-42 (31 tables). Jira wins by precedence; spec.md
+  needs updating by its owner in its own change.
+- Open nits for later (not fixed): Dockerfile runs as root; no compose healthcheck for `bpa-app`; `../models` as a resource root puts any non-model file at
+  the jar root; the CPT container logs "Expected to handle request, but an unexpected error occurred" during green runs (not investigated).

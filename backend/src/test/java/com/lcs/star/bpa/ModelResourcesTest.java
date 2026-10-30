@@ -35,7 +35,7 @@ class ModelResourcesTest {
             List<String> copies = files
                     .filter(p -> !p.startsWith(BACKEND.resolve("target")))
                     .map(p -> BACKEND.relativize(p).toString().replace(java.io.File.separatorChar, '/'))
-                    .filter(p -> p.endsWith(".bpmn") || p.endsWith(".dmn") || p.startsWith("src/main/resources/templates"))
+                    .filter(p -> p.endsWith(".bpmn") || p.endsWith(".dmn") || p.endsWith(".xlsx") || p.startsWith("src/main/resources/templates"))
                     .toList();
             assertThat(copies).isEmpty();
         }

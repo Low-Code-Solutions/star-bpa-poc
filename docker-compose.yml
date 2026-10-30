@@ -86,8 +86,9 @@ services:
     restart: unless-stopped
 
   # Spring Boot backend and job workers (ADR 0002). Build context is the repo root so models/ and templates/ are visible (BPA-43).
-  # Until the S22 persona-sync job exists (Part B) the app talks to Camunda as the admin from .env (S29 defaults demo/demo);
-  # `bpa-service` takes over once the job has created it.
+  # TEMPORARY (BPA-43 Part A only): until the S22 persona-sync job creates `bpa-service` (Part B), the app talks to Camunda as the
+  # admin from .env (S29 defaults demo/demo). These two env vars override application.yml's `bpa-service` for good, so Part B
+  # must delete CAMUNDA_CLIENT_AUTH_USERNAME and CAMUNDA_CLIENT_AUTH_PASSWORD below (S25, ADR 0005; BPA-43 plan, Human-gap log).
   bpa-app:
     build:
       context: .
