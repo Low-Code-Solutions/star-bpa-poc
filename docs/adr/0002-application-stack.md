@@ -36,6 +36,11 @@ and one package layout to put code in the right place.
   when the walking skeleton is built (L4, L5) and recorded in that item's plan. Not recorded in the sources
   as a decision.
 - S23 is to be added to 04-conventions (09 §4 item 5).
+- Walking skeleton (BPA-43): the Camunda client library is `io.camunda:camunda-spring-boot-3-starter` 8.10.1 (`@JobWorker`), with
+  `camunda-process-test-spring-boot-3` for tests, on Spring Boot 3.5.x and Java 21. Spring Boot 3 follows S21 (ADR 0011); the open-source
+  support for Boot 3.5 ended in June 2026, so **Boot 4 migration is a production item**.
+- camunda-spring-boot-3-starter 8.10.1: workers never run while micrometer-core is on the classpath (found under BPA-43). Micrometer is
+  excluded and banned; recheck on the next 8.10.x patch and then report it to Camunda.
 
 ## Sources
 

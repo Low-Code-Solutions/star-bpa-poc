@@ -1,0 +1,5 @@
+node_modules/
+dist/
+# Generated from ../api/openapi.yaml by `npm run gen:api` (S21); never edit by hand.
+src/api/schema.d.ts
+*.tsbuildinfo

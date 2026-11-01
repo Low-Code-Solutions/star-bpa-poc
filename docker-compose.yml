@@ -85,30 +85,36 @@ services:
     networks: [star]
     restart: unless-stopped
 
-  # Uncomment once backend/ contains the Spring Boot project (backend/pom.xml) and a Dockerfile.
-  # bpa-app:
-  #   build: ./backend
-  #   environment:
-  #     CAMUNDA_CLIENT_MODE: self-managed
-  #     CAMUNDA_CLIENT_GRPC_ADDRESS: http://camunda:26500
-  #     CAMUNDA_CLIENT_REST_ADDRESS: http://camunda:8080
-  #     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${BPA_DB_NAME:-bpa}
-  #     SPRING_DATASOURCE_USERNAME: ${BPA_DB_USER:-bpa}
-  #     SPRING_DATASOURCE_PASSWORD: ${BPA_DB_PASSWORD:-bpa}
-  #     WIREMOCK_BASE_URL: http://wiremock:8080
-  #   ports:
-  #     - "8081:8080"
-  #   volumes:
-  #     - ./backend/exchange:/exchange
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     camunda:
-  #       condition: service_healthy
-  #     wiremock:
-  #       condition: service_started
-  #   networks: [star]
-  #   restart: unless-stopped
+  # Spring Boot backend and job workers (ADR 0002). Build context is the repo root so models/ and templates/ are visible (BPA-43).
+  # Profile local runs the S22 persona sync at start-up: as the Camunda admin (CAMUNDA_ADMIN_*) it creates the personas and
+  # `bpa-service` (S25), then the app deploys the models and runs its workers as `bpa-service` (ADR 0005).
+  bpa-app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      CAMUNDA_GRPC_ADDRESS: http://camunda:26500
+      CAMUNDA_REST_ADDRESS: http://camunda:8080
+      CAMUNDA_ADMIN_USER: ${CAMUNDA_ADMIN_USER:-demo}
+      CAMUNDA_ADMIN_PASSWORD: ${CAMUNDA_ADMIN_PASSWORD:-demo}
+      BPA_DB_URL: jdbc:postgresql://postgres:5432/${BPA_DB_NAME:-bpa}
+      BPA_DB_USER: ${BPA_DB_USER:-bpa}
+      BPA_DB_PASSWORD: ${BPA_DB_PASSWORD:-bpa}
+      BPA_SERVICE_PASSWORD: ${BPA_SERVICE_PASSWORD:-}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      WIREMOCK_BASE_URL: http://wiremock:8080
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      camunda:
+        condition: service_healthy
+      wiremock:
+        condition: service_started
+    networks: [star]
+    restart: unless-stopped
 
   # Uncomment once the React app is scaffolded in ./frontend.
   # frontend:

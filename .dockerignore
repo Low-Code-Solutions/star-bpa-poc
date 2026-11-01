@@ -1,0 +1,9 @@
+# Build context for backend/Dockerfile is the repo root (BPA-43, Q10): send only what the image build needs.
+*
+!backend/
+!models/
+!templates/
+!api/
+**/target/
+backend/mocks/
+backend/postgres/

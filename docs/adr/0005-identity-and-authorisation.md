@@ -76,8 +76,11 @@ tests and in the showcase.
 
 ## Consequences
 
-- `DEMO_PASSWORD` and `BPA_SERVICE_PASSWORD` are not in `.env.example` yet (29 Oct); they are added with
-  the S22 startup job.
+- `DEMO_PASSWORD` and `BPA_SERVICE_PASSWORD` are in `.env.example` as placeholders, with `CAMUNDA_ADMIN_USER` and
+  `CAMUNDA_ADMIN_PASSWORD` for the S22 job (BPA-43).
+- Walking skeleton (BPA-43): the S22 job runs before the Camunda client starts, so the app deploys the models and runs its workers
+  as `bpa-service`. To deploy, `bpa-service` also holds RESOURCE `CREATE` on `*` besides the BPA-25 set (**ASSUMPTION**; shown to
+  work in `Bpa25CamundaChecksTest`, not proven minimal). Personas get no Camunda authorizations: the backend acts for them (S14).
 
 - The walking skeleton includes the React login (L4): login, `GET /api/v1/me`, logout, and one denied call
   returning 403 to prove backend enforcement; users and groups come from `personas.yaml` via the S22 job.

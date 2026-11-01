@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: bpa
+  datasource:
+    url: ${BPA_DB_URL:jdbc:postgresql://localhost:5432/bpa}
+    username: ${BPA_DB_USER:bpa}
+    password: ${BPA_DB_PASSWORD:}
+  mvc:
+    problemdetails:
+      enabled: true # RFC 9457 errors (S20)
+  flyway:
+    # V1 and the repeatable seed use schema-qualified names; the history table lives in bpa too (BPA-43 plan, Q1 of BPA-42).
+    schemas: bpa
+
+server:
+  servlet:
+    session:
+      timeout: 30m # S27 (ASSUMPTION), configurable
+      cookie: # S26: HttpOnly, SameSite=Lax, Secure outside localhost
+        http-only: true
+        same-site: lax
+        secure: ${BPA_SESSION_COOKIE_SECURE:false}
+
+camunda:
+  client:
+    mode: self-managed
+    grpc-address: ${CAMUNDA_GRPC_ADDRESS:http://localhost:26500}
+    rest-address: ${CAMUNDA_REST_ADDRESS:http://localhost:8080}
+    auth:
+      method: basic
+      username: bpa-service # S25: the one technical user, created by the S22 job
+      password: ${BPA_SERVICE_PASSWORD:}
+
+bpa:
+  camunda:
+    # Camunda REST API for the login check and, with profile local or showcase, the S22 persona sync.
+    rest-url: ${camunda.client.rest-address}
+    admin: # Used only by the S22 persona sync (ADR 0005, BPA-43 Q4); S29 keeps demo/demo.
+      username: ${CAMUNDA_ADMIN_USER:demo}
+      password: ${CAMUNDA_ADMIN_PASSWORD:demo}
+  personas:
+    file: classpath:personas.yaml
+    demo-password: ${DEMO_PASSWORD:}
+    service-password: ${BPA_SERVICE_PASSWORD:}

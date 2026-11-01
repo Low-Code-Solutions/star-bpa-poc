@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Spring Boot 3.5.x: 09 S21 and ADR 0011 lock Boot 3. Boot 4 migration is a production item (BPA-43 plan, Q2). -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.5.16</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.lcs.star</groupId>
+  <artifactId>bpa</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <name>STAR BPA POC backend</name>
+  <description>Spring Boot backend and Camunda job workers for the STAR BPA POC (ADR 0002)</description>
+
+  <properties>
+    <java.version>21</java.version>
+    <!-- One patch release for every Camunda component, equal to the pinned server (.env.example, ADR 0001). -->
+    <camunda.version>8.10.1</camunda.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+      <!-- With micrometer-core on the classpath the Camunda starter 8.10.1 (Boot 3 variant) activates a job and calls
+           JobHandlerInvokingBeans.handle, but never invokes the @JobWorker method or completes the job, and logs nothing
+           (BPA-43, found with a plain Testcontainers Camunda and no Process Test library). Without Micrometer the same worker
+           completes. Workaround until the cause is understood; see the BPA-43 plan. -->
+      <exclusions>
+        <exclusion><groupId>io.micrometer</groupId><artifactId>micrometer-core</artifactId></exclusion>
+        <exclusion><groupId>io.micrometer</groupId><artifactId>micrometer-jakarta9</artifactId></exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-jdbc</artifactId>
+    </dependency>
+    <!-- Login, sessions and CSRF (S5, S26, S27, ADR 0005); validation for the generated API models (S21). -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- Camunda Spring Boot Starter, Spring Boot 3 variant (the plain starter is built on Boot 4). -->
+    <dependency>
+      <groupId>io.camunda</groupId>
+      <artifactId>camunda-spring-boot-3-starter</artifactId>
+      <version>${camunda.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.camunda</groupId>
+      <artifactId>camunda-process-test-spring-boot-3</artifactId>
+      <version>${camunda.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <!-- The single top-level copies (ADR 0003, L1): never copy them into backend/. Classpath: bpmn/, dmn/ and templates/. -->
+      <resource>
+        <directory>../models</directory>
+      </resource>
+      <resource>
+        <directory>../templates</directory>
+        <targetPath>templates</targetPath>
+      </resource>
+    </resources>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <!-- Contract first (S20, S21, ADR 0011): Spring interfaces generated from the single top-level api/openapi.yaml. -->
+      <plugin>
+        <groupId>org.openapitools</groupId>
+        <artifactId>openapi-generator-maven-plugin</artifactId>
+        <version>7.14.0</version>
+        <executions>
+          <execution>
+            <id>generate-api</id>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+            <configuration>
+              <inputSpec>${project.basedir}/../api/openapi.yaml</inputSpec>
+              <generatorName>spring</generatorName>
+              <apiPackage>com.lcs.star.bpa.api.generated</apiPackage>
+              <modelPackage>com.lcs.star.bpa.api.generated.model</modelPackage>
+              <generateSupportingFiles>false</generateSupportingFiles>
+              <configOptions>
+                <interfaceOnly>true</interfaceOnly>
+                <skipDefaultInterface>true</skipDefaultInterface>
+                <useSpringBoot3>true</useSpringBoot3>
+                <useTags>true</useTags>
+                <openApiNullable>false</openApiNullable>
+                <useBeanValidation>true</useBeanValidation>
+                <documentationProvider>none</documentationProvider>
+                <annotationLibrary>none</annotationLibrary>
+              </configOptions>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Guard: a later dependency must not bring Micrometer back and silently stop every worker (see the comment on
+           spring-boot-starter-actuator above and the BPA-43 plan, Human-gap log). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.6.3</version>
+        <executions>
+          <execution>
+            <id>ban-micrometer-core</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <searchTransitive>true</searchTransitive>
+                  <excludes>
+                    <exclude>io.micrometer:micrometer-core</exclude>
+                    <exclude>io.micrometer:micrometer-jakarta9</exclude>
+                  </excludes>
+                  <message>camunda-spring-boot-3-starter 8.10.1: job workers never run while micrometer-core is on the classpath (found under BPA-43). Exclude it where it comes in; see the comment on spring-boot-starter-actuator in backend/pom.xml and the Human-gap log in intent/BPA-3-work-pack-assignment/plans/BPA-43.md.</message>
+                </bannedDependencies>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

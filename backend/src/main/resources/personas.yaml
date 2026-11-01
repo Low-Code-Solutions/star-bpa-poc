@@ -1,0 +1,64 @@
+# S22 personas (ADR 0005, 09 L9): 9 test users, one per S6 group, plus a second production-team user in another department
+# (the scope 403 demo) and a second time-method-analyst. Read only by the S22 persona sync, profiles local and showcase.
+# No passwords here: every persona uses DEMO_PASSWORD from .env.
+# ASSUMPTION (BPA-43 Q5): the usernames, names, employeeRef values and emails are synthetic and named in no source (L8).
+# Scope (docs/data-model.md 5.11): workpack-owner by department, project-engineer by project, production-team by department;
+# every ref exists in R__seed_reference_data.sql.
+users:
+  - username: tma-1
+    name: Synthetic Time and Method Analyst 1
+    employeeRef: E9001
+    email: tma-1@example.com
+    groups: [time-method-analyst]
+  - username: tma-2
+    name: Synthetic Time and Method Analyst 2
+    employeeRef: E9002
+    email: tma-2@example.com
+    groups: [time-method-analyst]
+  - username: pe-1
+    name: Synthetic Project Engineer 1
+    employeeRef: E9003
+    email: pe-1@example.com
+    groups: [project-engineer]
+    scope:
+      - group: project-engineer
+        projectRef: PRJ-139
+  - username: planner-1
+    name: Synthetic Production Planner 1
+    employeeRef: E9004
+    email: planner-1@example.com
+    groups: [production-planner]
+  - username: wpo-1
+    name: Synthetic Workpack Owner 1
+    employeeRef: E9005
+    email: wpo-1@example.com
+    groups: [workpack-owner]
+    scope:
+      - group: workpack-owner
+        departmentRef: Fabrication
+  - username: ppc-1
+    name: Synthetic PPC Team Member 1
+    employeeRef: E9006
+    email: ppc-1@example.com
+    groups: [ppc-team]
+  - username: supervisor-1
+    name: Synthetic Supervisor 1
+    employeeRef: E9007
+    email: supervisor-1@example.com
+    groups: [supervisor]
+  - username: pt-1
+    name: Synthetic Production Team Member 1
+    employeeRef: E9008
+    email: pt-1@example.com
+    groups: [production-team]
+    scope:
+      - group: production-team
+        departmentRef: Fabrication
+  - username: pt-2
+    name: Synthetic Production Team Member 2
+    employeeRef: E9009
+    email: pt-2@example.com
+    groups: [production-team]
+    scope:
+      - group: production-team
+        departmentRef: Painting

@@ -241,16 +241,31 @@
     </bpmn:endEvent>
     <bpmn:boundaryEvent id="BoundaryEvent_WorkPackInvalid" name="Input invalid" attachedToRef="ServiceTask_SaveWorkPack">
       <bpmn:documentation>WORKPACK_INVALID; variables validationMessages.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=validationMessages" target="validationMessages" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
       <bpmn:outgoing>Flow_WorkPackInvalid</bpmn:outgoing>
       <bpmn:errorEventDefinition id="ErrorEventDefinition_WorkPackInvalid" errorRef="Error_WorkPackInvalid" />
     </bpmn:boundaryEvent>
     <bpmn:boundaryEvent id="BoundaryEvent_CorrectionInvalid" name="Correction invalid" attachedToRef="ServiceTask_SaveWorkPackCorrections">
       <bpmn:documentation>WORKPACK_INVALID; variables validationMessages.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=validationMessages" target="validationMessages" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
       <bpmn:outgoing>Flow_CorrectionInvalid</bpmn:outgoing>
       <bpmn:errorEventDefinition id="ErrorEventDefinition_CorrectionInvalid" errorRef="Error_WorkPackInvalid" />
     </bpmn:boundaryEvent>
     <bpmn:boundaryEvent id="BoundaryEvent_ScheduleInvalid" name="Schedule invalid" attachedToRef="ServiceTask_SaveWorkPackSchedule">
       <bpmn:documentation>SCHEDULE_INVALID; variables validationMessages.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=validationMessages" target="validationMessages" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
       <bpmn:outgoing>Flow_ScheduleInvalid</bpmn:outgoing>
       <bpmn:errorEventDefinition id="ErrorEventDefinition_ScheduleInvalid" errorRef="Error_ScheduleInvalid" />
     </bpmn:boundaryEvent>

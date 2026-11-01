@@ -1,0 +1,5 @@
+# Scripts run on Linux (CI, containers): keep LF whatever the checkout setting is.
+*.sh text eol=lf
+backend/mvnw text eol=lf
+backend/.mvn/wrapper/maven-wrapper.properties text eol=lf
+*.cmd text eol=crlf

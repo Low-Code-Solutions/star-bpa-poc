@@ -1,0 +1,182 @@
+openapi: 3.1.0
+info:
+  title: STAR BPA POC API
+  version: 0.1.0
+  description: |
+    Contract-first API of the STAR BPA POC backend (09 S20, ADR 0011). This first version holds only the walking-skeleton
+    endpoints (BPA-43): login, logout, the current user, and the guarded Work Pack start. Stories add their endpoints in
+    their own pull requests. Errors are RFC 9457 problem details.
+
+    Every state-changing call needs the CSRF token (S26): read the `XSRF-TOKEN` cookie, set by any earlier response
+    (for example `GET /api/v1/me`), and send it back in the `X-XSRF-TOKEN` header. Sessions expire after 30 minutes idle
+    (S27); the API then returns 401.
+  license:
+    name: Proprietary (synthetic-data POC)
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: /
+security:
+  - sessionCookie: []
+tags:
+  - name: auth
+    description: Login and logout (S5, ADR 0005)
+  - name: me
+    description: The logged-in user
+  - name: workpacks
+    description: Work Packs (BPA-6 defines the request; the skeleton only checks the group)
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Log in with a Camunda username and password
+      description: |
+        The backend verifies the user against Camunda basic auth, reads the user's groups once and starts a session
+        (HttpOnly, SameSite=Lax cookie). The password is never stored or sent again.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+        '400':
+          description: Username or password missing
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Camunda cannot be reached to check the login; nothing about the password is implied
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: End the session
+      responses:
+        '204':
+          description: Logged out
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/me:
+    get:
+      tags: [me]
+      operationId: getMe
+      summary: The logged-in user and their Camunda groups
+      responses:
+        '200':
+          description: The logged-in user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/workpacks:
+    post:
+      tags: [workpacks]
+      operationId: startWorkPack
+      summary: Start a Work Pack request (process start from the portal)
+      description: |
+        Starts Process_PPC_WorkPackAssignment (09 S2, S20; actor `time-method-analyst`, D52). In the walking skeleton only
+        the group check is built: other groups get 403 and a `time-method-analyst` gets 501. BPA-6 defines the request
+        and the success response, test-first.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartWorkPackRequest'
+      responses:
+        '201':
+          description: Work Pack request started (defined by BPA-6)
+          x-assumption: defined by BPA-6
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '501':
+          description: Not implemented in the walking skeleton
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
+  responses:
+    Unauthorized:
+      description: Not logged in, wrong username or password, or the session expired
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: The user's groups do not allow the call, or the CSRF token is missing
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          format: password
+          minLength: 1
+    Me:
+      type: object
+      required: [username, groups]
+      properties:
+        username:
+          type: string
+        groups:
+          type: array
+          description: Camunda group IDs, read once at login (S5, S6)
+          items:
+            type: string
+    StartWorkPackRequest:
+      type: object
+      description: Placeholder; BPA-6 defines the fields.
+      x-assumption: defined by BPA-6
+      additionalProperties: true
+    Problem:
+      type: object
+      description: RFC 9457 problem details
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
