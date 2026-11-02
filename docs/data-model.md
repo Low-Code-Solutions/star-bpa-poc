@@ -1,6 +1,6 @@
 # Data model: STAR BPA POC
 
-Status: **v0.5, approved 29 Oct 2026; delivered as V1 under BPA-42.** Approval review of v0.4 done; every finding decided (Khitaba; Ahsan/Usama; Faraz as PO and Architect). Prepared by Claude (BA/solution designer) under Jira BPA-40. Formal approval for V1 generation: see §9.
+Status: **v0.6, 2 Nov 2026: `user_role_scope` removed (PO decision 2 Nov 2026, BPA-44; V1 edited in PR #19).** Earlier: **v0.5, approved 29 Oct 2026; delivered as V1 under BPA-42.** Approval review of v0.4 done; every finding decided (Khitaba; Ahsan/Usama; Faraz as PO and Architect). Prepared by Claude (BA/solution designer) under Jira BPA-40. Formal approval for V1 generation: see §9.
 Repo path when committed: `docs/data-model.md`. Schema: `bpa` (04-conventions).
 Approval chain (09 §4 item 3): Claude drafts → **Khitaba checks SORs** → **Faraz and Ahsan/Usama approve** → **Usama generates `V1__baseline_schema.sql` and `R__seed_reference_data.sql`** (09 S17).
 
@@ -16,6 +16,17 @@ Sources, in the authority order set by D57:
 ---
 
 ## 0. Change log
+
+### v0.6 (2 Nov 2026, PO decision; Jira BPA-44)
+
+The POC uses only the seven personas, one login each, username equal to the Camunda group ID; access is by group only (decided by the PO; approved by Ahsan on behalf of Faraz). Delivered in PR #19, which edited V1 because no shared or showcase environment existed (09 L5).
+
+| Change | Where |
+| --- | --- |
+| `user_role_scope` removed; domain F holds `app_user` only; 31 → 30 tables | §2, §2.4, §5.11, §7.1, §7.2 |
+| Test fixtures write `app_user` only; BPA-16's users are `workpack-owner` and `project-engineer` | §5.10 |
+| PRJ-139 and PRJ-140 stay as reference data; no scope FK depends on them | §11 |
+| Departments are no longer used for access checks | §3.5 |
 
 ### v0.5 (29 Oct 2026, approval review; Jira BPA-40)
 
@@ -190,7 +201,7 @@ The seven Camunda groups (09 S6, BPA-25): `time-method-analyst`, `project-engine
 
 ## 2. Domain map
 
-Six domains (09 S16), plus one cross-cutting audit table. **31 tables** (v0.5 adds `published_message`).
+Six domains (09 S16), plus one cross-cutting audit table. **30 tables** (v0.5 added `published_message`; v0.6 removed `user_role_scope`).
 
 | # | Domain | Tables | Count | SOR |
 | --- | --- | --- | --- | --- |
@@ -199,7 +210,7 @@ Six domains (09 S16), plus one cross-cutting audit table. **31 tables** (v0.5 ad
 | C | Assignment | `assignment_file`, `assignment_file_row`, `worker_assignment`, `worker_assignment_history`, `published_message` | 5 | POC database |
 | D | Hours | `hour_journal_header`, `hour_journal_line`, `digital_timesheet`, `digital_timesheet_line` | 4 | POC database |
 | E | Notification | `notification` | 1 | POC database |
-| F | Access scope | `app_user`, `user_role_scope` | 2 | POC database (the rows); columns per §1.3: Camunda identity, myPeople, D365 F&O, corporate email |
+| F | App user | `app_user` | 1 | POC database (the row); columns per §1.3: Camunda identity, myPeople, corporate email |
 | G | Audit | `audit_log` | 1 | POC database |
 
 ### 2.1 ERD — the Work Pack spine
@@ -265,14 +276,11 @@ erDiagram
 
 `worker_assignment_history.worker_assignment_id` is deliberately **not** drawn: it has no FK (F3). `published_message` has no FKs (§5.12).
 
-### 2.4 ERD — access scope and notification (domains E, F)
+### 2.4 ERD — app user and notification (domains E, F)
 
 ```mermaid
 erDiagram
-    app_user ||--o{ user_role_scope : "username"
     app_user ||--o{ notification : "recipient_username"
-    department ||--o{ user_role_scope : "department_ref"
-    project_job_code ||--o{ user_role_scope : "project_ref"
     workpack ||--o{ notification : "workpack_id"
     worker }o..o| app_user : "same Badge No, no FK (Q-DM8)"
 ```
@@ -341,7 +349,7 @@ The last seven are nullable on evidence: BPA-6 has an activity with no plan data
 | `department_ref` | `text` | NOT NULL | UNIQUE | D365 F&O Organisation (financial dimension) | BPA-6; D18; 09 S20 |
 | `name` | `text` | NOT NULL **(A)** | | D365 F&O Organisation | **(A)** |
 
-Required by BPA-6 (option list; background "department Fabrication"), the `workpack.department_ref` FK, BPA-15/BPA-16 scope checks, and the locked `GET /api/v1/departments` (S20). Stories refer to departments by a readable value ("Fabrication", "Painting"); whether that value is the `department_ref` or the `name` is a seed choice — **(A)**: seed `department_ref` = the readable value, so story data works unchanged.
+Required by BPA-6 (option list; background "department Fabrication"), the `workpack.department_ref` FK and the locked `GET /api/v1/departments` (S20). Stories refer to departments by a readable value ("Fabrication", "Painting"); whether that value is the `department_ref` or the `name` is a seed choice — **(A)**: seed `department_ref` = the readable value, so story data works unchanged.
 
 ### 3.6 `material` — sourced table, non-key columns ASSUMPTION (Q-DM2)
 
@@ -694,22 +702,12 @@ Epic 1 creates no rows; tests seed them. "Hours loaded" = at least one line with
 | `email` | `text` | NOT NULL **(A)** | | Corporate email system — **ASSUMPTION** | BPA-16; D19 |
 
 **SOR reason for the row's existence:** it links a Camunda username to a myPeople worker and an email address; neither Camunda nor myPeople holds both.
-At runtime written **only** by the S22 start-up job from `personas.yaml` (L2), as an **upsert** — never delete-and-insert, because `notification` and `user_role_scope` reference it. Outside `audit_log` (Q-DM11).
-**Tests (B7, Usama).** The S22 job runs only with profile `local` or `showcase`, so tests write the `app_user` and `user_role_scope` rows they need (for example BPA-16's U-11, U-12, P-201) as fixtures, with a setup assertion that fails loudly when they are absent. A skip was rejected: CI would go green with the behaviour untested. L2's "only writer" applies at runtime.
+At runtime written **only** by the S22 start-up job from `personas.yaml` (L2), as an **upsert** — never delete-and-insert, because `notification` references it. Outside `audit_log` (Q-DM11).
+**Tests (B7, Usama).** The S22 job runs only with profile `local` or `showcase`, so tests write the `app_user` rows they need (for example BPA-16's `workpack-owner` and `project-engineer`) as fixtures, with a setup assertion that fails loudly when they are absent. A skip was rejected: CI would go green with the behaviour untested. L2's "only writer" applies at runtime.
 
-### 5.11 `user_role_scope` (F)
+### 5.11 `user_role_scope` — removed in v0.6
 
-| Column | Type | Null | Constraint | SOR | Source |
-| --- | --- | --- | --- | --- | --- |
-| `id` | `uuid` | NOT NULL | PK | — | 04-conventions |
-| `username` | `text` | NOT NULL | FK → `app_user(username)` | Camunda identity | BPA-16, BPA-26; 09 S6 |
-| `group_id` | `text` | NOT NULL | `CHECK` in the seven group IDs (§1.6) | Camunda identity | BPA-16; 09 S6 |
-| `department_ref` | `text` | **NULL** | FK → `department(department_ref)` | D365 F&O Organisation | BPA-16; 09 S6 |
-| `project_ref` | `text` | **NULL** | FK → `project_job_code(project_ref)` | D365 F&O Project Management | BPA-15, BPA-16; 09 S6 |
-
-**SOR reason:** department/project scope that Camunda groups cannot express (09 S6). Replaces `user_role`.
-Both scope columns are nullable because groups scope differently: `workpack-owner` by department, `project-engineer` by project (BPA-16). `UNIQUE NULLS NOT DISTINCT (username, group_id, department_ref, project_ref)` **(A)** keeps the S22 job idempotent (PostgreSQL 15+, G1). At runtime written **only** by the S22 start-up job (L2); tests write fixtures (B7, §5.10).
-**SOR (A11).** The row is held in the POC database for the reason above; each column carries the SOR of what it identifies (§1.3), as Jira BPA-15 and BPA-16 now state.
+Dropped by the PO decision 2 Nov 2026, BPA-44: access is by Camunda group only, so the POC holds no department or project scope. The section number is kept so references elsewhere stay valid.
 
 ### 5.12 `published_message` (C) — new in v0.5
 
@@ -760,7 +758,7 @@ Index: `(table_name, record_id)` (A15), the lookup the tests and any audit scree
 - `uuid`: canonical lower-case form
 - `bytea` (`workpack_print.file`): not logged by value; logged as `sha256:<hex>` of the content **(A)** (A3)
 
-Scope: the POC-mastered tables of domains B–E. Out of scope: reference-data copies (seed-only), domain F (`app_user`, `user_role_scope`, written only by S22) — Q-DM11 — and `published_message` (itself a log, §5.12). BPA-23's worked example: table `workpack_phase`, column `manhours`, old `250`, new `300`.
+Scope: the POC-mastered tables of domains B–E. Out of scope: reference-data copies (seed-only), domain F (`app_user`, written only by S22) — Q-DM11 — and `published_message` (itself a log, §5.12). BPA-23's worked example: table `workpack_phase`, column `manhours`, old `250`, new `300`.
 
 ### 6.2 Not a table: `lead_time_days`
 
@@ -794,7 +792,6 @@ Implemented as `text` + `CHECK` (Q-DM1, decided 28 Oct).
 | Assignment flag | `HoursLoadedNotRemoved` | `worker_assignment.flag` | BPA-13 |
 | History change type | `Added`, `Replaced`, `Removed` | `worker_assignment_history.change_type` | BPA-13; D38 |
 | Notification channel | `Email`, `InSystem` | `notification.channel` | BPA-16; D44 |
-| Group ID | the seven in §1.6 | `user_role_scope.group_id` | 09 S6 |
 
 Approved drawing statuses are `IFC` and `As-Built` only (D10). Any other value on the event is rejected 400 `Unknown drawing status` (D60).
 
@@ -802,7 +799,7 @@ Approved drawing statuses are `IFC` and `As-Built` only (D10). Any other value o
 
 `COMMENT ON TABLE` on every table, plus a **column comment wherever a column's SOR differs from its table's**. The rule is mechanical: every column whose SOR **label** (§1.3 canonical list; notes after the label ignored) in §3–§6 differs from the table's own SOR gets a comment. The generator derives this from the SOR column; the CI test (09 S17) checks both. Tables needing column comments:
 
-`project_job_code`, `activity`, `cbs_activity`, `material_reservation`, `cutting_sheet`, `lookahead_item`, `workpack`, `workpack_material`, `workpack_schedule`, `release_signoff`, `assignment_file`, `worker_assignment`, `worker_assignment_history`, `hour_journal_line`, `digital_timesheet`, `notification`, `app_user`, `user_role_scope`, `audit_log`.
+`project_job_code`, `activity`, `cbs_activity`, `material_reservation`, `cutting_sheet`, `lookahead_item`, `workpack`, `workpack_material`, `workpack_schedule`, `release_signoff`, `assignment_file`, `worker_assignment`, `worker_assignment_history`, `hour_journal_line`, `digital_timesheet`, `notification`, `app_user`, `audit_log`.
 
 (`lookahead_item` stays because `design_dwg_ref` is Document Control under the §1.3 FK rule; `app_user` added — three SORs in one table, F15.)
 
@@ -971,7 +968,7 @@ All items were decided on the PO call of 28 Oct 2026 (Faraz with Khitaba and Ahs
 
 | Kind | Named keys (from the stories' backgrounds) |
 | --- | --- |
-| Projects | PRJ-139 (Job Code JC-139, WBS 11031), PRJ-140 (BPA-26 keeps it) |
+| Projects | PRJ-139 (Job Code JC-139, WBS 11031), PRJ-140 |
 | Activities | A-2201 (FAC CRPO 139, Module, M-01, Piping, baseline 01–30 Nov 2026, 1200 units; CBS CBS-139-PIP-01), A-2299 (no plan data) |
 | Departments | Fabrication, Painting |
 | Drawings | DWG-118, DWG-119, DWG-121, DWG-130, DWG-140, DWG-141; DWG-999 must **not** exist |
@@ -992,9 +989,9 @@ Values not listed here come from the stories' text when Usama generates the seed
 | `cutting_sheet` | partial | **at least one drawing with none** — BPA-10 |
 | `lookahead_item` | — | **at least one drawing with no row** — BPA-11 |
 | `worker` | — | **one with no `cost_centre_ref`** — BPA-15 (E1150) |
-| `project_job_code` | the 2 of L8 | must include every project a `personas.yaml` scope row names (PRJ-139, PRJ-140), or the `user_role_scope` FK fails at start-up |
+| `project_job_code` | the 2 of L8 | PRJ-139 and PRJ-140 (story backgrounds); no scope FK depends on them since v0.6 |
 
-All values obviously fake (L8). `app_user` and `user_role_scope` are **not** seeded here — `personas.yaml` is their only runtime writer (L2, 09 S22); tests write their own fixtures (B7).
+All values obviously fake (L8). `app_user` is **not** seeded here — `personas.yaml` is their only runtime writer (L2, 09 S22); tests write their own fixtures (B7).
 
 ---
 

@@ -5,6 +5,8 @@
 - Deciders: Ahsan (Build Lead), Usama (Lead Developer) for the 27 Oct rows; Faraz with Ahsan/Usama for
   S25-S27; Faraz for S28 and S29
 - Informed: Khitaba (BA)
+- Amended: 2026-11-02 (PO decision 2 Nov 2026, BPA-44; approved by Ahsan on behalf of Faraz): seven personas, access by
+  Camunda group only; `user_role_scope` removed. See the last item under Consequences.
 - 09 rows: S5, S6, G9, S22, S25, S26, S27, S28, S29; L2, L4, L9, L18
 
 ## Context
@@ -35,23 +37,23 @@ the backend verifies the user against Camunda, reads the user's groups once, and
 cookie. React never stores the password or sends a basic-auth header later. React shows `GET /api/v1/me`
 (username, groups); `POST /api/v1/auth/logout` ends the session. HTTPS anywhere other than localhost.
 
-**Roles and scope (S6).** Camunda is the source of truth for users, group membership and task state.
-One Camunda group per role, kebab-case: `time-method-analyst`, `project-engineer`, `production-planner`,
-`workpack-owner`, `ppc-team`, `supervisor`, `production-team`. Department/project scope that Camunda
-cannot express is held in `user_role_scope (username, group_id, department_ref, project_ref)`, SOR POC
-database; `user_role.role` is removed. The **backend enforces** group and scope (403); React only hides
-what the user cannot use. Groups are read at login and kept in the session.
+**Roles (S6; amended 2 Nov 2026).** Camunda is the source of truth for users, group membership and task
+state. One Camunda group per role, kebab-case: `time-method-analyst`, `project-engineer`,
+`production-planner`, `workpack-owner`, `ppc-team`, `supervisor`, `production-team`. Access is by
+Camunda group only: the POC holds no department or project scope (PO decision 2 Nov 2026, BPA-44; the
+`user_role_scope` table of the first design was removed). `user_role.role` is removed. The **backend
+enforces** the group (403); React only hides what the user cannot use. Groups are read at login and kept in the session.
 
 **Candidate groups (G9).** `time-method-analyst` on UserTask_CreateWorkPack and UserTask_ConfirmWorkPack;
 `project-engineer` on UserTask_SignOffRelease; `production-planner` on UserTask_ScheduleWorkPack. The other
 groups exist for portals only.
 
-**Personas (S22, L2, L9).** One `personas.yaml` lists test users (username, groups, department/project
-scope): 9 users, one per group, plus a second `production-team` user in another department (scope 403
-demo) and a second `time-method-analyst`. Department/project refs are fake and match the seed. The password
-comes from `.env` (`DEMO_PASSWORD`, placeholder in `.env.example`), never from the yaml. An idempotent
-startup job creates the Camunda users and groups through the REST API and writes `user_role_scope`; it is
-the **only** writer of them (L2) and runs only with profile `local` or `showcase`. No live myPeople sync.
+**Personas (S22, L2, L9; amended 2 Nov 2026).** One `personas.yaml` lists exactly **seven** test
+users, one per group, each with a username equal to its group ID; no department or project scope and
+no second users (PO decision 2 Nov 2026, BPA-44). The password comes from `.env` (`DEMO_PASSWORD`,
+placeholder in `.env.example`), never from the yaml. An idempotent startup job creates the Camunda
+users and groups through the REST API and upserts `app_user`; it is the **only** writer of them (L2)
+and runs only with profile `local` or `showcase`. No live myPeople sync.
 
 **Service identity (S25).** One technical Camunda user `bpa-service`, created by the S22 job, password from
 `.env` (`BPA_SERVICE_PASSWORD`, placeholder in `.env.example`). Used by the backend for the REST API
@@ -95,7 +97,13 @@ tests and in the showcase.
 - **Amended 29 Oct 2026 (A11, Khitaba, approved by Faraz; recorded under BPA-39):** `user_role_scope` keeps its rows in
   the POC database, but each column carries the SOR of the entity it identifies (`docs/data-model.md` §1.3; Jira BPA-15, BPA-16 SOR Notes):
   username and group_id Camunda identity, department_ref D365 F&O, project_ref D365 F&O Project Management.
-  The "SOR POC database" wording under Decision refers to the row.
+  The "SOR POC database" wording under Decision refers to the row. *Superseded 2 Nov 2026 by the next item.*
+- **Amended 2 Nov 2026 (PO decision 2 Nov 2026, BPA-44; approved by Ahsan on behalf of Faraz; delivered in PR #19):**
+  the POC uses only the seven personas, one login each, username equal to the Camunda group ID. Access is
+  by group only: department and project scope are out of the POC (production would add them, for example
+  through OIDC claims). `user_role_scope` was dropped from V1 (no shared or showcase environment existed,
+  09 L5) and the S22 job no longer writes it. Test users are named exactly as the persona IDs
+  (04-conventions). Jira BPA-15, BPA-16 and BPA-26 were updated the same day.
 
 ## Sources
 

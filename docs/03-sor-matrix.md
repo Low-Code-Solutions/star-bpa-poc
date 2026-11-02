@@ -1,6 +1,7 @@
 # 03 SOR matrix: STAR BPA POC
 
 Status: **ACTIVE, 28 Oct 2026 (Epic 1 rows; updated for 09-architecture-decisions, D58, D59, and PO decision P1 on WBS of 28 Oct).** Applied under PO delegation (D55, confirmed by Khitaba); open to PO challenge.
+Amended 2 Nov 2026 (PO decision 2 Nov 2026, BPA-44): `user_role_scope` removed; test users are the seven personas, access by group only.
 Owner: Faraz. Decision references (C, D) are in claude/06-epic1-decisions-draft.md; P1–P4 in claude/11-data-model.md §0.
 Column-level detail (types, constraints, SOR per column) is in claude/11-data-model.md (repo docs/data-model.md, 09 S16).
 
@@ -49,7 +50,6 @@ This matrix labels each **entity**. Column-level labels (including foreign-key c
 | worker_assignment, worker_assignment_history | POC workflow state; the real equivalent is FMS via Int-5 (D38) | Discarded |
 | digital_timesheet, digital_timesheet_line | Simulates the D365 timesheet / digital tab (D36) | Discarded |
 | notification | Output of the drawing-revision notice (D44) | Discarded |
-| user_role_scope | Department / project scope of a Camunda user that Camunda groups cannot express (09 S6); roles themselves live in Camunda | Discarded |
 | audit_log | Audit trail of POC-mastered data (FRD-7 §7.3.3, D64) | Discarded |
 
 ## Mocks
@@ -60,4 +60,4 @@ This matrix labels each **entity**. Column-level labels (including foreign-key c
 | D365 Document Control (drawing revisions) | In-app endpoint POST /api/v1/drawing-revisions publishing DrawingRevised (D41) | backend (API) |
 | Corporate email | Mailpit (catch-only; SMTP 1025, web 8025) (09 S8) | docker compose |
 | D365, P6, FMS master data | Repeatable Flyway seed R__seed_reference_data.sql; SOR per table via COMMENT ON TABLE (09 S16, S17); schema V1__baseline_schema.sql from docs/data-model.md | backend/src/main/resources/db/migration/ (09 L1) |
-| myPeople / identity for test users | personas.yaml → Camunda users and groups + user_role_scope (09 S22) | backend config |
+| myPeople / identity for test users | personas.yaml → Camunda users and groups + app_user; seven personas, username = group ID (09 S22; BPA-44) | backend config |
