@@ -60,16 +60,27 @@ A script check in the PR greps the YAML's quoted texts against the saved Jira te
 found; those must carry `x-assumption: true`.
 
 **x-assumption list (no story states them), for Khitaba:**
-1. POST workpacks 201 body (`processInstanceKey`) and its 503 when Camunda is down.
+1. POST workpacks 201 body (`processInstanceKey`); and 503 "The process engine is not available right now;
+   try again later" on every call that reaches Camunda (start, task API, drawing-revisions). *Built:
+   503 added to the task API and drawing-revisions too.*
 2. 403 text on non-task endpoints (BPA-6, 7, 10, 12, 14, 15 give only the code): "You are not allowed to do this".
-3. 400 for a missing or malformed `workpackNumber` query/path value: "workpackNumber is required" / "Workpack number must match WP-######".
+3. 400 for a missing or malformed `workpackNumber` query/path value: "Workpack number must match WP-######"
+   (one text for both cases, as built).
 4. GET workpacks/{n}/print for an unknown Work Pack: reuse "Work Pack not found" (BPA-10 states only the not-scheduled case).
 5. GET assignment-files/{id}/result, unknown id: "Assignment file not found".
 6. POST assignment-files with no `file` part: "File is required" (an unreadable file is a 200/201 result line per BPA-12).
 7. POST drawing-revisions missing a required field: "drawingRef, revision, status and registeredAt are required".
 8. GET tasks/{key} for a task outside the user's groups: reuse the BPA-26 403 text (BPA-26 states it for complete only).
-9. 401 texts kept from BPA-43 ("Wrong username or password", session expired): BPA-43 is a Task, not a story.
+9. 401 texts: "Wrong username or password" and "Login is not available right now; try again later" kept
+   from BPA-43 (a Task, not a story); "Not logged in or the session has expired" new.
 10. POST assignment-files success code 201 and the file-result `Content-Type` (JSON only; see Q3).
+11. *Added while building:* groups for endpoints whose story names none. The reference lists (#8–12) are
+    open to every logged-in user; the file result (#16) is `production-team` only, as for the upload.
+12. *Added while building:* look-ahead with no Look-Ahead row answers 200 with the three dates absent,
+    not 404 (BPA-11 states only the screen text).
+
+**Message check (scratchpad script, output in the PR):** 20 `detail`/`message` texts in the YAML;
+11 found verbatim in the Jira text, 9 marked x-assumption, 0 unmarked.
 
 ## 3. What the regenerated interfaces break, and how the build stays green
 Generator: `spring`, `interfaceOnly`, `skipDefaultInterface: true`, `useTags: true` (pom.xml). So each
