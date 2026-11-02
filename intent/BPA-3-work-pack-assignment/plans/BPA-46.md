@@ -45,8 +45,9 @@ Keys from Camunda (task, process instance) are `string` (int64 exceeds JS number
 | 19 | POST drawing-revisions | BPA-16, S28 | {drawingRef, revision, status enum, registeredAt date-time, supersededRevision?}; 201; `security: []` | 200 "Revision already received"; 404 "Drawing not found"; 400 "Unknown drawing status" |
 | 20 | GET me/notifications | BPA-16, D44 | [workpackNumber (→workpack), drawingRef, revision, sentAt] (InSystem channel only) | 401 |
 
-Enums from data-model §7.1: phase, workpack status, drawing status, hour_journal_line status,
-submission_status, channel. Row/file outcomes from BPA-12/13/22 are documented as an enum-like list
+Enums from data-model §7.1, used as schema `enum` where a field carries them: drawing status,
+hour_journal_line status, submission_status (as built; phase, workpack status and channel appear in no
+response field, so they get no schema, review Low 2). Row/file outcomes from BPA-12/13/22 are documented as an enum-like list
 in the description, not a schema `enum` (several carry parameters).
 
 ## 2. Error messages: extraction and the x-assumption list
@@ -70,7 +71,9 @@ found; those must carry `x-assumption: true`.
 5. GET assignment-files/{id}/result, unknown id: "Assignment file not found".
 6. POST assignment-files with no `file` part: "File is required" (an unreadable file is a 200/201 result line per BPA-12).
 7. POST drawing-revisions missing a required field: "drawingRef, revision, status and registeredAt are required".
-8. GET tasks/{key} for a task outside the user's groups: reuse the BPA-26 403 text (BPA-26 states it for complete only).
+8. GET tasks/{key} for a task outside the user's groups: reuse the BPA-26 403 text (BPA-26 states it for complete only);
+   and POST tasks/{key}/complete for an unknown task: reuse "Task not found" (BPA-26 states it for GET only).
+13. *Added at review:* POST drawing-revisions is CSRF-exempt (no session, S28).
 9. 401 texts: "Wrong username or password" and "Login is not available right now; try again later" kept
    from BPA-43 (a Task, not a story); "Not logged in or the session has expired" new.
 10. POST assignment-files success code 201 and the file-result `Content-Type` (JSON only; see Q3).
@@ -92,8 +95,10 @@ tag is one interface, and every operation in it is abstract.
 - **Break 2: operations added to an existing tag.** `me/notifications` under `me` would make
   `MeController` fail to compile; look-ahead or print under `workpacks` would break `WorkPackController`.
   Fix: one tag per implementing story, so new operations land in new interfaces nobody implements yet:
-  `tasks`, `reference` (#8–12), `hour-journal` (#13, 17), `prints`, `assignment-files`, `timesheets`,
-  `drawing-revisions`, `notifications`. `auth`, `me`, `workpacks` keep exactly their current operations.
+  `tasks`, `reference` (#8–11), `look-ahead` (#12), `hour-journal-headers` (#13),
+  `hour-journal-lines` (#17), `prints`, `assignment-files`, `timesheets`, `drawing-revisions`,
+  `notifications` (split as built after review Medium 3, so BPA-7 and BPA-14, and BPA-11 and the
+  unowned lists, never share an interface). `auth`, `me`, `workpacks` keep exactly their current operations.
   Each later story implements a whole interface, so `skipDefaultInterface` keeps forcing completeness.
 - **AuthController, MeController:** `LoginRequest`, `Me` unchanged → untouched.
 - **Unimplemented operations** have no controller, so they answer 404 until their story lands; noted
@@ -126,6 +131,20 @@ Plan commit (Approved) → group 1 → lint/build/test → group 2 → lint/buil
   costs rework in BPA-6, 8, 9, 11, 23. Mitigation: it lands in group 1 and is checked against the
   BPA-25 spike findings (check 4: `validationMessages` readable after WORKPACK_INVALID).
 - Variable names differ between sources (Q2).
+- Generated `@Pattern` (WorkpackNumber) and Java enums (drawing status) make Spring reject bad input with
+  its default 400 before a controller runs. BPA-16 ("Unknown drawing status") and the stories using the
+  x-assumption 400 text need an exception handler that writes those texts (review Low 4).
+- 401/403 texts: the contract now uses the live SecurityConfig texts (review Medium 2), so stories inherit
+  them without change.
+
+## Review (qa-reviewer, 2 Nov 2026, at 198cca5)
+1 High, 5 Medium, 9 Low. Fixed in the review-fix commit: High (Confirm/decline reasons are the process
+variable `confirmMessage`, per the BPMN; added to `Task`, removed from `validationMessages`); Medium 2
+(401/403 texts = SecurityConfig); Medium 3 (tags split); Medium 4 (drawing-revisions documented as
+CSRF-exempt, x-assumption, BPA-16 implements); Medium 5 (`x-assumption` on the reused TaskForbidden and
+TaskNotFound texts); Low: `x-assumption: true` with the reason in `x-assumption-note`; required fields
+per data-model NOT NULL; invented orderings removed. Open: Medium 1 (Q1, needs the PO); Lows on
+`multipleOf`, the duplicate TaskKey pattern, Jira status Backlog. See REVIEW.md.
 
 ## Proof
 Redocly lint clean; `./mvnw -B verify` green with all existing tests unchanged; frontend test + build

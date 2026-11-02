@@ -10,8 +10,8 @@ info:
     **Errors** are RFC 9457 problem details. Where a story states the message, `detail` carries that exact text. A text
     no story states is marked `x-assumption: true` and listed for Khitaba (L12).
 
-    **Security.** A session cookie set by `POST /api/v1/auth/login` (S5, ADR 0005). Every state-changing call needs the
-    CSRF token (S26): read the `XSRF-TOKEN` cookie, set by any earlier response (for example `GET /api/v1/me`), and send it
+    **Security.** A session cookie set by `POST /api/v1/auth/login` (S5, ADR 0005). Every state-changing call except
+    `POST /api/v1/drawing-revisions` (no session, S28) needs the CSRF token (S26): read the `XSRF-TOKEN` cookie, set by any earlier response (for example `GET /api/v1/me`), and send it
     back in the `X-XSRF-TOKEN` header. Sessions expire after 30 minutes idle (S27); the API then returns 401. Access is by
     Camunda group only, with no department or project scope (PO decision 2 Nov 2026, BPA-44).
 
@@ -36,8 +36,12 @@ tags:
     description: Backend task API for the four user tasks (S14, ADR 0004; BPA-26)
   - name: reference
     description: Reference lists for the task screens (S14, S20). Contract under BPA-46; implementing story not yet named.
-  - name: hour-journal
-    description: Project Hour Journal Headers and Lines, simulating D365 (BPA-7, BPA-14; 07 §10)
+  - name: hour-journal-headers
+    description: Project Hour Journal Headers, simulating D365 (BPA-7; 07 §10)
+  - name: hour-journal-lines
+    description: Project Hour Journal Lines, simulating D365 (BPA-14; 07 §10)
+  - name: look-ahead
+    description: Look-Ahead PPC plan dates for the Schedule Work Pack screen (BPA-11; D48; S20)
   - name: prints
     description: Workpack print (BPA-10; S1, S4; 07 §10)
   - name: assignment-files
@@ -79,7 +83,8 @@ paths:
                 $ref: '#/components/schemas/Problem'
         '401':
           description: Wrong username or password
-          x-assumption: text from the BPA-43 walking skeleton (a Task); no story states it
+          x-assumption: true
+          x-assumption-note: text from the BPA-43 walking skeleton (a Task); no story states it
           content:
             application/problem+json:
               schema:
@@ -92,7 +97,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '503':
           description: Camunda cannot be reached to check the login; nothing about the password is implied
-          x-assumption: text from the BPA-43 walking skeleton (a Task); no story states it
+          x-assumption: true
+          x-assumption-note: text from the BPA-43 walking skeleton (a Task); no story states it
           content:
             application/problem+json:
               schema:
@@ -142,7 +148,8 @@ paths:
       responses:
         '201':
           description: Work Pack request started
-          x-assumption: response body not stated by BPA-6
+          x-assumption: true
+          x-assumption-note: response body not stated by BPA-6
           content:
             application/json:
               schema:
@@ -169,7 +176,7 @@ paths:
         only my tasks"). Source: BPA-26, S14.
       responses:
         '200':
-          description: Open tasks for the user's groups, oldest first
+          description: Open tasks for the user's groups
           content:
             application/json:
               schema:
@@ -274,10 +281,11 @@ paths:
         Option list and read-only context panel of the Create Work Pack screen (BPA-6 "Context panel shows the activity
         read-only", D17; 09 S20). Seeded POC master data; real SOR P6 via the D365 PMS database (C13). Open to every
         logged-in user (x-assumption: no story names the groups). Source: S20, BPA-6.
-      x-assumption: open to every logged-in user
+      x-assumption: true
+      x-assumption-note: open to every logged-in user
       responses:
         '200':
-          description: All activities, ordered by activityRef
+          description: All activities
           content:
             application/json:
               schema:
@@ -294,10 +302,11 @@ paths:
       description: |
         Option list of the Create Work Pack screen (BPA-6; 09 S20). Seeded POC master data; real SOR D365 F&O Document
         Control (C15). Open to every logged-in user (x-assumption). Source: S20, BPA-6.
-      x-assumption: open to every logged-in user
+      x-assumption: true
+      x-assumption-note: open to every logged-in user
       responses:
         '200':
-          description: All drawings, ordered by drawingRef
+          description: All drawings
           content:
             application/json:
               schema:
@@ -314,10 +323,11 @@ paths:
       description: |
         Option list of the Create and Confirm Work Pack screens (BPA-6, BPA-23; 09 S20). Seeded POC master data; real SOR
         D365 F&O Product Information Management (C12, D54). Open to every logged-in user (x-assumption). Source: S20, BPA-6.
-      x-assumption: open to every logged-in user
+      x-assumption: true
+      x-assumption-note: open to every logged-in user
       responses:
         '200':
-          description: All materials, ordered by materialRef
+          description: All materials
           content:
             application/json:
               schema:
@@ -334,10 +344,11 @@ paths:
       description: |
         Option list of the Create Work Pack screen (BPA-6; 09 S20). Seeded POC master data; real SOR D365 F&O (D18). Open
         to every logged-in user (x-assumption). Source: S20, BPA-6.
-      x-assumption: open to every logged-in user
+      x-assumption: true
+      x-assumption-note: open to every logged-in user
       responses:
         '200':
-          description: All departments, ordered by departmentRef
+          description: All departments
           content:
             application/json:
               schema:
@@ -350,7 +361,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/WorkpackNumberPath'
     get:
-      tags: [reference]
+      tags: [look-ahead]
       operationId: getLookAhead
       summary: The Look-Ahead PPC plan dates for a Work Pack's drawing
       description: |
@@ -358,7 +369,8 @@ paths:
         Work Pack's drawing. When no Look-Ahead row exists for the drawing, the response is 200 with the three dates
         absent, and the screen shows "No Look-Ahead plan dates for <drawing>" (BPA-11 "No Look-Ahead row for the
         drawing"; 200 rather than 404 is x-assumption). Open to every logged-in user (x-assumption). Source: S20, BPA-11.
-      x-assumption: 200 with absent dates when no row exists; open to every logged-in user
+      x-assumption: true
+      x-assumption-note: 200 with absent dates when no row exists; open to every logged-in user
       responses:
         '200':
           description: The Look-Ahead dates, or none
@@ -374,7 +386,7 @@ paths:
           $ref: '#/components/responses/WorkPackNotFound'
   /api/v1/hour-journal-headers:
     get:
-      tags: [hour-journal]
+      tags: [hour-journal-headers]
       operationId: listHourJournalHeaders
       summary: The Project Hour Journal Header of a Work Pack
       description: |
@@ -401,7 +413,7 @@ paths:
           $ref: '#/components/responses/WorkPackNotFound'
   /api/v1/hour-journal-lines:
     get:
-      tags: [hour-journal]
+      tags: [hour-journal-lines]
       operationId: listHourJournalLines
       summary: The Project Hour Journal Lines of a Work Pack
       description: |
@@ -411,7 +423,7 @@ paths:
         - $ref: '#/components/parameters/WorkpackNumberQuery'
       responses:
         '200':
-          description: The Lines, ordered by employeeRef
+          description: The Lines
           content:
             application/json:
               schema:
@@ -474,7 +486,8 @@ paths:
                     detail: Workpack print not available
                 workPackNotFound:
                   summary: Unknown Work Pack (x-assumption)
-                  x-assumption: BPA-10 states only the not-scheduled case
+                  x-assumption: true
+                  x-assumption-note: BPA-10 states only the not-scheduled case
                   value:
                     status: 404
                     title: Not Found
@@ -507,14 +520,16 @@ paths:
       responses:
         '201':
           description: Upload recorded; the result per row or one file-level line
-          x-assumption: status code 201 not stated by BPA-12
+          x-assumption: true
+          x-assumption-note: status code 201 not stated by BPA-12
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AssignmentFileResult'
         '400':
           description: The request has no file part
-          x-assumption: text not stated by any story
+          x-assumption: true
+          x-assumption-note: text not stated by any story
           content:
             application/problem+json:
               schema:
@@ -544,7 +559,8 @@ paths:
         The same rows as the upload response, with their current outcomes, for download (BPA-12 "Upload is recorded";
         D49, D58). JSON only; the portal builds the download file (x-assumption, plan Q3). Group `production-team` only
         (ASSUMPTION, as for the upload). Source: BPA-12.
-      x-assumption: JSON only; group production-team
+      x-assumption: true
+      x-assumption-note: JSON only; group production-team
       responses:
         '200':
           description: The result
@@ -558,7 +574,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           description: No upload with this id
-          x-assumption: text not stated by any story
+          x-assumption: true
+          x-assumption-note: text not stated by any story
           content:
             application/problem+json:
               schema:
@@ -579,7 +596,7 @@ paths:
         - $ref: '#/components/parameters/WorkpackNumberQuery'
       responses:
         '200':
-          description: The time sheets, ordered by employeeRef
+          description: The time sheets
           content:
             application/json:
               schema:
@@ -603,7 +620,11 @@ paths:
         Stands in for a D365 F&O Document Control event (09 S20, S28; D41). Not restricted: no session, group or API key
         (S28). Records the revision in the read-only copy, marks `supersededRevision` as Superseded only when the event
         names it and it exists (D45, D53), and publishes DrawingRevised, which starts Process_PPC_DrawingRevisionNotice.
-        The revision label is taken as given (D42). Source: BPA-16; 07 §10.
+        The revision label is taken as given (D42). No CSRF token is needed: with no session there is nothing for CSRF
+        to protect, so BPA-16 exempts this path from the S26 check (x-assumption; today's SecurityConfig would answer
+        403). Source: BPA-16; 07 §10.
+      x-assumption: true
+      x-assumption-note: CSRF-exempt; BPA-16 implements the exemption in SecurityConfig
       security: []
       requestBody:
         required: true
@@ -637,7 +658,8 @@ paths:
                     detail: Unknown drawing status
                 missingField:
                   summary: A required field is missing (x-assumption)
-                  x-assumption: text not stated by any story
+                  x-assumption: true
+                  x-assumption-note: text not stated by any story
                   value:
                     status: 400
                     title: Bad Request
@@ -664,7 +686,7 @@ paths:
         notices"; D44). Source: BPA-16.
       responses:
         '200':
-          description: The user's notices, newest first
+          description: The user's notices
           content:
             application/json:
               schema:
@@ -706,7 +728,8 @@ components:
   responses:
     Unauthorized:
       description: Not logged in, or the session expired (S27)
-      x-assumption: no story states the text
+      x-assumption: true
+      x-assumption-note: no story states the text
       content:
         application/problem+json:
           schema:
@@ -714,12 +737,13 @@ components:
           example:
             status: 401
             title: Unauthorized
-            detail: Not logged in or the session has expired
+            detail: Not logged in, or the session has expired
     Forbidden:
       description: |
         The user's groups do not allow the call, or the CSRF token is missing. Stories give only the code (BPA-6, 7, 10,
         12, 14, 15); the text is x-assumption.
-      x-assumption: text not stated by any story
+      x-assumption: true
+      x-assumption-note: text not stated by any story
       content:
         application/problem+json:
           schema:
@@ -727,11 +751,13 @@ components:
           example:
             status: 403
             title: Forbidden
-            detail: You are not allowed to do this
+            detail: Your groups do not allow this call, or the CSRF token is missing
     TaskForbidden:
       description: |
         The task's candidate groups do not include any of the user's groups (BPA-26 "Wrong group is forbidden"; 09 S6).
         BPA-26 states the text for completing; using it for reading a task is x-assumption.
+      x-assumption: true
+      x-assumption-note: BPA-26 states this text for POST complete only; reused for GET /tasks/{taskKey}
       content:
         application/problem+json:
           schema:
@@ -742,6 +768,8 @@ components:
             detail: You are not allowed to work on this task
     TaskNotFound:
       description: No open or completed task with this key (BPA-26 "Unknown task")
+      x-assumption: true
+      x-assumption-note: BPA-26 states this text for GET /tasks/{taskKey} only; reused for POST complete
       content:
         application/problem+json:
           schema:
@@ -762,7 +790,8 @@ components:
             detail: Work Pack not found
     InvalidWorkpackNumber:
       description: The workpackNumber is missing or does not match WP-###### (D15)
-      x-assumption: text not stated by any story
+      x-assumption: true
+      x-assumption-note: text not stated by any story
       content:
         application/problem+json:
           schema:
@@ -773,7 +802,8 @@ components:
             detail: Workpack number must match WP-######
     EngineUnavailable:
       description: Camunda cannot be reached; nothing was changed
-      x-assumption: text not stated by any story
+      x-assumption: true
+      x-assumption-note: text not stated by any story
       content:
         application/problem+json:
           schema:
@@ -862,12 +892,19 @@ components:
                 Messages from the last rejected save (BPMN error from the save worker, G2), empty after a successful save
                 (BPA-23 "Validation messages are cleared after a successful save"). Texts come from the stories, for
                 example BPA-6 "Drawing is required", "Phase Finishing is not selected for this Work Pack", "Date to
-                complete cannot be in the past"; BPA-8 "Materials are not reserved for this Workpack", "Drawing is not
-                approved (IFC or As-Built required)"; BPA-9 "Declined by Project Engineer: Wrong drawing revision";
+                complete cannot be in the past"; BPA-23 "Material MAT-PIPE-06 is listed twice for phase Cutting";
                 BPA-11 "Date cannot be earlier than 28 Oct 2026", "Planned end cannot be before planned start". Several
-                carry values, so they are not an enum.
+                carry values, so they are not an enum. The release-check and decline reasons are in `confirmMessage`.
               items:
                 type: string
+            confirmMessage:
+              type: string
+              description: |
+                Process variable `confirmMessage` on the Confirm Workpack task: why the task came back. Set from the release
+                check's releaseReason (BPA-8: "Materials are not reserved for this Workpack", "Drawing is not approved (IFC
+                or As-Built required)") or by a declined sign-off (BPA-9: "Declined by Project Engineer: Wrong drawing
+                revision"). Absent on other tasks and when the task has not come back (Process_PPC_WorkPackAssignment,
+                BusinessRuleTask_ReleaseCheck output and ServiceTask_RecordSignOff).
     CompleteTaskRequest:
       type: object
       required: [variables]
@@ -887,7 +924,7 @@ components:
     Activity:
       type: object
       description: activity, joined to wbs and project_job_code (data model §3.1–3.3)
-      required: [activityRef, activityName, wbsRef, projectRef]
+      required: [activityRef, activityName, wbsRef, projectRef, jobCodeRef]
       properties:
         activityRef:
           type: string
@@ -997,7 +1034,7 @@ components:
     HourJournalLine:
       type: object
       description: hour_journal_line (data model §5.6), joined to worker
-      required: [employeeRef, estimatedHours, status]
+      required: [employeeRef, role, designation, estimatedHours, status]
       properties:
         employeeRef:
           type: string
@@ -1018,7 +1055,7 @@ components:
     DigitalTimesheet:
       type: object
       description: digital_timesheet (data model §5.7), joined to worker and workpack
-      required: [employeeRef, workpackNumber, projectRef, wbsRef, submissionStatus]
+      required: [employeeRef, workpackNumber, projectRef, wbsRef, activityRef, submissionStatus]
       properties:
         employeeRef:
           type: string
