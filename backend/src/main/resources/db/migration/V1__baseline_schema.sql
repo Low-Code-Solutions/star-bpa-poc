@@ -548,7 +548,7 @@ CREATE TABLE bpa.digital_timesheet_line (
 COMMENT ON TABLE bpa.digital_timesheet_line IS 'POC database';
 
 -- =====================================================================================================
--- Domain F: access scope (before E: notification references app_user)
+-- Domain F: app user (before E: notification references app_user). No department or project scope (BPA-44).
 -- =====================================================================================================
 
 -- F.1 app_user (5.10); keyed by username (04-conventions exception, D63)
@@ -566,31 +566,6 @@ COMMENT ON TABLE bpa.app_user IS 'POC database';
 COMMENT ON COLUMN bpa.app_user.username IS 'Camunda identity';
 COMMENT ON COLUMN bpa.app_user.employee_ref IS 'myPeople';
 COMMENT ON COLUMN bpa.app_user.email IS 'Corporate email system';
-
--- F.2 user_role_scope (5.11)
-CREATE TABLE bpa.user_role_scope (
-    id             uuid        NOT NULL DEFAULT gen_random_uuid(),
-    username       text        NOT NULL,
-    group_id       text        NOT NULL,
-    department_ref text,
-    project_ref    text,
-    created_at     timestamptz NOT NULL DEFAULT now(),
-    created_by     text        NOT NULL,
-    updated_at     timestamptz NOT NULL DEFAULT now(),
-    updated_by     text        NOT NULL,
-    PRIMARY KEY (id),
-    UNIQUE NULLS NOT DISTINCT (username, group_id, department_ref, project_ref),
-    FOREIGN KEY (username) REFERENCES bpa.app_user (username) ON DELETE NO ACTION,
-    FOREIGN KEY (department_ref) REFERENCES bpa.department (department_ref) ON DELETE NO ACTION,
-    FOREIGN KEY (project_ref) REFERENCES bpa.project_job_code (project_ref) ON DELETE NO ACTION,
-    CHECK (group_id IN ('time-method-analyst', 'project-engineer', 'production-planner', 'workpack-owner',
-                        'ppc-team', 'supervisor', 'production-team'))
-);
-COMMENT ON TABLE bpa.user_role_scope IS 'POC database';
-COMMENT ON COLUMN bpa.user_role_scope.username IS 'Camunda identity';
-COMMENT ON COLUMN bpa.user_role_scope.group_id IS 'Camunda identity';
-COMMENT ON COLUMN bpa.user_role_scope.department_ref IS 'D365 F&O Organisation';
-COMMENT ON COLUMN bpa.user_role_scope.project_ref IS 'D365 F&O Project Management';
 
 -- =====================================================================================================
 -- Domain E: notification

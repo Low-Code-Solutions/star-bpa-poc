@@ -10,5 +10,5 @@ npm run dev     # http://localhost:5173, proxies /api to bpa-app on http://local
 ```
 
 Start the compose stack first (`docker compose up -d --build` from the repo root). Log in as a persona from
-`backend/src/main/resources/personas.yaml` (for example `tma-1`) with `DEMO_PASSWORD` from `.env`. If port 5173 is taken,
+`backend/src/main/resources/personas.yaml` (for example `time-method-analyst`) with `DEMO_PASSWORD` from `.env`. If port 5173 is taken,
 run `npx vite --port <free port>`.

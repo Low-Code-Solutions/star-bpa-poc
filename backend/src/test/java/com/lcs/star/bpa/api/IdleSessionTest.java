@@ -60,9 +60,9 @@ class IdleSessionTest {
     @Test
     void BPA43_idleSessionReturns401() throws InterruptedException {
         assertThat(configuredTimeout).isEqualTo(Duration.ofMinutes(30));
-        when(camunda.verify("tma-1", "right")).thenReturn(Optional.of(new CamundaUser("tma-1", List.of("time-method-analyst"))));
+        when(camunda.verify("time-method-analyst", "right")).thenReturn(Optional.of(new CamundaUser("time-method-analyst", List.of("time-method-analyst"))));
         var browser = new TestBrowser(port);
-        assertThat(browser.login("tma-1", "right").statusCode()).isEqualTo(200);
+        assertThat(browser.login("time-method-analyst", "right").statusCode()).isEqualTo(200);
         assertThat(browser.get("/api/v1/me").statusCode()).isEqualTo(200);
 
         Thread.sleep(2500);

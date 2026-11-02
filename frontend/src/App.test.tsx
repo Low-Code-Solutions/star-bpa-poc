@@ -24,7 +24,7 @@ function fakeBackend() {
       if (username === 'camunda-down') {
         return json(503, { status: 503, detail: 'Login is not available right now; try again later' }, 'application/problem+json');
       }
-      if (username === 'tma-1' && password === 'right') {
+      if (username === 'time-method-analyst' && password === 'right') {
         session = { username, groups: ['time-method-analyst'] };
         return json(200, session);
       }
@@ -54,12 +54,12 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.type(await screen.findByLabelText('Username'), 'tma-1');
+    await user.type(await screen.findByLabelText('Username'), 'time-method-analyst');
     await user.type(screen.getByLabelText('Password'), 'right');
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 
-    expect(await screen.findByText('tma-1')).toBeInTheDocument();
-    expect(screen.getByText('time-method-analyst')).toBeInTheDocument();
+    // BPA-44: the username equals its group ID, so /me shows it twice (as the user and as the group).
+    expect(await screen.findAllByText('time-method-analyst')).toHaveLength(2);
     const login = calls.find((c) => c.path === '/api/v1/auth/login');
     expect(login?.xsrf).toBe('token-123');
 
@@ -75,7 +75,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.type(await screen.findByLabelText('Username'), 'tma-1');
+    await user.type(await screen.findByLabelText('Username'), 'time-method-analyst');
     await user.type(screen.getByLabelText('Password'), 'wrong');
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 

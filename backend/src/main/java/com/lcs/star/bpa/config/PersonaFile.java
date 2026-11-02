@@ -12,16 +12,11 @@ import org.springframework.core.io.Resource;
 /** The contents of {@code personas.yaml} (S22, L9). */
 public record PersonaFile(List<Persona> users) {
 
-    public record Persona(String username, String name, String employeeRef, String email, List<String> groups, List<Scope> scope) {
+    public record Persona(String username, String name, String employeeRef, String email, List<String> groups) {
 
         public Persona {
             groups = groups == null ? List.of() : List.copyOf(groups);
-            scope = scope == null ? List.of() : List.copyOf(scope);
         }
-    }
-
-    /** One {@code user_role_scope} row: a department or a project the user's group is limited to (docs/data-model.md 5.11). */
-    public record Scope(String group, String departmentRef, String projectRef) {
     }
 
     public static PersonaFile load(Resource resource) {
