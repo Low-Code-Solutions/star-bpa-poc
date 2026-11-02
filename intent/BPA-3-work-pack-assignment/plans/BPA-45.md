@@ -1,7 +1,7 @@
 # Plan: BPA-45 Record PO acceptance of Epic 1 intent and spec, repo-master sign-off and team change
 Jira: BPA-45 (Task, epic BPA-3)
 Story last updated: 2026-11-02T18:53:30.269+0400
-Status: Approved (Faraz, 2 Nov 2026)
+Status: Closed (2026-11-02)
 Approver: Faraz (Product Owner and Architect); Ahsan (Build Lead) reviews and merges
 Branch: BPA-45-po-acceptance-team-change, from main 73c85a5
 
