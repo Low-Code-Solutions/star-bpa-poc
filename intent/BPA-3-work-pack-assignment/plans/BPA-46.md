@@ -76,7 +76,7 @@ found; those must carry `x-assumption: true`.
 13. *Added at review:* POST drawing-revisions is CSRF-exempt (no session, S28).
 9. 401 texts: "Wrong username or password" and "Login is not available right now; try again later" kept
    from BPA-43 (a Task, not a story); "Not logged in or the session has expired" new.
-10. POST assignment-files success code 201 and the file-result `Content-Type` (JSON only; see Q3).
+10. POST assignment-files success code 201; the CSV layout and file name of the file result (Q3: JSON and CSV).
 11. *Added while building:* groups for endpoints whose story names none. The reference lists (#8–12) are
     open to every logged-in user; the file result (#16) is `production-team` only, as for the upload.
 12. *Added while building:* look-ahead with no Look-Ahead row answers 200 with the three dates absent,
@@ -143,14 +143,22 @@ variable `confirmMessage`, per the BPMN; added to `Task`, removed from `validati
 (401/403 texts = SecurityConfig); Medium 3 (tags split); Medium 4 (drawing-revisions documented as
 CSRF-exempt, x-assumption, BPA-16 implements); Medium 5 (`x-assumption` on the reused TaskForbidden and
 TaskNotFound texts); Low: `x-assumption: true` with the reason in `x-assumption-note`; required fields
-per data-model NOT NULL; invented orderings removed. Open: Medium 1 (Q1, needs the PO); Lows on
+per data-model NOT NULL; invented orderings removed. Medium 1 answered by the PO (Q1, no body). Lows on
 `multipleOf`, the duplicate TaskKey pattern, Jira status Backlog. See REVIEW.md.
 
 ## Proof
 Redocly lint clean; `./mvnw -B verify` green with all existing tests unchanged; frontend test + build
 green; message-check script output in the PR; every operation has a `description` citing its story or 09 row.
 
-## Questions (for Faraz)
+## Questions (for Faraz), answered 2 Nov 2026 after review
+- Answers (Faraz, PO, in the session): Q1 no body (as built); Q2 data-model names (as built); Q3 JSON and
+  CSV, by Accept header (contract changed: `text/csv` on GET assignment-files/{id}/result; the generated
+  method still returns `AssignmentFileResult`, so BPA-12 adds a `text/csv` HttpMessageConverter; CSV
+  layout and file name x-assumption); Q4 BPA-6 builds the four lists, BPA-11 builds look-ahead
+  (proposed to Jira as comments on BPA-6 and BPA-11, shown to Faraz first). Q1's scope wording is
+  proposed as a comment on BPA-46; the Description is not edited.
+
+Asked:
 - Q1. POST workpacks: BPA-46 says "complete the request body from BPA-6", but BPA-6 starts the process
   and takes the data through UserTask_CreateWorkPack. Plan: no body, 201 with processInstanceKey (x-assumption). Agree?
 - Q2. Variable names: form-specs use `dateToComplete`, `plannedStart`, `plannedEnd`; data-model columns

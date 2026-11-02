@@ -557,17 +557,34 @@ paths:
       summary: The result of an uploaded assignment file
       description: |
         The same rows as the upload response, with their current outcomes, for download (BPA-12 "Upload is recorded";
-        D49, D58). JSON only; the portal builds the download file (x-assumption, plan Q3). Group `production-team` only
-        (ASSUMPTION, as for the upload). Source: BPA-12.
+        D49, D58). JSON for the screen; CSV for the download, chosen with the Accept header (PO decision on plan Q3,
+        2 Nov 2026). Group `production-team` only (ASSUMPTION, as for the upload). Source: BPA-12.
       x-assumption: true
-      x-assumption-note: JSON only; group production-team
+      x-assumption-note: group production-team; CSV layout and file name
       responses:
         '200':
           description: The result
+          headers:
+            Content-Disposition:
+              description: CSV only, attachment; filename="<file name>-result.csv" (x-assumption)
+              schema:
+                type: string
+                example: attachment; filename="assign-01-result.csv"
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AssignmentFileResult'
+            text/csv:
+              schema:
+                type: string
+              example: |
+                rowNumber,workpackNumber,badgeNo,workerName,outcome,wpOutcome
+                2,WP-000457,E1021,Worker E1021,Assigned,
+                3,WP-000457,E1099,Worker E1099,Assigned,
+              x-assumption: true
+              x-assumption-note: |
+                Header row with the AssignmentFileRow field names in this order (the BPA-12 result columns); RFC 4180
+                quoting; UTF-8. When the file has a file-level outcome, the CSV holds one line, that outcome.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
