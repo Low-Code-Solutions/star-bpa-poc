@@ -52,3 +52,10 @@ The sources record no other option for the contract style or for the S21 tools.
 
 09 S2, S14, S19, S20, S21, S28, L12, §3, §4 item 4; 07 §10, §11 G5; 06 D44, D58;
 `intent/BPA-3-work-pack-assignment/spec.md`.
+
+## Notes
+
+- 2 Nov 2026 (BPA-45): Usama has left the project. The full draft of `api/openapi.yaml` (09 §4 item 4)
+  moves to Faraz under BPA-46, reviewed and merged by Ahsan; it also covers the S20 reference lists
+  (BPA-3 comment 10462). The decision is unchanged; the "Order and ownership" line above is the record
+  as written.

@@ -1,6 +1,6 @@
 # Spec: Work Pack Assignment (Epic 1, BPA-3)
 
-Status: Accepted (Faraz, Product Owner, 2 Nov 2026; BPA-3 comment 10462; recorded under BPA-45)
+Status: Accepted (Faraz, Product Owner, 2 Nov 2026; BPA-3 comment 10462) as at main 73c85a5; delivery order, OpenAPI row and open point then updated per that comment (BPA-45)
 Backfilled under BPA-33 (ADR 0015).
 Reads with: `intent.md` (this folder) and the BPA-3 epic in Jira.
 
@@ -38,7 +38,8 @@ Items still marked PROPOSED are delivery sequencing by Claude, not business rule
 2. Done: data model v0.5 approved (BPA-40) → full `V1__baseline_schema.sql` and
    `R__seed_reference_data.sql` (BPA-42; V1 amended by BPA-44).
 3. Done: BPA-25 Spike, the four Camunda 8.10.1 API checks (S15, L18).
-4. Done: walking skeleton (BPA-43): login, Flyway, model deploy, one worker, CI.
+4. Done: walking skeleton (BPA-43): login, Flyway, model deploy, one worker, CI. It applied the full V1,
+   not the `workpack` table only first planned (L5), because V1 was ready (REVIEW.md, BPA-43 review 1).
 5. Open: full `api/openapi.yaml` (S20, L12; 09 §4 item 4) under **BPA-46**, owner Faraz (PO decision
    2 Nov 2026). Done before BPA-26 planning starts.
 6. Superseded: the separate BPA-21 pilot (L7); BPA-14 is built in its normal turn (focus rule, 29 Oct).
@@ -60,7 +61,7 @@ to a contract's shape is recorded in the plan and, if it changes a decision, in 
 |---|---|---|---|
 | `V1__baseline_schema.sql` | Walking skeleton (`workpack` only), then regenerated in full from the approved data model (S17, L5) | none while V1 is unfrozen; regenerate from `docs/data-model.md` | Frozen from the first shared or showcase environment; after that each change is `V2__<change>.sql` in the story that needs it |
 | `R__seed_reference_data.sql` | Data-model work (S17; L8 sizes) | Stories that need an extra boundary row (PROPOSED) | Reference-data copies only; personas are written by the S22 startup job (L2) |
-| `api/openapi.yaml` | Skeleton paths by BPA-43; every S20 endpoint, including the reference lists (activities, drawings, materials, departments, workpacks/{n}/look-ahead), by BPA-46 (Faraz; PO decision 2 Nov 2026) | Each story implements its endpoints against the contract; a change to a path or schema is made in the story's PR and recorded in its plan | Error texts from the stories; unknown texts get `x-assumption: true` (L12) |
+| `api/openapi.yaml` | Skeleton paths by BPA-43; every S20 endpoint, including the reference lists (activities, drawings, materials, departments, workpacks/{n}/look-ahead), by BPA-46 (Faraz; PO decision 2 Nov 2026) | Each story implements its endpoints against the contract; a change to a path or schema is made in the story's PR and recorded in its plan (PROPOSED) | Error texts from the stories; unknown texts get `x-assumption: true` (L12) |
 | BPMN and DMN in `models/` | Repo-restructure work (copied with the 09 §4 item 2 fixes) | A story changes a model only if its acceptance criteria require it; the plan names the element IDs (PROPOSED) | Lint with `.bpmnlintrc`; Modeler review for structural changes (S13) |
 | `workpack.assignment_state` | Data model §8 transitions (D61) | Set by: BPA-10 (AwaitingFile), BPA-22 (Assigning, or AwaitingFile when all rows are rejected), BPA-15 (Assigned); a replacement upload sets Replacing and BPA-13 resets Assigned on both outcomes; read by BPA-12 | Not a process variable (L10); each worker element documents its transition |
 | Messages (`AssignmentFileReceived`, `AssignmentFileReplaced`, `DrawingRevised`) | BPA-12, BPA-13 and BPA-16 respectively | none | Message IDs and TTLs per G10/D70 and D62 |

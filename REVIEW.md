@@ -132,3 +132,14 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Open for Ahsan: `spec.md` row 69, `docs/`, ADR-0005 and closed plans still name `user_role_scope` (Jira's grep criterion has no docs exception);
   a Jira comment or docs item recording that the PO decision of 2 Nov overrides them is still to be made; test-first failing runs not shown;
   local compose run (7 logins, `/me`) not done; backend tests first run in CI.
+
+### BPA-45 at f9a4a37, 2 Nov 2026 (qa-reviewer)
+- Docs only: 0 High, 3 Medium (Important), 6 Low. Reviewer read BPA-45, BPA-46, BPA-3 comments 10462/10460 and BPA Sprint 2 in Jira.
+- Checks passed: no 09 row and no ADR Decision text changed; history (deciders, closed plans, data-model history) untouched; spec.md
+  delivery order matches comment 10462 and the Sprint 2 rank exactly; every "Done" readiness item verified in Jira and git.
+- Important (3), all fixed: ADR 0011 still named Usama as OpenAPI owner (dated Notes entry added); plan row for ADR 0015 did not match the
+  diff (plan corrected, note moved to a `## Notes` section); spec.md marked Accepted on text edited after the PO's acceptance and one
+  PROPOSED marker dropped (status now says "as at 73c85a5, then updated per comment 10462"; marker restored).
+- Low (6): fixed: 09 change log now names S20 owner column and L19; plan Status format per docs/04; skeleton line explains full V1;
+  ADR 0015 note moved out of Decision. Open for Faraz (plan Q1, Q2): owner of items waiting on Usama; BPA-46 not in a sprint.
+- Not verified by the reviewer: CI; `intent/generate-index.sh` rerun (author reran it).

@@ -1,7 +1,7 @@
 # Plan: BPA-45 Record PO acceptance of Epic 1 intent and spec, repo-master sign-off and team change
 Jira: BPA-45 (Task, epic BPA-3)
 Story last updated: 2026-11-02T18:53:30.269+0400
-Status: Approved (Faraz, Product Owner, 2 Nov 2026, in the Claude session that built it)
+Status: Approved (Faraz, 2 Nov 2026)
 Approver: Faraz (Product Owner and Architect); Ahsan (Build Lead) reviews and merges
 Branch: BPA-45-po-acceptance-team-change, from main 73c85a5
 
@@ -17,7 +17,8 @@ Branch: BPA-45-po-acceptance-team-change, from main 73c85a5
 |---|---|
 | `intent/BPA-3-work-pack-assignment/intent.md` | Status line → `Accepted (Faraz, Product Owner, 2 Nov 2026; BPA-3 comment 10462)` |
 | `intent/BPA-3-work-pack-assignment/spec.md` | Status line as above. Delivery order: "Before any story" items marked done with their keys; Sprint 1/2 lists replaced by the BPA Sprint 2 order (BPA-26 → 6 → 7 → 8 → 23 → 9 → 11 → 10, stretch 12 and 22; then 14 → 15 → 13 → 16) with BPA-46 first; BPA-21 pilot line marked superseded (focus rule 29 Oct). Shared contracts: `api/openapi.yaml` row → created in full by BPA-46 (Faraz), which also owns the reference-list endpoints; the PROPOSED per-story wording replaced. Open point → closed by the PO (task API first). |
-| `docs/adr/0015-delivery-artifact-chain.md` | "pending the Product Owner's sign-off" paragraph → signed off by Faraz 2 Nov 2026; interim exception recorded as ended (09, data model and 03 were copied in by BPA-35). Decision unchanged. |
+| `docs/adr/0015-delivery-artifact-chain.md` | New `## Notes` section at the end: PO sign-off (Faraz, 2 Nov 2026) and the interim exception ended (BPA-35 copied 09, data model and 03). The original "pending" paragraph is kept as the record; Decision unchanged. *(Departure after review: first drafted as a note inside Decision.)* |
+| `docs/adr/0011-api-contract-and-tooling.md` | *Added after review:* `## Notes` entry: §4 item 4 (OpenAPI draft) moves from Usama to Faraz under BPA-46; the "Order and ownership" line kept as the record. |
 | `CLAUDE.md` | Team: Usama removed (left the project, 2 Nov 2026); Ahsan and Faraz build. Reference: "Product Owner sign-off pending" → signed off 2 Nov 2026. |
 | `docs/00-context.md` | Team: Usama line removed; Ahsan builds with Claude Code; owner note dated. |
 | `docs/09-architecture-decisions.md` | One change-log entry: §4 item 4 (OpenAPI draft) moves from Usama to Faraz (BPA-46); Usama has left; repo-master sign-off; intent/spec accepted. No row edited. |
@@ -25,7 +26,7 @@ Branch: BPA-45-po-acceptance-team-change, from main 73c85a5
 | `REVIEW.md` | qa-reviewer pass for BPA-45 |
 | this plan | Status → Closed in the final commit |
 
-Not changed: ADR deciders and closed plans (history); `docs/data-model.md`; 03 and 04 (no Usama, no
+Not changed: ADR deciders, ADR 0010 and the BPA-25 spike README (finished work), and closed plans (history); `docs/data-model.md`; 03 and 04 (no Usama, no
 sign-off wording; checked by grep).
 
 ## Order of work
@@ -34,7 +35,7 @@ sign-off wording; checked by grep).
 3. Regenerate `intent/README.md`; grep for leftovers ("awaiting Product Owner", "sign-off pending",
    "Usama" outside history).
 4. Run the `qa-reviewer` subagent; fix findings; record the pass in REVIEW.md.
-5. Close the plan, push, open the PR for Ahsan; comment on BPA-45 and BPA-3 with the PR link and this
+5. Record the review in REVIEW.md and fix findings (done: see REVIEW.md, BPA-45). Close the plan, push, open the PR for Ahsan; comment on BPA-45 and BPA-3 with the PR link and this
    plan's commit SHA (text shown to Faraz first).
 
 ## Risks
@@ -48,11 +49,18 @@ sign-off wording; checked by grep).
 ## Proof
 - `git diff main --stat` shows only the files listed.
 - `intent/README.md` shows both epic files as Accepted.
-- Grep shows no "awaiting Product Owner acceptance" and no "sign-off pending" left in current docs.
+- Grep shows no "awaiting Product Owner acceptance" left; the only "sign-off pending" / "pending the
+  Product Owner's sign-off" wording left is ADR 0015's original paragraph, superseded by its Notes entry.
+- Grep shows Usama named as owner of open work only where a dated note now reassigns it (09 change log
+  covers S20 and L19; ADR 0011 Notes).
 - CI: plan check passes (this plan exists); lint and backend workflows unaffected (no code change).
 
 ## Questions
-None open.
+- Q1 (for Faraz): items recorded as waiting on Usama have no owner now: his Jira confirmation of the
+  data-model v0.5 approval (BPA-42/43 plans, comment 10423) and the Jira comments drafted for "Usama's
+  yes" in REVIEW.md (BPA-43 review 2). Waive, or name Ahsan? Not decided here; history not rewritten.
+- Q2 (for Faraz): BPA-46 must finish before BPA-26 planning (spec.md, BPA-46 Done-when) but is in no
+  sprint. Add it to BPA Sprint 2? Jira change, not made here.
 
 ## Human-gap log
 - Jira BPA-33 (the backfill that produced intent.md and spec.md) is still Backlog under BPA-27 (Done);

@@ -16,7 +16,7 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 ## BPA-3-work-pack-assignment
 
 - [intent.md](BPA-3-work-pack-assignment/intent.md): Accepted (Faraz, Product Owner, 2 Nov 2026; BPA-3 comment 10462; recorded under BPA-45)
-- [spec.md](BPA-3-work-pack-assignment/spec.md): Accepted (Faraz, Product Owner, 2 Nov 2026; BPA-3 comment 10462; recorded under BPA-45)
+- [spec.md](BPA-3-work-pack-assignment/spec.md): Accepted (Faraz, Product Owner, 2 Nov 2026; BPA-3 comment 10462) as at main 73c85a5; delivery order, OpenAPI row and open point then updated per that comment (BPA-45)
 
 | Plan | Summary | Status |
 |---|---|---|
@@ -30,5 +30,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-42](BPA-3-work-pack-assignment/plans/BPA-42.md) | Generate V1__baseline_schema.sql and R__seed_reference_data.sql from data model v0.5 | Closed (2026-10-29) |
 | [BPA-43](BPA-3-work-pack-assignment/plans/BPA-43.md) | Walking skeleton: Spring Boot backend, Flyway, model deploy, one worker, login and CI | Closed (2026-10-30) |
 | [BPA-44](BPA-3-work-pack-assignment/plans/BPA-44.md) | Remove department/project scope: 7 personas, access by group only | Closed (2026-11-02) |
-| [BPA-45](BPA-3-work-pack-assignment/plans/BPA-45.md) | Record PO acceptance of Epic 1 intent and spec, repo-master sign-off and team change | Approved (Faraz, Product Owner, 2 Nov 2026, in the Claude session that built it) |
+| [BPA-45](BPA-3-work-pack-assignment/plans/BPA-45.md) | Record PO acceptance of Epic 1 intent and spec, repo-master sign-off and team change | Approved (Faraz, 2 Nov 2026) |
 
