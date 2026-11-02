@@ -1,7 +1,7 @@
 # Plan: BPA-44 Remove department/project scope: 7 personas, access by group only
 Jira: BPA-44 (Task, epic BPA-3)
 Story last updated: 2026-11-02T13:07:09.943+0400
-Status: Approved (Ahsan, 2 Nov 2026)
+Status: Closed (2026-11-02)
 Approver: Ahsan (Build Lead)
 Branch: BPA-44-remove-scope, from main ecd4fbc
 
@@ -30,7 +30,7 @@ Branch: BPA-44-remove-scope, from main ecd4fbc
 No scope logic exists in `api`, `task`, `worker`, `domain` or `persistence`.
 
 ## Files that change
-personas.yaml, PersonaFile.java, PersonaSync.java, V1__baseline_schema.sql (or new V2, Q1), R__seed_reference_data.sql (comment), PersonaSyncTest.java, AuthApiTest.java, IdleSessionTest.java, Bpa25CamundaChecksTest.java, App.test.tsx, backend/README.md, frontend/README.md, this plan, REVIEW.md (qa-reviewer pass), regenerated intent index if the repo does that.
+personas.yaml, FlywayBaselineTest.java (table count 31 -> 30, found by qa-reviewer), PersonaFile.java, PersonaSync.java, V1__baseline_schema.sql (or new V2, Q1), R__seed_reference_data.sql (comment), PersonaSyncTest.java, AuthApiTest.java, IdleSessionTest.java, Bpa25CamundaChecksTest.java, App.test.tsx, backend/README.md, frontend/README.md, this plan, REVIEW.md (qa-reviewer pass), regenerated intent index if the repo does that.
 
 ## Order of work (test-first, ADR 0014)
 1. Branch exists. Commit this plan first.
@@ -70,3 +70,12 @@ Test output (backend `./mvnw verify` incl. integration tag, frontend `npm test`)
 ## Human-gap log
 - BPA-26 "merged task API code" not found in repo (see Readiness check).
 - Docker down -v needs your approval at run time.
+
+## Departures and as-built notes (2 Nov 2026)
+- `FlywayBaselineTest` was not in the plan: it asserted 31 tables; V1 now creates 30. Changed to 30 (qa-reviewer, Important).
+- `App.test.tsx`: the username now equals its group, so `/me` shows the text twice; the test checks the "Logged in as" line and the Groups list separately.
+- Q2 as built: `spec.md` row 69 and the closed plans still say `user_role_scope`; not edited. Ahsan to accept in the PR (Jira's grep criterion has no docs exception).
+- Test-first not demonstrable: this machine has no JDK/Maven and Docker was stopped, so backend tests were not run locally, and tests and code share one commit. Frontend tests ran (3/3). CI is the first backend run.
+- The local compose run (7 persona logins and `/me`, step 4) was not done for the same reason; Ahsan or CI must confirm it. `docker compose down -v` was not run.
+- BPA-26 task API code does not exist in the repo, so nothing to remove there.
+- Camunda keeps the old 9 users in its volume until `docker compose down -v`.

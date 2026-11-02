@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 
@@ -58,8 +58,9 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Password'), 'right');
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 
-    // BPA-44: the username equals its group ID, so /me shows it twice (as the user and as the group).
-    expect(await screen.findAllByText('time-method-analyst')).toHaveLength(2);
+    // BPA-44: the username equals its group ID, so check the user line and the group list separately.
+    expect((await screen.findByText(/Logged in as/)).textContent).toContain('time-method-analyst');
+    expect(within(screen.getByRole('list', { name: 'Groups' })).getByText('time-method-analyst')).toBeInTheDocument();
     const login = calls.find((c) => c.path === '/api/v1/auth/login');
     expect(login?.xsrf).toBe('token-123');
 

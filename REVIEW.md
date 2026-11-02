@@ -124,3 +124,11 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Not verified by the reviewer: full `./mvnw -B verify` (integration classes per the author's run), CI, React in a browser, test-first failing runs
   (tests and code in one commit, 70ccf24), the Camunda-outage path end to end, FEEL behaviour of the new output mappings when the variable is absent.
 
+### BPA-44 at b12f100, 2 Nov 2026 (qa-reviewer)
+- Code: 0 BLOCKER, 1 Important, 3 Nits. Reviewer read the code (no JDK, no Maven); no test was run.
+- Important (1): `FlywayBaselineTest` asserted 31 tables, V1 now has 30: fixed (30), plan updated.
+- Nits: `App.test.tsx` assertion relied on the username appearing twice: fixed (user line and Groups list checked separately). Left: long lines in
+  `AuthApiTest`/`Bpa25CamundaChecksTest` after the rename; `BPA43_personaSyncIsIdempotent` counts all `app_user` rows (fine while only the sync writes them).
+- Open for Ahsan: `spec.md` row 69, `docs/`, ADR-0005 and closed plans still name `user_role_scope` (Jira's grep criterion has no docs exception);
+  a Jira comment or docs item recording that the PO decision of 2 Nov overrides them is still to be made; test-first failing runs not shown;
+  local compose run (7 logins, `/me`) not done; backend tests first run in CI.
