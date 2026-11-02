@@ -66,7 +66,7 @@ to a contract's shape is recorded in the plan and, if it changes a decision, in 
 | Messages (`AssignmentFileReceived`, `AssignmentFileReplaced`, `DrawingRevised`) | BPA-12, BPA-13 and BPA-16 respectively | none | Message IDs and TTLs per G10/D70 and D62 |
 | Backend task API (`/api/v1/tasks…`) | BPA-26 (after BPA-25) | User-task stories BPA-6, 8, 9, 11, 23 use it | Per-task variable allow-list in config (S14) |
 | `audit_log` (D64) | In V1 | Written by every save worker | |
-| `personas.yaml` and the sync job | Walking skeleton (S22, L9) | Stories needing an extra persona (PROPOSED) | Only writer of Camunda users, groups and `user_role_scope` (L2) |
+| `personas.yaml` and the sync job | Walking skeleton (S22, L9) | Stories needing an extra persona (PROPOSED) | Only writer of Camunda users, groups and `app_user` (L2); seven personas, no scope (BPA-44) |
 
 ## Open points for this spec
 - Sprint 1 places BPA-6, 8, 9 and 23 before BPA-26 (task API). Whether those stories are first built

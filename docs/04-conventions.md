@@ -49,3 +49,10 @@ Project and Claude Code use identical names. All file paths below are from the r
 ## Tests
 - One test per Gherkin scenario, named after the story key and scenario,
   e.g. BPA14_validNearMissStartsIncidentProcess
+
+## Test users (personas)
+- Exactly seven, one per Camunda group, username equal to the group ID: time-method-analyst, project-engineer,
+  production-planner, production-team, ppc-team, supervisor, workpack-owner (PO decision 2 Nov 2026, BPA-44).
+- Stories, Gherkin and tests use these usernames. Do not invent extra users (such as U-11 or pe.139); a story that
+  genuinely needs a second user in one group raises it with the PO first.
+- No department or project scope: access is by group only.
