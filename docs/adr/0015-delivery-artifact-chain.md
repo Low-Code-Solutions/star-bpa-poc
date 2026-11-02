@@ -94,3 +94,10 @@ has no copy (09, data model) or an outdated one (03).
 09 L3 reserves 0001–0014 for the Epic 1 architecture ADRs (not yet written). Jira BPA-19 ("ADR 0001:
 Jira as source of truth") is Done but no file exists. To avoid a clash this ADR takes 0015, and the
 Jira-as-source-of-truth decision will be written as 0016. See `README.md`.
+
+## Notes
+
+- 2 Nov 2026 (BPA-45): the Product Owner (Faraz) signed off the repo as master for design artifacts
+  (BPA-3 comment 10462), closing the "pending the Product Owner's sign-off" condition in the Decision.
+  The interim exception has ended: BPA-35 copied 09, the data model and 03 into the repo. The decision
+  itself is unchanged.
