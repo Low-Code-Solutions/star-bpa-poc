@@ -65,8 +65,9 @@ Not chosen: HSE incidents, D365 to FMS batch orchestration, Transport requests, 
 - Faraz: Product Owner and Architect; approves stories as Ready and Done. Also supports Khitaba on
   business analysis and the dev team on build
 - Khitaba: Business Analyst and Scrum Master
-- Ahsan: Build Lead; repo, build architecture, test strategy, final pull-request approval
-- Usama: Lead Developer; builds stories with Claude Code alongside Ahsan, job workers and integrations, peer review
+- Ahsan: Build Lead; repo, build architecture, test strategy, builds stories with Claude Code, final
+  pull-request approval
+- Usama left the project on 2 Nov 2026; Ahsan and Faraz build (PO decision, BPA-3 comment 10462)
 
 ## Plan
 - Sprint 0 (1 week): setup, slice workshop, SOR matrix, first epic refined

@@ -76,6 +76,10 @@ CLAUDE.md records it as the working rule. Interim exception: 09, the data model 
 stay mastered in the Claude Project until the repo-restructure work copies them in, because the repo
 has no copy (09, data model) or an outdated one (03).
 
+*Sign-off note, 2 Nov 2026 (BPA-45):* the Product Owner (Faraz) signed off the repo as master for
+design artifacts (BPA-3 comment 10462). The interim exception has ended: BPA-35 copied 09, the data
+model and 03 into the repo. The decision above is unchanged.
+
 ## Consequences
 
 - The L1 layout gains `intent/`, `REVIEW.md` and `.claude/` (agents, hooks, settings).

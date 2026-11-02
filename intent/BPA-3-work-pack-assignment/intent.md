@@ -1,7 +1,7 @@
 # Intent: Work Pack Assignment (Epic 1, BPA-3)
 
 Author: Claude, from 00-context (ACTIVE, 28 Oct 2026) and the BPA-3 epic (v1.0, 28 Oct 2026).
-Status: Draft, awaiting Product Owner acceptance
+Status: Accepted (Faraz, Product Owner, 2 Nov 2026; BPA-3 comment 10462; recorded under BPA-45)
 Backfilled under BPA-33 (ADR 0015); the requirements themselves were agreed earlier in Jira and are
 not changed by this file.
 Source of truth: Jira BPA-3 and its stories for scope and acceptance criteria; this file states intent.

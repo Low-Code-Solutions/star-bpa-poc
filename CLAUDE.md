@@ -5,7 +5,8 @@ FMS and myPeople stay the systems of record (SOR); the POC automates the work be
 Codename "STAR" in all outputs. Synthetic data only. Never invent a business rule: mark it ASSUMPTION.
 
 **Team:** Faraz (Product Owner and Architect; also works as BA alongside Khitaba and as a developer),
-Khitaba (BA, Scrum Master), Ahsan (Build Lead; approves and merges PRs), Usama (Lead Developer).
+Khitaba (BA, Scrum Master), Ahsan (Build Lead; builds, approves and merges PRs). Usama left the
+project on 2 Nov 2026; Ahsan and Faraz build.
 Apply the rules for the role the person is working in: Faraz's BA and dev work follows the same
 branch, PR and write-back rules as everyone else's.
 
@@ -105,8 +106,8 @@ For each Gherkin scenario, first write a test named `BPA<n>_<camelCaseScenarioTi
 - Never merge a PR. Ahsan approves and merges.
 
 ## Reference
-The repo is the master copy of these and of all design artifacts (ADR 0015; Product Owner sign-off
-pending): change them only by pull request. SharePoint "Project knowledge" and the Claude Project
+The repo is the master copy of these and of all design artifacts (ADR 0015; signed off by the Product
+Owner 2 Nov 2026): change them only by pull request. SharePoint "Project knowledge" and the Claude Project
 hold copies refreshed after merge. Read on demand (not imported, to keep this context small):
 `docs/09-architecture-decisions.md` (LOCKED decisions; READ THIS FIRST applies) and
 `docs/data-model.md` (the single domain data model, 09 S16).
