@@ -15,9 +15,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 
 /**
- * S22 persona sync (ADR 0005, L2, L9; BPA-43 Q4, Q5). The only runtime writer of Camunda users and groups, {@code app_user} and
- * {@code user_role_scope}. Idempotent: existing groups, users and memberships are kept, missing permissions are added. It only adds:
- * removing a persona or one of its groups from {@code personas.yaml} needs a manual step in Camunda Admin (scope rows are pruned).
+ * S22 persona sync (ADR 0005, L2, L9; BPA-43 Q4, Q5; BPA-44). The only runtime writer of Camunda users and groups and of
+ * {@code app_user}. Access is by Camunda group only: there is no department or project scope. Idempotent: existing groups, users and
+ * memberships are kept, missing permissions are added. It only adds: removing a persona or one of its groups from
+ * {@code personas.yaml} needs a manual step in Camunda Admin.
  *
  * <p>Runs once the singletons exist and before the Camunda client starts (SmartLifecycle), so {@code bpa-service} exists and holds
  * its permissions before the app deploys the models and opens its job workers as that user.
@@ -78,7 +79,7 @@ public class PersonaSync implements SmartInitializingSingleton {
         for (PersonaFile.Persona persona : personas.users()) {
             syncCamundaUser(persona);
         }
-        transaction.executeWithoutResult(status -> personas.users().forEach(this::syncScope));
+        transaction.executeWithoutResult(status -> personas.users().forEach(this::syncAppUser));
         LOG.info("Persona sync done: {} personas, {} groups, {}", personas.users().size(), GROUPS.size(), SERVICE_USER);
     }
 
@@ -111,8 +112,8 @@ public class PersonaSync implements SmartInitializingSingleton {
         persona.groups().forEach(group -> camunda.addUserToGroup(group, persona.username()));
     }
 
-    /** Upserts app_user (never delete-and-insert: docs/data-model.md 5.10) and makes the user's scope rows match the file. */
-    private void syncScope(PersonaFile.Persona persona) {
+    /** Upserts app_user (never delete-and-insert: docs/data-model.md 5.10). */
+    private void syncAppUser(PersonaFile.Persona persona) {
         jdbc.update("""
                 INSERT INTO bpa.app_user (username, employee_ref, email, created_by, updated_by)
                 VALUES (?, ?, ?, 'persona-sync', 'persona-sync')
@@ -120,20 +121,6 @@ public class PersonaSync implements SmartInitializingSingleton {
                     SET employee_ref = EXCLUDED.employee_ref, email = EXCLUDED.email, updated_at = now(), updated_by = 'persona-sync'
                     WHERE (bpa.app_user.employee_ref, bpa.app_user.email) IS DISTINCT FROM (EXCLUDED.employee_ref, EXCLUDED.email)
                 """, persona.username(), persona.employeeRef(), persona.email());
-        for (PersonaFile.Scope scope : persona.scope()) {
-            jdbc.update("""
-                    INSERT INTO bpa.user_role_scope (username, group_id, department_ref, project_ref, created_by, updated_by)
-                    VALUES (?, ?, ?, ?, 'persona-sync', 'persona-sync')
-                    ON CONFLICT DO NOTHING
-                    """, persona.username(), scope.group(), scope.departmentRef(), scope.projectRef());
-        }
-        List<PersonaFile.Scope> listed = persona.scope();
-        jdbc.query("SELECT id, group_id, department_ref, project_ref FROM bpa.user_role_scope WHERE username = ?", rs -> {
-            var row = new PersonaFile.Scope(rs.getString("group_id"), rs.getString("department_ref"), rs.getString("project_ref"));
-            if (!listed.contains(row)) {
-                jdbc.update("DELETE FROM bpa.user_role_scope WHERE id = ?", rs.getObject("id"));
-            }
-        }, persona.username());
     }
 
     private static String required(String value, String name) {

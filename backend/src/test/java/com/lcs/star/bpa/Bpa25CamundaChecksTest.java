@@ -44,7 +44,7 @@ class Bpa25CamundaChecksTest {
         String servicePassword = new CamundaIdentityClient(url).verify("bpa-service", PersonaSyncTest.SERVICE_PASSWORD).isPresent()
                 ? PersonaSyncTest.SERVICE_PASSWORD : PersonaSyncTest.EXISTING_SERVICE_PASSWORD;
         service = new CamundaRest(url, "bpa-service", servicePassword);
-        tma = new CamundaRest(url, "tma-1", PersonaSyncTest.DEMO_PASSWORD);
+        tma = new CamundaRest(url, "time-method-analyst", PersonaSyncTest.DEMO_PASSWORD);
 
         Reply deployed = service.deploy(
                 new ClassPathResource("bpmn/Process_PPC_WorkPackAssignment.bpmn"),
@@ -71,17 +71,17 @@ class Bpa25CamundaChecksTest {
     void BPA25_check2UserAssignsThemselvesAndCompletes() {
         // As in the BPA-25 kit: the persona gets only what acting for themselves needs (the sync grants personas nothing).
         var adminClient = new CamundaAdminClient(IntegrationCamunda.restUrl(), IntegrationCamunda.ADMIN, IntegrationCamunda.ADMIN_PASSWORD);
-        if (adminClient.authorizations("tma-1").stream().noneMatch(a -> PROCESS.equals(a.resourceId()))) {
-            adminClient.createAuthorization("tma-1", "PROCESS_DEFINITION", PROCESS, Set.of("READ_USER_TASK", "UPDATE_USER_TASK", "COMPLETE_USER_TASK"));
+        if (adminClient.authorizations("time-method-analyst").stream().noneMatch(a -> PROCESS.equals(a.resourceId()))) {
+            adminClient.createAuthorization("time-method-analyst", "PROCESS_DEFINITION", PROCESS, Set.of("READ_USER_TASK", "UPDATE_USER_TASK", "COMPLETE_USER_TASK"));
         }
         String task = createWorkPackTask(startInstance());
 
-        assertThat(tma.post("/v2/user-tasks/" + task + "/assignment", Map.of("assignee", "tma-1", "allowOverride", true)).status()).isEqualTo(204);
+        assertThat(tma.post("/v2/user-tasks/" + task + "/assignment", Map.of("assignee", "time-method-analyst", "allowOverride", true)).status()).isEqualTo(204);
         assertThat(tma.post("/v2/user-tasks/" + task + "/completion", Map.of("variables", Map.of())).status()).isEqualTo(204);
 
         Reply read = admin.pollGet("/v2/user-tasks/" + task, r -> "COMPLETED".equals(r.body().path("state").asText()));
         assertThat(read.body().path("state").asText()).isEqualTo("COMPLETED");
-        assertThat(read.body().path("assignee").asText()).isEqualTo("tma-1");
+        assertThat(read.body().path("assignee").asText()).isEqualTo("time-method-analyst");
     }
 
     @Test
@@ -93,7 +93,7 @@ class Bpa25CamundaChecksTest {
         assertThat(me.status()).isEqualTo(200);
         assertThat(texts(me.body().path("groups"))).contains("time-method-analyst");
 
-        assertThat(new CamundaRest(IntegrationCamunda.restUrl(), "tma-1", "not-the-password").get("/v2/authentication/me").status()).isEqualTo(401);
+        assertThat(new CamundaRest(IntegrationCamunda.restUrl(), "time-method-analyst", "not-the-password").get("/v2/authentication/me").status()).isEqualTo(401);
         assertThat(service.get("/v2/authentication/me").status()).isEqualTo(200);
     }
 
@@ -127,7 +127,7 @@ class Bpa25CamundaChecksTest {
 
         completeOnBehalf(task);
         Reply read = admin.pollGet("/v2/user-tasks/" + task, r -> "COMPLETED".equals(r.body().path("state").asText()));
-        assertThat(read.body().path("assignee").asText()).isEqualTo("tma-1");
+        assertThat(read.body().path("assignee").asText()).isEqualTo("time-method-analyst");
 
         String job = activateSaveWorkPackJob(instance);
         assertThat(service.post("/v2/jobs/" + job + "/completion", Map.of("variables", Map.of())).status()).isEqualTo(204);
@@ -153,7 +153,7 @@ class Bpa25CamundaChecksTest {
 
     /** S14: bpa-service assigns the task to the real user, then completes it. */
     private static void completeOnBehalf(String task) {
-        assertThat(service.post("/v2/user-tasks/" + task + "/assignment", Map.of("assignee", "tma-1", "allowOverride", true)).status()).isEqualTo(204);
+        assertThat(service.post("/v2/user-tasks/" + task + "/assignment", Map.of("assignee", "time-method-analyst", "allowOverride", true)).status()).isEqualTo(204);
         assertThat(service.post("/v2/user-tasks/" + task + "/completion", Map.of("variables", Map.of())).status()).isEqualTo(204);
     }
 

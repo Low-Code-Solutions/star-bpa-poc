@@ -34,7 +34,7 @@ class FlywayBaselineTest {
                 "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
                         + "WHERE n.nspname = 'bpa' AND c.relkind = 'r' AND c.relname <> 'flyway_schema_history'",
                 Integer.class);
-        assertThat(tables).isEqualTo(31);
+        assertThat(tables).isEqualTo(30);
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.worker", Integer.class)).isEqualTo(12);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.department", Integer.class)).isEqualTo(3);

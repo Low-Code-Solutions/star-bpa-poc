@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from './App';
 
@@ -24,7 +24,7 @@ function fakeBackend() {
       if (username === 'camunda-down') {
         return json(503, { status: 503, detail: 'Login is not available right now; try again later' }, 'application/problem+json');
       }
-      if (username === 'tma-1' && password === 'right') {
+      if (username === 'time-method-analyst' && password === 'right') {
         session = { username, groups: ['time-method-analyst'] };
         return json(200, session);
       }
@@ -54,12 +54,13 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.type(await screen.findByLabelText('Username'), 'tma-1');
+    await user.type(await screen.findByLabelText('Username'), 'time-method-analyst');
     await user.type(screen.getByLabelText('Password'), 'right');
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 
-    expect(await screen.findByText('tma-1')).toBeInTheDocument();
-    expect(screen.getByText('time-method-analyst')).toBeInTheDocument();
+    // BPA-44: the username equals its group ID, so check the user line and the group list separately.
+    expect((await screen.findByText(/Logged in as/)).textContent).toContain('time-method-analyst');
+    expect(within(screen.getByRole('list', { name: 'Groups' })).getByText('time-method-analyst')).toBeInTheDocument();
     const login = calls.find((c) => c.path === '/api/v1/auth/login');
     expect(login?.xsrf).toBe('token-123');
 
@@ -75,7 +76,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.type(await screen.findByLabelText('Username'), 'tma-1');
+    await user.type(await screen.findByLabelText('Username'), 'time-method-analyst');
     await user.type(screen.getByLabelText('Password'), 'wrong');
     await user.click(screen.getByRole('button', { name: 'Log in' }));
 

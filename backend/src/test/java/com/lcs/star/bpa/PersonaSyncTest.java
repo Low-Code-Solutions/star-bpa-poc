@@ -19,7 +19,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** BPA-43 Part B: the S22 persona sync against the integration Camunda (ADR 0005, L2, L9; Q4, Q5). */
+/** BPA-43 Part B: the S22 persona sync against the integration Camunda (ADR 0005, L2, L9; Q4, Q5); BPA-44: seven personas, no scope. */
 @Tag("integration")
 @TestMethodOrder(OrderAnnotation.class)
 class PersonaSyncTest {
@@ -60,47 +60,42 @@ class PersonaSyncTest {
         sync().sync();
 
         assertThat(identity.verify("bpa-service", existingPassword)).as("existing password kept").isPresent();
-        assertThat(identity.verify("tma-1", DEMO_PASSWORD)).as("the sync still ran to the end").isPresent();
+        assertThat(identity.verify("time-method-analyst", DEMO_PASSWORD)).as("the sync still ran to the end").isPresent();
         assertThat(permissionsOf("bpa-service")).containsAllEntriesOf(expectedServicePermissions());
     }
 
     @Test
     @Order(2)
-    void BPA43_personaSyncCreatesUsersGroupsAndScopeRows() {
+    void BPA44_personaSyncCreatesSevenPersonasInTheirGroups() {
         sync().sync();
 
-        assertThat(personas.users()).hasSize(9);
+        // PO decision 2 Nov 2026: seven personas, username == Camunda group ID, access by group only (BPA-44).
+        List<String> groupIds = List.of("time-method-analyst", "project-engineer", "production-planner", "production-team", "ppc-team",
+                "supervisor", "workpack-owner");
+        assertThat(personas.users()).extracting(PersonaFile.Persona::username).containsExactlyInAnyOrderElementsOf(groupIds);
         for (PersonaFile.Persona persona : personas.users()) {
             var user = identity.verify(persona.username(), DEMO_PASSWORD);
             assertThat(user).as(persona.username() + " logs in with DEMO_PASSWORD").isPresent();
-            assertThat(user.get().groups()).as(persona.username() + " groups").containsExactlyInAnyOrderElementsOf(persona.groups());
+            assertThat(user.get().groups()).as(persona.username() + " groups").containsExactly(persona.username());
         }
-        Set<String> groups = personas.users().stream().flatMap(p -> p.groups().stream()).collect(Collectors.toSet());
-        assertThat(groups).containsExactlyInAnyOrder("time-method-analyst", "project-engineer", "production-planner",
-                "workpack-owner", "ppc-team", "supervisor", "production-team");
 
         assertThat(jdbc.queryForList("SELECT username FROM bpa.app_user ORDER BY username", String.class))
-                .containsExactly("pe-1", "planner-1", "ppc-1", "pt-1", "pt-2", "supervisor-1", "tma-1", "tma-2", "wpo-1");
-        assertThat(scopeRows()).containsExactlyInAnyOrder(
-                "pe-1|project-engineer||PRJ-139",
-                "wpo-1|workpack-owner|Fabrication|",
-                "pt-1|production-team|Fabrication|",
-                "pt-2|production-team|Painting|");
+                .containsExactlyElementsOf(groupIds.stream().sorted().toList());
+        assertThat(jdbc.queryForList("SELECT table_name FROM information_schema.tables WHERE table_schema = 'bpa' AND table_name LIKE '%scope%'",
+                String.class)).as("no scope table").isEmpty();
     }
 
     @Test
     @Order(3)
     void BPA43_personaSyncIsIdempotent() {
         sync().sync();
-        List<String> scopeBefore = scopeRows();
         Map<String, Set<String>> permissionsBefore = permissionsOf("bpa-service");
         int authorizationsBefore = admin.authorizations("bpa-service").size();
 
         sync().sync();
         sync().sync();
 
-        assertThat(scopeRows()).containsExactlyInAnyOrderElementsOf(scopeBefore);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.app_user", Integer.class)).isEqualTo(9);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.app_user", Integer.class)).isEqualTo(7);
         assertThat(admin.authorizations("bpa-service")).hasSize(authorizationsBefore);
         assertThat(permissionsOf("bpa-service")).isEqualTo(permissionsBefore);
     }
@@ -125,10 +120,5 @@ class PersonaSyncTest {
         return admin.authorizations(owner).stream().collect(Collectors.toMap(
                 a -> a.resourceType() + ":" + a.resourceId(), CamundaAdminClient.Authorization::permissionTypes,
                 (a, b) -> { throw new IllegalStateException("two authorizations for one resource: " + a + ", " + b); }));
-    }
-
-    private static List<String> scopeRows() {
-        return jdbc.queryForList("SELECT concat_ws('|', username, group_id, coalesce(department_ref, ''), coalesce(project_ref, '')) "
-                + "FROM bpa.user_role_scope", String.class);
     }
 }

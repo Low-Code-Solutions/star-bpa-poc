@@ -29,4 +29,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-40](BPA-3-work-pack-assignment/plans/BPA-40.md) | Data model v0.5: approval fixes | Closed (2026-10-29) |
 | [BPA-42](BPA-3-work-pack-assignment/plans/BPA-42.md) | Generate V1__baseline_schema.sql and R__seed_reference_data.sql from data model v0.5 | Closed (2026-10-29) |
 | [BPA-43](BPA-3-work-pack-assignment/plans/BPA-43.md) | Walking skeleton: Spring Boot backend, Flyway, model deploy, one worker, login and CI | Closed (2026-10-30) |
+| [BPA-44](BPA-3-work-pack-assignment/plans/BPA-44.md) | Remove department/project scope: 7 personas, access by group only | Closed (2026-11-02) |
 

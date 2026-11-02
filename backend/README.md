@@ -23,9 +23,9 @@ in the top-level `models/` folder deploy to Camunda.
 
 ## Login and personas (ADR 0005)
 - With profile `local` or `showcase` (compose sets `local`), the S22 persona sync runs at start-up as the Camunda admin
-  (`CAMUNDA_ADMIN_*`): it creates the seven S6 groups, the 9 users in `src/main/resources/personas.yaml` (password
-  `DEMO_PASSWORD`) and `bpa-service` (password `BPA_SERVICE_PASSWORD`, kept if the user exists), and writes `app_user` and
-  `user_role_scope`. The app then deploys the models and runs its workers as `bpa-service`.
+  (`CAMUNDA_ADMIN_*`): it creates the seven S6 groups, the 7 users in `src/main/resources/personas.yaml` (password
+  `DEMO_PASSWORD`) and `bpa-service` (password `BPA_SERVICE_PASSWORD`, kept if the user exists), and writes `app_user`.
+  The app then deploys the models and runs its workers as `bpa-service`. Access is by Camunda group only (no department or project scope, BPA-44). After pulling BPA-44, reset local data once with `docker compose down -v` so the old users and the changed V1 do not linger.
 - API contract: `api/openapi.yaml` (S20). The Spring interfaces are generated at build time into
   `target/generated-sources/openapi` (S21); controllers in `com.lcs.star.bpa.api` implement them.
 - Tests tagged `integration` (`PersonaSyncTest`, `Bpa25CamundaChecksTest`) start their own Camunda 8.10.1 configured like compose.

@@ -7,7 +7,7 @@
 --     whole row (every non-key column is part of the match, so there is nothing for an UPDATE to change);
 --   * nothing is deleted; drawing_revision rows written at runtime from DrawingRevised events are never touched
 --     (only the (drawing_ref, revision) pairs below are written).
--- Not seeded here: app_user, user_role_scope (S22 job, L2), Work Pack, assignment, hours, notification and audit
+-- Not seeded here: app_user (S22 job, L2), Work Pack, assignment, hours, notification and audit
 -- tables, scenario data (A6, A7, B7). Named rows come from data model section 11.
 
 -- -----------------------------------------------------------------------------------------------------
