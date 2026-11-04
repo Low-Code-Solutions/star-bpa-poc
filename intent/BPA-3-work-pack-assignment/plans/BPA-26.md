@@ -130,6 +130,10 @@ All error bodies asserted as `application/problem+json` with the exact `detail`.
   Operate's screen shows the assignee or the actor is the open part (screenshot pending). This contradicts "Operate shows
   project-engineer as the user who completed the task" if Operate shows the actor. Reported for the PO, not worked round:
   the backend cannot call Camunda as the user, because it does not keep the password (S5).
+  **Operate screenshot (Ahsan, 4 Nov):** the Sign off release element's Details tab shows `Assignee: project-engineer`
+  (Candidate Groups: project-engineer) and has no "completed by" field. Its Operations Log tab is the audit log, which
+  names `bpa-service` (API above). Proposal for the PO: the AC is met through the assignee; the audit-log actor stays
+  `bpa-service`, and D63's own "done by" columns hold the real user.
 - Q2 (Khitaba). Read allow-lists, the 404/403/409/400 order, and 404 for non-Epic-1 tasks are ASSUMPTIONs; listed for the comment.
 - Q3. Spec.md names BPA-8 among the task-API users; Jira (comment 10376) lists BPA-6, 9, 11, 23. BPA-8's Confirm task
   is served either way; reported, no change.
