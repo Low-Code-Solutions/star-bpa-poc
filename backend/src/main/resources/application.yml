@@ -65,3 +65,7 @@ bpa:
       "[UserTask_ScheduleWorkPack]": # production-planner (G9), BPA-11
         write: [plannedStartDate, plannedEndDate]
         read: [plannedStartDate, plannedEndDate]
+
+# S9, ADR 0013: business dates (D20 "no past date", ...) are read in this zone; instants stay UTC.
+app:
+  business-zone: Asia/Riyadh

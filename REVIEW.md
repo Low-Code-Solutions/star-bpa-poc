@@ -189,3 +189,36 @@ Newest last. One entry per review; the full report goes in the PR description.
   tests pass, `./mvnw -B verify` 38 tests green.
 - Not verified by the reviewer: test runs, failing-first output (tests and code in one commit, 79e617e; the run is in the plan's
   Human-gap log and the PR), CI.
+
+### BPA-6 at 498a708, 4 Nov 2026 (qa-reviewer)
+- Code: 0 High, 6 Medium (Important), 14 Low. Reviewer read BPA-6 in Jira (evidence; comments 10378, 10465), the plan, spec.md,
+  the contract's workpacks/reference/task schemas, data model §1.2, §1.5, §3.1-3.7, §4.1-4.3, §6.1, the BPMN create path, the form
+  spec, 09 S7/S9/S14/S20 and ADR 0006/0007/0013; no test was run by the reviewer (author: 10/11 backend red for the expected reason,
+  React import red; then 11/11 BPA6, `./mvnw -B verify` 49, `npm test` 9/9, build clean).
+- Checks passed: all 14 AC texts exact in the validator, React field texts the same; D14/D16/D20/D74 rules; find-then-ON CONFLICT
+  idempotency; created_by/updated_by/audit username from server-set completedBy (client copy rejected 400); audit_log per business
+  column, §6.1 value format, changed_at timestamptz UTC; Double/Integer man hours parsed exactly; reference lists absent-not-null,
+  budgetedUnits a number; POST workpacks group-gated with CSRF; corrections jobs failed retries 0 as decided.
+- Important (6):
+  - Worker validated before the idempotency check, so a retry after a committed save could loop back and drop the next input;
+    the rerun test bypassed the worker: fixed (the worker returns the saved Work Pack before any check; BPA6_rerunDoesNotCreateSecondWorkPack
+    now runs the job twice through the worker, the retry with other data after Riyadh midnight).
+  - Business zone hard-coded: fixed (`app.business-zone`, default Asia/Riyadh, injected; S9, ADR 0013).
+  - After a rejected save the portal never showed the returned task without a reload and dropped the entered data: fixed (the task
+    list watches for the returned task and reopens it; the screen prefills from the task's variables; new React test in TaskList.test.tsx).
+  - The Riyadh boundary rows passed with a UTC implementation: fixed (row added in both tests: 20 Oct rejected at 20 Oct 21:30 UTC;
+    React also asserts the date picker's `min`); to be proposed to Jira as an extra Examples row.
+  - ASSUMPTIONs not commented in Jira: comment drafted for the developer's yes (plan Q4, Q5, completedBy).
+  - Contract still documented the 501 stub: fixed (501 response and sentence removed; `completedBy` documented in CompleteTaskRequest).
+- Low (14), fixed: vacuous otherRoles task-list check (an analyst's Create task is now open first); `contains` replaced by exact
+  message lists; double message on an unreadable date; tests added for the corrections incident, a client-sent completedBy (400) and
+  the audit rows; created_at/updated_at now from the injected clock; React decimal check catches "1e-3"; TaskList now tested.
+  Left: stale material phase after a phase row changes (the save step rejects it); Camunda 4xx on start gives 500; completedBy not in
+  ADR 0004 (contract updated; ADR note left for Ahsan); leftover instances in the shared test Camunda (classes assert on their own
+  keys); 12cc690 red on its own (AuthApiTest fixed in 498a708); form spec key dateToComplete (contract wins); plan Story last updated
+  bumped (status change only).
+- Tests strengthened after review (said here and in the PR, L15): BPA6_rerunDoesNotCreateSecondWorkPack, BPA6_otherRolesCannotCreateWorkPack,
+  BPA6_dateToCompleteBoundary (backend and React), exact message lists in the rejection tests. After the fixes: `./mvnw -B verify` 52 tests
+  (WorkPackApiTest 14), `npm test` 10/10, `npm run build` clean.
+- Not verified by the reviewer: test runs, failing-first output (tests and code in one commit, 12cc690), CI, SDK default backoff
+  vs S7, test order across integration classes, React in a browser.
