@@ -1,8 +1,8 @@
 # Plan: BPA-7 PPC Team can track a Work Pack's estimated man hours in a Project Hour Journal Header
 Jira: BPA-7 (Story, epic BPA-3)
 Story last updated: 2026-11-02T16:13:09.864+0400
-Status: Approved (Ahsan, Build Lead, 4 Nov 2026, in the Claude Code session)
-Approver: Ahsan (Build Lead)
+Status: Closed (2026-11-04)
+Approver: Ahsan (Build Lead), approved 4 Nov 2026 in the Claude Code session
 Branch: BPA-7-hour-journal-header, from main 0a6a144
 
 

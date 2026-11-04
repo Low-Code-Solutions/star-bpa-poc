@@ -35,4 +35,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-46](BPA-3-work-pack-assignment/plans/BPA-46.md) | Draft the full api/openapi.yaml contract (09 S20, §4 item 4) | Closed (2026-11-04) |
 | [BPA-47](BPA-3-work-pack-assignment/plans/BPA-47.md) | Set the React portal structure and add project skills for task screens and job workers | Closed (2026-11-04) |
 | [BPA-6](BPA-3-work-pack-assignment/plans/BPA-6.md) | Time & Method Analyst can create a Work Pack with estimates | Closed (2026-11-04) |
+| [BPA-7](BPA-3-work-pack-assignment/plans/BPA-7.md) | PPC Team can track a Work Pack's estimated man hours in a Project Hour Journal Header | Closed (2026-11-04) |
 
