@@ -1,0 +1,163 @@
+# Plan: BPA-26 Portal user can get, view and complete their tasks through the backend task API
+Jira: BPA-26 (Story, epic BPA-3)
+Story last updated: 2026-11-02T16:20:42.128+0400 (Jira `updated`; per the changelog a Rank change, content last changed 2026-11-02T13:04:54; 2026-11-04T12:24 is the Ready → In Progress move only)
+Status: Closed (2026-11-04)
+Approver: Ahsan (Build Lead), approved 4 Nov 2026 in the Claude Code session; Faraz (Product Owner and Architect) for the questions below
+Branch: BPA-26-task-api, from main 83cf6ca
+
+
+## Context
+React must never use Camunda Tasklist (09 S2, S14). BPA-26 builds the backend task API that every Epic 1
+user-task story (BPA-6, 9, 11, 23, and the Confirm task for BPA-8) completes its task through: list my tasks,
+open one, complete it. Access is by Camunda group only (BPA-44). The backend calls Camunda as `bpa-service`
+(S25), assigns the task to the session user and then completes it, so Camunda records the real user.
+It is first in the Sprint 2 delivery order (spec.md), against the merged contract (`api/openapi.yaml`, BPA-46:
+`listTasks`, `getTask`, `completeTask`) and the REST calls BPA-25 proved on 8.10.1.
+
+## Readiness check
+| DoR item | State |
+|---|---|
+| Template, persona, outcome | Met |
+| Gherkin, testable, unhappy paths | Met: 7 scenarios (4 unhappy) |
+| BPMN IDs exist | Met: the four user tasks exist in `models/bpmn/Process_PPC_WorkPackAssignment.bpmn` with the G9 candidate groups |
+| SOR per field | Met (Camunda for task data; allow-list is config) |
+| DMN | None needed |
+| No blocking question | Met: BPA-25 Done. Q1 below is not blocking but changes one assertion |
+| ≤ 8 points | 5; Jira says "Ahsan to confirm" (Q4) |
+| intent.md / spec.md accepted | Met (Faraz, 2 Nov 2026) |
+| PO approved | Met (Faraz, 2 Nov 2026); status Ready |
+
+No plan existed, so there is nothing to compare against Jira `updated`.
+
+## Design (what the code does)
+`bpa-service` REST calls, exactly those BPA-25 proved (results.md, comment 10420), via a RestClient adapter like
+`CamundaIdentityClient` (not the Java `CamundaClient` bean: `AuthApiTest` runs with `camunda.client.enabled=false`
+and must keep starting):
+
+| API | Camunda calls |
+|---|---|
+| GET /api/v1/tasks | `POST /v2/user-tasks/search` filter `state=CREATED`, `processDefinitionId=Process_PPC_WorkPackAssignment`, `candidateGroup` per session group; drop elementIds not in config; read `workpackNumber` per task via variables search |
+| GET /api/v1/tasks/{key} | `GET /v2/user-tasks/{key}` (404 → "Task not found") → group check (403) → `POST /v2/user-tasks/{key}/variables/search` → `variables` = read allow-list only; `validationMessages` ([] when absent), `confirmMessage`, `workpackNumber` as their own fields |
+| POST …/{key}/complete | get task (404) → group (403) → state COMPLETED (409) → every variable name on the write allow-list (400 "Variable X is not allowed for this task") → `POST /assignment {assignee: <session user>, allowOverride: true}` → `POST /completion {variables}` → 204 |
+
+Check order 404 → 403 → 409 → 400 is an ASSUMPTION (no source orders them). Camunda unreachable → 503
+`EngineUnavailable` text from the contract. A task outside the configured four elementIds answers 404 (ASSUMPTION).
+No validity conditions are added here (none in BPA-26; BPA-9's "Reason is required" is the first, built by BPA-9).
+
+Allow-list in `application.yml` (as built: `bpa.tasks.process-id` plus `bpa.tasks.allow-lists."[<elementId>]".read` /
+`.write`; the brackets keep the element ID as written), bound to a `@ConfigurationProperties` record.
+Write lists from the `CompleteTaskRequest` description in the contract:
+- CreateWorkPack: activityRef, drawingRef, departmentRef, completionDate, phases, materials
+- ConfirmWorkPack: same (material line `id` sits inside `materials`)
+- SignOffRelease: signOffDecision, declineReason
+- ScheduleWorkPack: plannedStartDate, plannedEndDate
+
+Read lists = the write list of the task (prefill). ASSUMPTION: no source names the read list.
+
+## Files that change
+- `backend/src/main/java/com/lcs/star/bpa/adapter/CamundaTaskClient.java` (new): the five REST calls BPA-25 proved; maps 404, 409
+  and connection errors to small exceptions; parses variable values (JSON strings). As built after review: no
+  `GET /v2/variables/{key}` (`bpa-service` gets 403 on it, checked on the local stack 4 Nov); the variable search asks
+  for `truncateValues=false` instead (200, checked the same day). A Camunda 400 on reading a task (key above int64) is
+  treated as not found; searches log a warning when Camunda holds more than one page of 100.
+- `backend/src/main/resources/application.yml` also sets `spring.jackson.default-property-inclusion: non_null`
+  (as built after review): the contract leaves optional fields out instead of sending null.
+- `backend/src/main/java/com/lcs/star/bpa/task/TaskService.java` (new): the checks and assign-then-complete.
+- `backend/src/main/java/com/lcs/star/bpa/task/TaskAllowList.java` (new): config record.
+- `backend/src/main/java/com/lcs/star/bpa/task/TaskConfig.java` (new, as built): bean wiring for the client and service
+  (split out of TaskAllowList so the record stays a plain properties binding).
+- `backend/src/main/java/com/lcs/star/bpa/api/TaskController.java` (new): implements generated `TasksApi`; session
+  user and groups from the `SecurityContext` as `MeController` does.
+- `backend/src/main/resources/application.yml`: `bpa.tasks` allow-lists.
+- `backend/src/test/java/com/lcs/star/bpa/TaskApiTest.java` (new): the seven scenario tests.
+- `backend/src/test/java/com/lcs/star/bpa/api/TestBrowser.java`: made `public` so the new test can reuse it.
+- `api/openapi.yaml`: no change expected. Any change found necessary is made in this PR and recorded here (spec.md rule).
+- `REVIEW.md`: the qa-reviewer pass.
+
+No BPMN, DMN, migration or React change.
+
+## Order of work
+1. Ask before moving BPA-26 Ready → In Progress. Commit this plan (Approved) as the first commit.
+2. Write `TaskApiTest` (all 7 tests), `@Tag("integration")`, using `IntegrationCamunda`, `CamundaRest` and the
+   persona sync exactly as `Bpa25CamundaChecksTest` does; the app is a `@SpringBootTest(RANDOM_PORT)` with
+   `camunda.client.enabled=false` and `bpa.camunda.rest-url` / `bpa-service` password pointed at the integration Camunda.
+   Background: the admin deploys the models and starts `Process_PPC_WorkPackAssignment` with `startInstructions` at
+   `UserTask_SignOffRelease` (variable `workpackNumber=WP-000457`; the Background's project PRJ-139 is not set: no source names that variable and the task API never reads it) and at
+   `UserTask_ConfirmWorkPack` (`WP-000460`), then polls until the tasks are searchable. Login through `TestBrowser`
+   with the real `CamundaIdentityClient`.
+3. Run them; show each fails for the expected reason (404 from the missing controller), output kept for the PR.
+4. Build adapter → allow-list config → service → controller, re-running the tests until green.
+5. `./mvnw -B verify` (all backend tests, enforcer, generator), Redocly lint unchanged.
+6. End to end on the local stack (Proof). Update this plan where the build departed from it.
+7. qa-reviewer → REVIEW.md → fixes → plan `Closed` → PR → Jira comment (PR link, plan path, plan SHA); ask before In Review.
+
+## Scenario-to-test table
+| Scenario | Test | Key assertion |
+|---|---|---|
+| The task list shows only my tasks | BPA26_listsOnlyMyTasks | project-engineer's list holds the WP-000457 sign-off key, not the WP-000460 Confirm key |
+| I can open one of my tasks | BPA26_getsOneTask | 200; name "Sign off release", workpackNumber WP-000457, `variables` object present |
+| Completing a task records the real user | BPA26_completeRecordsRealUser | 204; Camunda task (read as admin, polled) is COMPLETED with assignee project-engineer. Operate: see Q1 |
+| Wrong group is forbidden (outline, 1 row) | BPA26_wrongGroupIsForbidden | time-method-analyst gets 403 "You are not allowed to work on this task"; task still CREATED |
+| Variable not on the allow-list | BPA26_variableNotAllowedIsRejected | 400 "Variable workpackStatus is not allowed for this task"; task still CREATED |
+| Unknown task | BPA26_unknownTaskIsNotFound | GET /api/v1/tasks/9999999999 → 404 "Task not found" |
+| Completed task cannot be completed again | BPA26_completedTaskCannotBeCompletedAgain | second complete → 409 "Task is already completed" |
+
+All error bodies asserted as `application/problem+json` with the exact `detail`.
+
+## Risks
+- **Eventual consistency** (BPA-25): searches and `GET /v2/user-tasks/{key}` read secondary storage. Right after a
+  completion the task can still read CREATED, so the 409 also has to come from the engine's rejection of the assign
+  or complete. The status Camunda returns for that (404 or 409) is unknown; I confirm it in step 3–4 and record it.
+  **Found 4 Nov:** it happens (BPA26_completedTaskCannotBeCompletedAgain). The second assign is rejected with
+  `404 NOT_FOUND` "Command 'ASSIGN' rejected with code 'NOT_FOUND': Expected to assign user task with key …, but no
+  such user task was found". The adapter treats 404 and 409 on assign/complete as "task gone", and the API answers 409.
+  Tests poll for setup; the portal may list a just-completed task for about a second (React concern, noted for BPA-6).
+- **Completer in Operate** not confirmed by BPA-25 (2, 5b): see Q1.
+- **N+1 reads** for `workpackNumber` in the list: one variables search per task. Fine at POC sizes.
+- **Shared integration Camunda** across test classes in one JVM: tests assert on their own task keys only.
+
+## Proof
+- `./mvnw -B verify` output: the 7 BPA26 tests passing, failing-first output from step 3.
+- Local stack: `docker compose up -d`, app with profile `local`; start a WP-000457 instance at the sign-off task
+  (admin, `startInstructions`), then as project-engineer: login, GET tasks, GET task, POST complete; responses in the PR.
+- Operate screenshot of the completed task (human step, L19).
+
+## Questions
+- Q1 (Faraz). The AC says "Operate shows project-engineer as the user who completed the task". BPA-25 did not confirm
+  this (comment 10420: completer when `bpa-service` completes is unknown; D63 keeps the real user in our own columns).
+  The automated test can prove the task was assigned to project-engineer and then completed; it cannot read Operate's
+  screen. Proposal: the test asserts assignee + COMPLETED, and the Operate check is a manual screenshot in the PR. If
+  Operate shows `bpa-service` as the actor, that is a contradiction to log, not to work round. To be posted as a
+  Jira comment after your yes.
+  **Found 4 Nov (local stack, instance 2251799813686051, task 2251799813686055):** the task reads COMPLETED with
+  `assignee: project-engineer`, but Camunda's audit log (`POST /v2/audit-logs/search`) records `actorId: bpa-service`
+  for both ASSIGN and COMPLETE. So Camunda keeps the real user as assignee, and the service user as the actor. Whether
+  Operate's screen shows the assignee or the actor is the open part (screenshot pending). This contradicts "Operate shows
+  project-engineer as the user who completed the task" if Operate shows the actor. Reported for the PO, not worked round:
+  the backend cannot call Camunda as the user, because it does not keep the password (S5).
+  **Operate screenshot (Ahsan, 4 Nov):** the Sign off release element's Details tab shows `Assignee: project-engineer`
+  (Candidate Groups: project-engineer) and has no "completed by" field. Its Operations Log tab is the audit log, which
+  names `bpa-service` (API above). Proposal for the PO: the AC is met through the assignee; the audit-log actor stays
+  `bpa-service`, and D63's own "done by" columns hold the real user.
+- **Decided by Ahsan (Build Lead), 4 Nov 2026, in the session; no code change, all as built:** Q1 the AC is met through
+  the assignee (audit-log actor stays `bpa-service`; D63 columns hold the real user), Faraz to confirm in Jira as PO;
+  check order 404 → 403 → 409 → 400; read list = write list; non-Epic-1 or cancelled tasks answer 404 "Task not found".
+- Q2 (Khitaba). Read allow-lists, the 404/403/409/400 order, and 404 for non-Epic-1 tasks are ASSUMPTIONs; listed for the comment.
+  Also ASSUMPTIONs (found by the QA review): cancelled or failed tasks answer 404 and the short-lived listener states
+  (CREATING, ASSIGNING, UPDATING) count as open; one page of 100 per Camunda search; the list is sorted oldest first;
+  a taskKey outside the contract's pattern, or above int64, answers 404 "Task not found".
+- Q3. Spec.md names BPA-8 among the task-API users; Jira (comment 10376) lists BPA-6, 9, 11, 23. BPA-8's Confirm task
+  is served either way; reported, no change.
+- Q4 (Ahsan). Confirm the 5-point estimate (Jira DoR line).
+
+## Human-gap log
+- 4 Nov: the repo's `atlassian` MCP server needs sign-in; Jira was read through the claude.ai Atlassian connector instead.
+- The Operate check and the local-stack run are human steps (L19).
+- 4 Nov: the dev machine had no git identity, no JDK 21 and Docker Desktop stopped. Ahsan set the repo identity and
+  installed Temurin 21; Claude started Docker Desktop. The Claude Code session predates JAVA_HOME, so each Maven call sets it.
+- 4 Nov: `openapi-generator-maven-plugin` 7.14.0 cannot resolve `$ref`s when the repo path holds a space
+  (`D:\LCS CLaude\…`: URISyntaxException "Illegal character in path"). CI (Linux) is unaffected. Worked round locally
+  with `subst S: "D:\LCS CLaude"` and building from `S:\star-bpa-poc\backend`. A pom fix is outside BPA-26: to be
+  proposed as a separate Jira item (needs confirmation before it is created).
+- 4 Nov, test-first (L15): before any production code all 7 BPA26 tests failed with 404 "No static resource
+  api/v1/tasks/…" (no controller); after the build all 7 pass and `./mvnw -B verify` passes (38 tests).

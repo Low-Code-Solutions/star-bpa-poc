@@ -157,3 +157,35 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Low, fixed: `x-assumption: true` (reason in `x-assumption-note`); required fields per NOT NULL columns; invented orderings removed; plan
   enum line corrected. Low, left: no `multipleOf: 0.01`; TaskKey and CamundaKey patterns duplicated; Jira BPA-46 still Backlog; reference
   lists have no implementing story (plan Q4); generated validation needs exception handlers in BPA-16 and the 400-text stories (noted in plan).
+
+### BPA-26 at 0cb0940, 4 Nov 2026 (qa-reviewer)
+- Code: 0 High, 5 Medium (Important), 7 Low. Reviewer read BPA-26 in Jira (evidence and changelog), the plan, spec.md, the contract's
+  task paths, 09 S5/S6/S14/S15/S20/S25/G9 and ADR 0004/0005; no test was run by the reviewer (author: 7 BPA26 failing first with
+  404 "No static resource", then `./mvnw -B verify` 38 tests green).
+- Checks passed: check order 404/403/409/400 as planned; 403 before any variable read; groups from the session only; CSRF enforced
+  on complete; `bpa-service` for all Camunda calls; engine 404 on a second assign mapped to 409; 7 scenarios, 7 tests, names as in
+  the Jira DoD; diff inside the plan.
+- Important (5):
+  - AC "Operate shows project-engineer as the user who completed the task": the audit log and Operations Log name `bpa-service`;
+    only the Assignee is the real user (plan Q1). Decided by Ahsan (Build Lead), 4 Nov: met through the assignee; PO to confirm in
+    Jira. Open until Faraz answers.
+  - ASSUMPTIONs not commented in Jira (check order, read lists, 404 for non-Epic-1 tasks, other states, page limit 100, oldest-first
+    sort): all now in plan Q2; Jira comment drafted, posting needs the developer's yes.
+  - `workpackNumber` and `confirmMessage` sent as JSON null where the contract says absent: fixed (`spring.jackson.default-property-inclusion:
+    non_null`; BPA26_getsOneTask asserts `confirmMessage` is absent).
+  - `assertStaysOpen` read eventually consistent storage: fixed (the project engineer completes the task through the API, 204, which
+    the engine would refuse on a completed task).
+  - Second-complete test covered only the engine-rejection path: fixed (immediate call, then a third call once the search reads
+    COMPLETED; both 409).
+- Low (7): malformed or above-int64 taskKey gave 500: fixed (404 "Task not found", asserted in BPA26_unknownTaskIsNotFound).
+  Variable-scope Javadoc overstated, searches not paged: Javadoc corrected, warning logged when Camunda holds more than a page.
+  Transient listener states mapped to 404: fixed (treated as open). getsOneTask did not exercise the read allow-list: fixed
+  (declineReason returned, workpackStatus not). Plan inaccuracies: fixed (config key shape, Story last updated, calls); and
+  `GET /v2/variables/{key}` was not proved by BPA-25: confirmed 403 for `bpa-service` on the local stack, call removed, the variable
+  search uses `truncateValues=false` instead. Left: assign then complete is not atomic (harmless, allowOverride true); a task cancelled
+  between the read and the assign is reported as 409.
+- Tests strengthened after review (said here and in the PR, L15): BPA26_getsOneTask, BPA26_wrongGroupIsForbidden,
+  BPA26_variableNotAllowedIsRejected, BPA26_unknownTaskIsNotFound, BPA26_completedTaskCannotBeCompletedAgain. After the fixes: 7 BPA26
+  tests pass, `./mvnw -B verify` 38 tests green.
+- Not verified by the reviewer: test runs, failing-first output (tests and code in one commit, 79e617e; the run is in the plan's
+  Human-gap log and the PR), CI.
