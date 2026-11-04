@@ -1,8 +1,8 @@
 # Plan: BPA-26 Portal user can get, view and complete their tasks through the backend task API
 Jira: BPA-26 (Story, epic BPA-3)
 Story last updated: 2026-11-02T16:20:42.128+0400 (Jira `updated`; per the changelog a Rank change, content last changed 2026-11-02T13:04:54; 2026-11-04T12:24 is the Ready → In Progress move only)
-Status: Approved (Ahsan, Build Lead, 4 Nov 2026, in the Claude Code session)
-Approver: Ahsan (Build Lead); Faraz (Product Owner and Architect) for the questions below
+Status: Closed (2026-11-04)
+Approver: Ahsan (Build Lead), approved 4 Nov 2026 in the Claude Code session; Faraz (Product Owner and Architect) for the questions below
 Branch: BPA-26-task-api, from main 83cf6ca
 
 

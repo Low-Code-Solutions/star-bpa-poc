@@ -21,6 +21,7 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | Plan | Summary | Status |
 |---|---|---|
 | [BPA-25](BPA-3-work-pack-assignment/plans/BPA-25.md) | ? | ? |
+| [BPA-26](BPA-3-work-pack-assignment/plans/BPA-26.md) | Portal user can get, view and complete their tasks through the backend task API | Closed (2026-11-04) |
 | [BPA-34](BPA-3-work-pack-assignment/plans/BPA-34.md) | Restructure repo to 09 L1 (layout only, no content) | Closed (2026-10-28) |
 | [BPA-35](BPA-3-work-pack-assignment/plans/BPA-35.md) | Copy design docs into the repo and make it master: 00, 01, 03, 09, data model | Closed (2026-10-28) |
 | [BPA-36](BPA-3-work-pack-assignment/plans/BPA-36.md) | Commit Epic 1 models with 09 fixes, bpmnlint config and lint CI; form specs to docs | Closed (2026-10-28) |
@@ -31,4 +32,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-43](BPA-3-work-pack-assignment/plans/BPA-43.md) | Walking skeleton: Spring Boot backend, Flyway, model deploy, one worker, login and CI | Closed (2026-10-30) |
 | [BPA-44](BPA-3-work-pack-assignment/plans/BPA-44.md) | Remove department/project scope: 7 personas, access by group only | Closed (2026-11-02) |
 | [BPA-45](BPA-3-work-pack-assignment/plans/BPA-45.md) | Record PO acceptance of Epic 1 intent and spec, repo-master sign-off and team change | Closed (2026-11-02) |
+| [BPA-46](BPA-3-work-pack-assignment/plans/BPA-46.md) | Draft the full api/openapi.yaml contract (09 S20, §4 item 4) | Closed (2026-11-04) |
 
