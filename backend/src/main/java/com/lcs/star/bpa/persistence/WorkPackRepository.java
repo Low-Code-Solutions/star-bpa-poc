@@ -36,20 +36,22 @@ public class WorkPackRepository {
         if (existing.isPresent()) {
             return existing.get();
         }
+        // S9: one clock for the audit columns and audit_log.changed_at, not the database's now().
+        Instant now = clock.instant();
+        Timestamp at = Timestamp.from(now);
         String number = jdbc.queryForObject("SELECT 'WP-' || lpad(nextval('bpa.workpack_number_seq')::text, 6, '0')", String.class);
         // ON CONFLICT: two runs of the same job racing past find() leave exactly one row; the loser reads the winner's.
         List<UUID> inserted = jdbc.queryForList("""
                 INSERT INTO bpa.workpack (workpack_number, activity_ref, drawing_ref, department_ref, completion_date, status,
-                                          process_instance_key, created_by, updated_by)
-                VALUES (?, ?, ?, ?, ?, 'Draft', ?, ?, ?)
+                                          process_instance_key, created_at, created_by, updated_at, updated_by)
+                VALUES (?, ?, ?, ?, ?, 'Draft', ?, ?, ?, ?, ?)
                 ON CONFLICT (process_instance_key) DO NOTHING
                 RETURNING id""", UUID.class, number, input.activityRef(), input.drawingRef(), input.departmentRef(),
-                input.completionDate(), processInstanceKey, username, username);
+                input.completionDate(), processInstanceKey, at, username, at, username);
         if (inserted.isEmpty()) {
             return find(processInstanceKey).orElseThrow();
         }
         UUID workpackId = inserted.get(0);
-        Instant now = clock.instant();
         audit("workpack", workpackId, "workpack_number", number, username, now);
         audit("workpack", workpackId, "activity_ref", input.activityRef(), username, now);
         audit("workpack", workpackId, "drawing_ref", input.drawingRef(), username, now);
@@ -60,17 +62,18 @@ public class WorkPackRepository {
 
         for (WorkPackInput.Phase phase : input.phases()) {
             UUID id = jdbc.queryForObject("""
-                    INSERT INTO bpa.workpack_phase (workpack_id, phase, manhours, created_by, updated_by)
-                    VALUES (?, ?, ?, ?, ?) RETURNING id""", UUID.class, workpackId, phase.phase(), phase.manhours(), username, username);
+                    INSERT INTO bpa.workpack_phase (workpack_id, phase, manhours, created_at, created_by, updated_at, updated_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id""", UUID.class, workpackId, phase.phase(), phase.manhours(),
+                    at, username, at, username);
             audit("workpack_phase", id, "workpack_id", workpackId.toString(), username, now);
             audit("workpack_phase", id, "phase", phase.phase(), username, now);
             audit("workpack_phase", id, "manhours", text(phase.manhours()), username, now);
         }
         for (WorkPackInput.Material material : input.materials()) {
             UUID id = jdbc.queryForObject("""
-                    INSERT INTO bpa.workpack_material (workpack_id, material_ref, phase, created_by, updated_by)
-                    VALUES (?, ?, ?, ?, ?) RETURNING id""", UUID.class, workpackId, material.materialRef(), material.phase(),
-                    username, username);
+                    INSERT INTO bpa.workpack_material (workpack_id, material_ref, phase, created_at, created_by, updated_at, updated_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id""", UUID.class, workpackId, material.materialRef(), material.phase(),
+                    at, username, at, username);
             audit("workpack_material", id, "workpack_id", workpackId.toString(), username, now);
             audit("workpack_material", id, "material_ref", material.materialRef(), username, now);
             audit("workpack_material", id, "phase", material.phase(), username, now);
@@ -78,7 +81,8 @@ public class WorkPackRepository {
         return new SavedWorkPack(workpackId, number);
     }
 
-    private Optional<SavedWorkPack> find(long processInstanceKey) {
+    /** The Work Pack saved for this process instance, if any (the D65 re-run key). */
+    public Optional<SavedWorkPack> find(long processInstanceKey) {
         return jdbc.query("SELECT id, workpack_number FROM bpa.workpack WHERE process_instance_key = ?",
                 (rs, n) -> new SavedWorkPack(rs.getObject("id", UUID.class), rs.getString("workpack_number")), processInstanceKey)
                 .stream().findFirst();

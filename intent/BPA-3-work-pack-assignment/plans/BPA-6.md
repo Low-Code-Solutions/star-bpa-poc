@@ -1,6 +1,6 @@
 # Plan: BPA-6 Time & Method Analyst can create a Work Pack with estimates
 Jira: BPA-6 (Story, epic BPA-3)
-Story last updated: 2026-11-02T20:51:49.871+0400 (the PO's Q4 comment 10465; no field change found since approval)
+Story last updated: 2026-11-04T13:48:15+0400 (the move to In Progress only; last content change 2 Nov, the PO's Q4 comment 10465)
 Status: Approved (Ahsan, Build Lead, 4 Nov 2026, in the Claude Code session)
 Approver: Ahsan (Build Lead); Faraz (Product Owner and Architect) for the questions below
 Branch: BPA-6-create-work-pack, from main efcf784
@@ -100,6 +100,19 @@ Asia/Riyadh). `validationMessages` from the task are shown. Other groups see the
 - Extra validator messages for input the AC does not cover (ASSUMPTION texts, Q5): "Select a phase for each man-hour
   line", "Phase <p> is not a valid phase", "Select a material for each material line", "<Field> <ref> is not known",
   "Date to complete must be a date (YYYY-MM-DD)".
+
+**Review fixes (qa-reviewer at 498a708; REVIEW.md):**
+- `SaveWorkPackWorker` checks for a saved Work Pack before validating, so a retry never loops back (D65); the zone is
+  injected from `app.business-zone` (application.yml; S9, ADR 0013) instead of a constant in `ClockConfig`.
+- `WorkPackRepository` writes `created_at`/`updated_at` from the injected clock; `find` is public for the worker.
+- `api/openapi.yaml` (a contract change in this story's PR, spec.md rule): the 501 response and "Until BPA-6 is built"
+  removed from `POST /api/v1/workpacks`; `completedBy` documented in `CompleteTaskRequest`.
+- React: `TaskList` watches for a returned Create task after a completion and reopens it; `CreateWorkPack` prefills from the
+  task's variables; decimal check on the number. New `frontend/src/TaskList.test.tsx` (not a scenario test).
+- Tests strengthened (L15, said in the PR): rerun through the worker twice; otherRoles with an open Create task; exact
+  message lists; a Riyadh-only row in both date tests ("20 Oct rejected at 20 Oct 21:30 UTC", to propose to Jira).
+  New non-scenario backend tests: `correctionsJobRaisesAnIncident`, `completedByCannotBeSentByTheClient`, `newWorkPackIsAudited`.
+- After the fixes: `./mvnw -B verify` 52 tests; `npm test` 10/10; build clean.
 
 ## Order of work
 1. Commit this plan (Approved). Ask before Ready → In Progress.

@@ -6,6 +6,12 @@ import { CreateWorkPack } from './CreateWorkPack';
 type Api = ReturnType<typeof apiClient>;
 type TaskSummary = components['schemas']['TaskSummary'];
 
+/** Pause between task-list reads while waiting for Camunda's search (BPA-25: eventually consistent). Tests shorten it. */
+export let RETRY_MS = 500;
+export function setRetryMs(ms: number) {
+  RETRY_MS = ms;
+}
+
 /**
  * The user's open tasks through the backend task API (S14; BPA-26), and for the Time & Method Analyst the Work Pack request
  * start (BPA-6; D52). Screens for the other user tasks come with their stories (BPA-8/23, 9, 11).
@@ -40,19 +46,34 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
         setNotice(null);
         return;
       }
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
     }
     setNotice('The Work Pack request was started; its task will appear in the list shortly');
   }
 
+  /**
+   * After a completion the save step either saves the Work Pack or sends the task back with its messages (BPMN error, G2).
+   * The returned task (a new key on the same instance) reaches the search a moment later, so watch for it and reopen it.
+   */
+  async function awaitSaveOutcome(done: TaskSummary) {
+    setOpen(null);
+    setNotice('Task completed; checking the save');
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
+      const list = await refresh();
+      const back = list.find((t) => t.processInstanceKey === done.processInstanceKey && t.elementId === done.elementId && t.key !== done.key);
+      if (back) {
+        setNotice(null);
+        setOpen(back);
+        return;
+      }
+    }
+    // ASSUMPTION: no returned task within ~5 s means the save step accepted the data.
+    setNotice('Task completed; the Work Pack is saved');
+  }
+
   if (open?.elementId === 'UserTask_CreateWorkPack') {
-    return (
-      <CreateWorkPack api={api} taskKey={open.key} onDone={() => {
-        setOpen(null);
-        setNotice('Task completed; the Work Pack is being saved');
-        refresh();
-      }} />
-    );
+    return <CreateWorkPack key={open.key} api={api} taskKey={open.key} onDone={() => awaitSaveOutcome(open)} />;
   }
 
   return (

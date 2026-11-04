@@ -8,6 +8,9 @@ import com.lcs.star.bpa.api.TestBrowser;
 import com.lcs.star.bpa.domain.WorkPackInput;
 import com.lcs.star.bpa.persistence.WorkPackRepository;
 import com.lcs.star.bpa.persistence.WorkPackRepository.SavedWorkPack;
+import com.lcs.star.bpa.worker.SaveWorkPackWorker;
+import io.camunda.client.api.response.ActivatedJob;
+import io.camunda.client.api.worker.JobClient;
 import java.math.BigDecimal;
 import java.net.http.HttpResponse;
 import java.time.Clock;
@@ -25,6 +28,7 @@ import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -82,6 +86,9 @@ class WorkPackApiTest {
 
     @Autowired
     WorkPackRepository workPacks;
+
+    @Autowired
+    SaveWorkPackWorker saveWorkPack;
 
     @BeforeEach
     void today() {
@@ -153,7 +160,7 @@ class WorkPackApiTest {
         rows.forEach((message, variables) -> {
             Outcome outcome = submit(analyst, variables);
             rowsCheck.assertThat(outcome.saved()).as("not saved: " + message).isFalse();
-            rowsCheck.assertThat(outcome.validationMessages()).as("row '" + message + "'").contains(message);
+            rowsCheck.assertThat(outcome.validationMessages()).as("row '" + message + "'").containsExactly(message);
         });
         rowsCheck.assertAll();
     }
@@ -164,7 +171,7 @@ class WorkPackApiTest {
                 List.of(material("MAT-PIPE-06", "Cutting"), material("MAT-FLG-02", "Finishing"))));
 
         assertThat(outcome.saved()).isFalse();
-        assertThat(outcome.validationMessages()).contains("Phase Finishing is not selected for this Work Pack");
+        assertThat(outcome.validationMessages()).containsExactly("Phase Finishing is not selected for this Work Pack");
     }
 
     @Test
@@ -173,7 +180,7 @@ class WorkPackApiTest {
                 "materials", List.of(material("MAT-PIPE-06", "Cutting"))));
 
         assertThat(outcome.saved()).isFalse();
-        assertThat(outcome.validationMessages()).contains("Phase Cutting is listed twice");
+        assertThat(outcome.validationMessages()).containsExactly("Phase Cutting is listed twice");
     }
 
     @Test
@@ -186,7 +193,7 @@ class WorkPackApiTest {
                 List.of(material("MAT-PIPE-06", "Cutting"), material("MAT-PIPE-06", "Welding"))));
 
         assertThat(sameSame.saved()).as("Cutting | Cutting").isFalse();
-        assertThat(sameSame.validationMessages()).contains("Material MAT-PIPE-06 is listed twice for phase Cutting");
+        assertThat(sameSame.validationMessages()).containsExactly("Material MAT-PIPE-06 is listed twice for phase Cutting");
         assertThat(cuttingWelding.saved()).as("Cutting | Welding: " + cuttingWelding).isTrue();
     }
 
@@ -198,7 +205,7 @@ class WorkPackApiTest {
         clock.set(Instant.parse("2026-10-21T06:00:00Z"));
         Outcome past = submit(analyst, with(validWorkPack(), "completionDate", "2026-10-20"));
         rowsCheck.assertThat(past.saved()).as("20 Oct at 21 Oct 06:00 UTC").isFalse();
-        rowsCheck.assertThat(past.validationMessages()).contains("Date to complete cannot be in the past");
+        rowsCheck.assertThat(past.validationMessages()).containsExactly("Date to complete cannot be in the past");
 
         Outcome today = submit(analyst, with(validWorkPack(), "completionDate", "2026-10-21"));
         rowsCheck.assertThat(today.saved()).as("21 Oct at 21 Oct 06:00 UTC: " + today).isTrue();
@@ -206,6 +213,12 @@ class WorkPackApiTest {
         clock.set(Instant.parse("2026-10-20T21:30:00Z")); // 21 Oct 2026 00:30 in Riyadh
         Outcome riyadhMidnight = submit(analyst, with(validWorkPack(), "completionDate", "2026-10-21"));
         rowsCheck.assertThat(riyadhMidnight.saved()).as("21 Oct at 20 Oct 21:30 UTC: " + riyadhMidnight).isTrue();
+
+        // Added after review (said in the PR, L15): at the same instant 20 Oct is already past in Riyadh, though not in UTC.
+        // Without this row a UTC implementation would pass the three AC rows.
+        Outcome utcToday = submit(analyst, with(validWorkPack(), "completionDate", "2026-10-20"));
+        rowsCheck.assertThat(utcToday.saved()).as("20 Oct at 20 Oct 21:30 UTC").isFalse();
+        rowsCheck.assertThat(utcToday.validationMessages()).containsExactly("Date to complete cannot be in the past");
 
         rowsCheck.assertAll();
     }
@@ -228,7 +241,7 @@ class WorkPackApiTest {
                 rowsCheck.assertThat(outcome.saved()).as(hours + " accepted: " + outcome).isTrue();
             } else {
                 rowsCheck.assertThat(outcome.saved()).as(hours + " rejected").isFalse();
-                rowsCheck.assertThat(outcome.validationMessages()).as(hours).contains(message);
+                rowsCheck.assertThat(outcome.validationMessages()).as(hours).containsExactly(message);
             }
         });
         rowsCheck.assertAll();
@@ -236,17 +249,23 @@ class WorkPackApiTest {
 
     @Test
     void BPA6_rerunDoesNotCreateSecondWorkPack() {
+        // The save-workpack job for one instance runs twice through the worker, as a retry after a lost completion would.
         // The AC's key 2251799813685501 is illustrative. A key from partition 2's range is used instead, because the
         // single-partition test Camunda numbers its own instances from 2251799813685249 and could reach the AC's value.
         long instance = 4503599627370497L;
-        WorkPackInput input = new WorkPackInput("A-2201", "DWG-118", "Fabrication", LocalDate.parse("2026-11-06"),
-                List.of(new WorkPackInput.Phase("Cutting", new BigDecimal("150")), new WorkPackInput.Phase("Welding", new BigDecimal("250"))),
-                List.of(new WorkPackInput.Material("MAT-PIPE-06", "Cutting"), new WorkPackInput.Material("MAT-FLG-02", "Welding")));
+        Map<String, Object> firstRun = with(validWorkPack(), "completionDate", "2026-10-21");
+        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
 
-        SavedWorkPack first = workPacks.save(instance, input, "time-method-analyst");
-        SavedWorkPack retried = workPacks.save(instance, input, "time-method-analyst");
+        saveWorkPack.handle(client, job(1L, instance, "ServiceTask_SaveWorkPack", firstRun));
+        SavedWorkPack first = workPacks.find(instance).orElseThrow(() -> new AssertionError("first run saved nothing"));
+        // The retry carries other data, and by now 21 Oct is in the past: neither may change or reject the saved Work Pack.
+        clock.set(Instant.parse("2026-10-21T21:30:00Z")); // 22 Oct 00:30 in Riyadh
+        saveWorkPack.handle(client, job(2L, instance, "ServiceTask_SaveWorkPack",
+                with(validWorkPack(), "phases", List.of(phase("Cutting", 999), phase("Welding", 1)))));
 
-        assertThat(retried).as("the retried job gets the same Work Pack").isEqualTo(first);
+        Mockito.verify(client, Mockito.never()).newThrowErrorCommand(Mockito.anyLong());
+        Mockito.verify(client).newCompleteCommand(1L);
+        Mockito.verify(client).newCompleteCommand(2L);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.workpack WHERE process_instance_key = ?", Integer.class, instance))
                 .isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT workpack_number FROM bpa.workpack WHERE process_instance_key = ?", String.class, instance))
@@ -254,11 +273,17 @@ class WorkPackApiTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.workpack_phase WHERE workpack_id = ?", Integer.class, first.id()))
                 .as("estimates kept, not doubled").isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT sum(manhours) FROM bpa.workpack_phase WHERE workpack_id = ?", BigDecimal.class, first.id()))
-                .isEqualByComparingTo("400");
+                .as("the first run's 150 + 250, not the retry's").isEqualByComparingTo("400");
     }
 
     @Test
     void BPA6_otherRolesCannotCreateWorkPack() {
+        // An open Create Work Pack task exists, so "lists no Create Work Pack task for me" is about the group, not an empty list.
+        TestBrowser analyst = analyst();
+        HttpResponse<String> started = analyst.post("/api/v1/workpacks", "");
+        assertThat(started.statusCode()).isEqualTo(201);
+        String instance = json(started.body()).path("processInstanceKey").asText();
+        String openTask = createTask(analyst, instance, null);
         TestBrowser productionTeam = loggedInAs("production-team");
 
         HttpResponse<String> start = productionTeam.post("/api/v1/workpacks", "");
@@ -266,7 +291,74 @@ class WorkPackApiTest {
         assertThat(start.statusCode()).isEqualTo(403);
         HttpResponse<String> tasks = productionTeam.get("/api/v1/tasks");
         assertThat(tasks.statusCode()).isEqualTo(200);
-        assertThat(elements(json(tasks.body()))).noneMatch(t -> CREATE.equals(t.path("elementId").asText()));
+        assertThat(elements(json(tasks.body()))).noneMatch(t -> CREATE.equals(t.path("elementId").asText()))
+                .noneMatch(t -> openTask.equals(t.path("key").asText()));
+    }
+
+    // --- decisions and data-model rules without a scenario of their own (BPA-6 review) -----------------------------------
+
+    /** Ahsan, 4 Nov: until BPA-23, a save-workpack job from the corrections step is an incident and saves nothing. */
+    @Test
+    void correctionsJobRaisesAnIncident() {
+        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+
+        saveWorkPack.handle(client, job(3L, 4503599627370498L, "ServiceTask_SaveWorkPackCorrections", validWorkPack()));
+
+        Mockito.verify(client.newFailCommand(3L)).retries(0);
+        Mockito.verify(client.newFailCommand(3L).retries(0)).errorMessage("Save corrections is built by BPA-23");
+        assertThat(workPacks.find(4503599627370498L)).isEmpty();
+    }
+
+    /** D63: completedBy is set by the task API from the session; a client that sends it is refused. */
+    @Test
+    void completedByCannotBeSentByTheClient() {
+        TestBrowser analyst = analyst();
+        HttpResponse<String> started = analyst.post("/api/v1/workpacks", "");
+        String task = createTask(analyst, json(started.body()).path("processInstanceKey").asText(), null);
+
+        HttpResponse<String> response = analyst.post("/api/v1/tasks/" + task + "/complete",
+                toJson(Map.of("variables", with(validWorkPack(), "completedBy", "project-engineer"))));
+
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(json(response.body()).path("detail").asText()).isEqualTo("Variable completedBy is not allowed for this task");
+    }
+
+    /** D64, data model §6.1: one audit row per business column, old value null, canonical value, the user and the clock. */
+    @Test
+    void newWorkPackIsAudited() {
+        long instance = 4503599627370499L;
+        clock.set(TODAY);
+        SavedWorkPack saved = workPacks.save(instance, new WorkPackInput("A-2201", "DWG-118", "Fabrication", LocalDate.parse("2026-11-06"),
+                List.of(new WorkPackInput.Phase("Cutting", new BigDecimal("150.00"))), List.of(new WorkPackInput.Material("MAT-PIPE-06", "Cutting"))),
+                "time-method-analyst");
+
+        List<Map<String, Object>> workpack = jdbc.queryForList(
+                "SELECT column_name, old_value, new_value, username, changed_at FROM bpa.audit_log WHERE record_id = ? ORDER BY column_name", saved.id());
+        assertThat(workpack).extracting(r -> r.get("column_name")).containsExactly("activity_ref", "completion_date", "department_ref",
+                "drawing_ref", "process_instance_key", "status", "workpack_number");
+        assertThat(workpack).allSatisfy(r -> {
+            assertThat(r.get("old_value")).isNull();
+            assertThat(r.get("username")).isEqualTo("time-method-analyst");
+            assertThat(((java.sql.Timestamp) r.get("changed_at")).toInstant()).isEqualTo(TODAY);
+        });
+        assertThat(workpack).filteredOn(r -> "completion_date".equals(r.get("column_name"))).singleElement()
+                .satisfies(r -> assertThat(r.get("new_value")).isEqualTo("2026-11-06"));
+        assertThat(jdbc.queryForObject("""
+                SELECT a.new_value FROM bpa.audit_log a JOIN bpa.workpack_phase p ON p.id = a.record_id
+                WHERE p.workpack_id = ? AND a.column_name = 'manhours'""", String.class, saved.id())).as("150.00 -> 150").isEqualTo("150");
+        assertThat(jdbc.queryForObject("SELECT created_at FROM bpa.workpack WHERE id = ?", java.sql.Timestamp.class, saved.id()).toInstant())
+                .as("audit columns from the same clock (S9)").isEqualTo(TODAY);
+    }
+
+    private static ActivatedJob job(long key, long instance, String elementId, Map<String, Object> variables) {
+        ActivatedJob job = Mockito.mock(ActivatedJob.class);
+        Map<String, Object> withUser = new LinkedHashMap<>(variables);
+        withUser.put("completedBy", "time-method-analyst");
+        Mockito.when(job.getKey()).thenReturn(key);
+        Mockito.when(job.getProcessInstanceKey()).thenReturn(instance);
+        Mockito.when(job.getElementId()).thenReturn(elementId);
+        Mockito.when(job.getVariablesAsMap()).thenReturn(withUser);
+        return job;
     }
 
     // --- the portal's steps, as React calls them ---------------------------------------------------------------------------

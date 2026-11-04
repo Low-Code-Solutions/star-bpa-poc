@@ -211,6 +211,14 @@ describe('CreateWorkPack', () => {
     await late.user.click(screen.getByRole('button', { name: 'Complete task' }));
     expect(shownMessages()).not.toContain('Date to complete cannot be in the past');
     expect(late.completions()).toHaveLength(1);
+
+    // Added after review (said in the PR, L15): at the same instant 20 Oct is past in Riyadh but still today in UTC, so a
+    // screen that used UTC or the browser's zone would let it through. The date picker's minimum is the Riyadh date too.
+    expect(screen.getByLabelText('Date to complete')).toHaveAttribute('min', '2026-10-21');
+    setDate('2026-10-20');
+    await late.user.click(screen.getByRole('button', { name: 'Complete task' }));
+    expect(shownMessages()).toContain('Date to complete cannot be in the past');
+    expect(late.completions()).toHaveLength(1);
   });
 
   it('BPA6_manHoursBoundary', async () => {

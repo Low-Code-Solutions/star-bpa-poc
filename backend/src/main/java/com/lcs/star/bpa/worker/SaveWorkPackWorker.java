@@ -1,6 +1,5 @@
 package com.lcs.star.bpa.worker;
 
-import com.lcs.star.bpa.config.ClockConfig;
 import com.lcs.star.bpa.domain.WorkPackInput;
 import com.lcs.star.bpa.domain.WorkPackValidator;
 import com.lcs.star.bpa.persistence.ReferenceRepository;
@@ -13,6 +12,7 @@ import io.camunda.client.api.worker.JobClient;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,17 +38,20 @@ public class SaveWorkPackWorker {
     static final String CORRECTIONS_NOT_BUILT = "Save corrections is built by BPA-23";
     /** B12: who a worker writes as when no user is in context. */
     static final String SERVICE_USER = "bpa-service";
+    static final String BAD_DATE = "Date to complete must be a date (YYYY-MM-DD)"; // ASSUMPTION
 
     private static final Logger LOG = LoggerFactory.getLogger(SaveWorkPackWorker.class);
 
     private final WorkPackRepository workPacks;
     private final ReferenceRepository references;
     private final Clock clock;
+    private final ZoneId businessZone;
 
-    public SaveWorkPackWorker(WorkPackRepository workPacks, ReferenceRepository references, Clock clock) {
+    public SaveWorkPackWorker(WorkPackRepository workPacks, ReferenceRepository references, Clock clock, ZoneId businessZone) {
         this.workPacks = workPacks;
         this.references = references;
         this.clock = clock;
+        this.businessZone = businessZone;
     }
 
     @JobWorker(type = "save-workpack", autoComplete = false)
@@ -58,10 +61,22 @@ public class SaveWorkPackWorker {
             client.newFailCommand(job.getKey()).retries(0).errorMessage(CORRECTIONS_NOT_BUILT).send().join();
             return;
         }
+        // D65, S7: a retry after a committed save gets that Work Pack back, before any check. Re-validating could now fail
+        // (a "today" date gone past at midnight) and loop the task back while the Work Pack exists (BPA-6 review).
+        var existing = workPacks.find(job.getProcessInstanceKey());
+        if (existing.isPresent()) {
+            LOG.info("save-workpack job {} retried: Work Pack {} already saved", job.getKey(), existing.get().workpackNumber());
+            complete(client, job, existing.get());
+            return;
+        }
         Map<String, Object> variables = job.getVariablesAsMap();
         List<String> messages = new ArrayList<>();
         WorkPackInput input = read(variables, messages);
-        messages.addAll(WorkPackValidator.validate(input, LocalDate.ofInstant(clock.instant(), ClockConfig.BUSINESS_ZONE), known()));
+        List<String> rules = new ArrayList<>(WorkPackValidator.validate(input, LocalDate.ofInstant(clock.instant(), businessZone), known()));
+        if (messages.contains(BAD_DATE)) {
+            rules.remove("Date to complete is required"); // the date is there, only unreadable
+        }
+        messages.addAll(rules);
         if (!messages.isEmpty()) {
             List<String> distinct = messages.stream().distinct().toList();
             LOG.info("Work Pack of instance {} rejected: {}", job.getProcessInstanceKey(), distinct);
@@ -73,6 +88,10 @@ public class SaveWorkPackWorker {
         String username = completedBy instanceof String s && !s.isBlank() ? s : SERVICE_USER;
         SavedWorkPack saved = workPacks.save(job.getProcessInstanceKey(), input, username);
         LOG.info("Work Pack {} saved for instance {} by {}", saved.workpackNumber(), job.getProcessInstanceKey(), username);
+        complete(client, job, saved);
+    }
+
+    private static void complete(JobClient client, ActivatedJob job, SavedWorkPack saved) {
         client.newCompleteCommand(job.getKey())
                 .variables(Map.of("workpackId", saved.id().toString(), "workpackNumber", saved.workpackNumber(), "validationMessages", List.of()))
                 .send().join();
@@ -110,7 +129,7 @@ public class SaveWorkPackWorker {
             try {
                 completionDate = LocalDate.parse(s);
             } catch (DateTimeParseException e) {
-                messages.add("Date to complete must be a date (YYYY-MM-DD)"); // ASSUMPTION
+                messages.add(BAD_DATE);
             }
         }
         List<WorkPackInput.Phase> phases = new ArrayList<>();

@@ -144,7 +144,7 @@ paths:
         Starts `Process_PPC_WorkPackAssignment` at `StartEvent_WorkPackRequested` (09 S2, S20; D52). Only group
         `time-method-analyst` may call it (BPA-6 "Other roles cannot create a Work Pack"). The call carries no Work Pack
         data: the Analyst enters it in the Create Work Pack task that follows (`UserTask_CreateWorkPack`, BPA-6), through
-        the task API. Until BPA-6 is built the backend answers 501 (walking skeleton, BPA-43).
+        the task API. Built by BPA-6.
       responses:
         '201':
           description: Work Pack request started
@@ -158,12 +158,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
-        '501':
-          description: Not built yet (walking skeleton, BPA-43); BPA-6 replaces this
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
         '503':
           $ref: '#/components/responses/EngineUnavailable'
   /api/v1/tasks:
@@ -936,6 +930,8 @@ components:
             completionDate, phases [{phase, manhours}] and materials [{materialRef, phase}] (Confirm also each material
             line's id, data model §6.3); UserTask_SignOffRelease takes signOffDecision (Approved or Declined) and
             declineReason; UserTask_ScheduleWorkPack takes plannedStartDate and plannedEndDate.
+            The backend adds `completedBy`, the session user's Camunda username, to every completion, so the save workers
+            record who did the work (D63; BPA-6). It is on no allow-list: a request that sends it is refused with 400.
           example:
             signOffDecision: Approved
     Activity:

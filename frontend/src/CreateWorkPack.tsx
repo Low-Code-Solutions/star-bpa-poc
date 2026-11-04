@@ -53,9 +53,10 @@ export function fieldMessages(form: {
     const text = p.manhours.trim();
     if (text === '') continue;
     const hours = Number(text);
-    const decimals = text.includes('.') ? text.split('.')[1].replace(/0+$/, '').length : 0;
+    // More than 2 decimals = not a whole number of hundredths. Checked on the number, so "1e-3" is caught like "0.001".
+    const moreThanTwoDecimals = Math.round(hours * 100) / 100 !== hours;
     if (!(hours > 0)) add('Man hours must be greater than 0');
-    else if (decimals > 2) add('Man hours can have at most 2 decimal places');
+    else if (moreThanTwoDecimals) add('Man hours can have at most 2 decimal places');
     else if (hours > 99999.99) add('Man hours cannot exceed 99,999.99');
   }
   if (form.phases.some((p) => !p.phase)) add('Select a phase for each man-hour line');
@@ -80,8 +81,23 @@ export function CreateWorkPack({ api, taskKey, onDone }: { api: Api; taskKey: st
 
   useEffect(() => {
     api.GET('/api/v1/tasks/{taskKey}', { params: { path: { taskKey } } }).then(({ data }) => {
-      // After a rejected save the task comes back with the save step's messages (G2).
+      // After a rejected save the task comes back with the save step's messages (G2) and the data entered before, read back
+      // through the task's read allow-list (BPA-26), so the Analyst corrects instead of retyping.
       setMessages(data?.validationMessages ?? []);
+      const v = (data?.variables ?? {}) as Record<string, unknown>;
+      const text = (value: unknown) => (typeof value === 'string' ? value : '');
+      setActivityRef(text(v.activityRef));
+      setDrawingRef(text(v.drawingRef));
+      setDepartmentRef(text(v.departmentRef));
+      setCompletionDate(text(v.completionDate));
+      if (Array.isArray(v.phases)) {
+        setPhases(v.phases.map((p: { phase?: unknown; manhours?: unknown }) => ({
+          phase: text(p.phase), manhours: p.manhours === undefined || p.manhours === null ? '' : String(p.manhours),
+        })));
+      }
+      if (Array.isArray(v.materials)) {
+        setMaterials(v.materials.map((m: { materialRef?: unknown; phase?: unknown }) => ({ materialRef: text(m.materialRef), phase: text(m.phase) })));
+      }
     });
     api.GET('/api/v1/activities').then(({ data }) => setActivities(data ?? []));
     api.GET('/api/v1/drawings').then(({ data }) => setDrawings(data ?? []));
