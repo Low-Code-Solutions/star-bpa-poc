@@ -80,6 +80,11 @@ final class IntegrationCamunda {
         return "http://" + CAMUNDA.getHost() + ":" + CAMUNDA.getMappedPort(8080);
     }
 
+    /** The gateway's gRPC address, for an app whose job workers run against this Camunda (BPA-6). */
+    static String grpcUrl() {
+        return "http://" + CAMUNDA.getHost() + ":" + CAMUNDA.getMappedPort(26500);
+    }
+
     static JdbcTemplate jdbc() {
         return new JdbcTemplate(dataSource());
     }

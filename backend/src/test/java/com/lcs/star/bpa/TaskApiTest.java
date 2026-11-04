@@ -5,11 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lcs.star.bpa.CamundaRest.Reply;
-import com.lcs.star.bpa.adapter.CamundaAdminClient;
-import com.lcs.star.bpa.adapter.CamundaIdentityClient;
 import com.lcs.star.bpa.api.TestBrowser;
-import com.lcs.star.bpa.config.PersonaFile;
-import com.lcs.star.bpa.config.PersonaSync;
 import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -62,26 +57,11 @@ class TaskApiTest {
         registry.add("camunda.client.auth.password", () -> servicePassword);
     }
 
-    /** Camunda, the persona sync and the deployed models; once per JVM is enough, the calls are idempotent. */
-    static synchronized void background() {
-        if (admin != null) {
-            return;
-        }
-        IntegrationCamunda.start();
-        String url = IntegrationCamunda.restUrl();
-        var adminClient = new CamundaAdminClient(url, IntegrationCamunda.ADMIN, IntegrationCamunda.ADMIN_PASSWORD);
-        new PersonaSync(adminClient, IntegrationCamunda.jdbc(), PersonaFile.load(new ClassPathResource("personas.yaml")),
-                PersonaSyncTest.DEMO_PASSWORD, PersonaSyncTest.SERVICE_PASSWORD).sync();
-        // PersonaSyncTest may have made bpa-service first with another password; the sync keeps it (as in Bpa25CamundaChecksTest).
-        servicePassword = new CamundaIdentityClient(url).verify("bpa-service", PersonaSyncTest.SERVICE_PASSWORD).isPresent()
-                ? PersonaSyncTest.SERVICE_PASSWORD : PersonaSyncTest.EXISTING_SERVICE_PASSWORD;
-        admin = new CamundaRest(url, IntegrationCamunda.ADMIN, IntegrationCamunda.ADMIN_PASSWORD);
-        Reply deployed = admin.deploy(
-                new ClassPathResource("bpmn/Process_PPC_WorkPackAssignment.bpmn"),
-                new ClassPathResource("bpmn/Process_PPC_WorkerReassignment.bpmn"),
-                new ClassPathResource("bpmn/Process_PPC_DrawingRevisionNotice.bpmn"),
-                new ClassPathResource("dmn/Decision_WorkpackReleaseCheck.dmn"));
-        assertThat(deployed.status()).as("models deploy: " + deployed.body()).isEqualTo(200);
+    /** Camunda, the persona sync and the deployed models (IntegrationApp, shared with BPA-6's tests). */
+    static void background() {
+        IntegrationApp.background();
+        admin = IntegrationApp.admin;
+        servicePassword = IntegrationApp.servicePassword;
     }
 
     @Test
