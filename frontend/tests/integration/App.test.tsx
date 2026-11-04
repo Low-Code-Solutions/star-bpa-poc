@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { App } from './App';
+import { App } from '@/App';
 
 // BPA-43 Part B: the walking-skeleton login screen (L4, ADR 0005). The backend is replaced by a fetch mock that behaves like
 // AuthApiTest proves the real one does.

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@tests/test-utils';
 import userEvent from '@testing-library/user-event';
-import { apiClient } from './api/client';
+import { apiClient } from '@/services/apiClient';
 import { CreateWorkPack } from './CreateWorkPack';
 
 // BPA-6: the Create Work Pack screen (09 S14: React checks field rules before submission; the save step re-checks them,

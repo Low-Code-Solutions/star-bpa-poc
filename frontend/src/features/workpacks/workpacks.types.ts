@@ -1,0 +1,18 @@
+import type { StartWorkPackResponse } from '@/types/api';
+
+/** A phase line and a material line as the Create Work Pack screen holds them (man hours as typed). */
+export type PhaseRow = { phase: string; manhours: string };
+export type MaterialRow = { materialRef: string; phase: string };
+
+/** The Create Work Pack screen's fields; names as the BPA-26 write allow-list for UserTask_CreateWorkPack. */
+export type CreateWorkPackForm = {
+  activityRef: string;
+  drawingRef: string;
+  departmentRef: string;
+  completionDate: string;
+  phases: PhaseRow[];
+  materials: MaterialRow[];
+};
+
+/** POST /api/v1/workpacks: the started instance, or the HTTP status of the refusal (403 outside time-method-analyst). */
+export type StartResult = StartWorkPackResponse | { status: number };

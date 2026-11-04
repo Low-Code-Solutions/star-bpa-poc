@@ -5,7 +5,7 @@
   "description": "STAR BPA POC React portal (ADR 0004). Walking skeleton: login, /me, logout (BPA-43).",
   "type": "module",
   "scripts": {
-    "gen:api": "openapi-typescript ../api/openapi.yaml -o src/api/schema.d.ts",
+    "gen:api": "openapi-typescript ../api/openapi.yaml -o src/services/schema.d.ts",
     "predev": "npm run gen:api",
     "dev": "vite",
     "prebuild": "npm run gen:api",
@@ -28,6 +28,7 @@
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.20.5",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^5.0.0",

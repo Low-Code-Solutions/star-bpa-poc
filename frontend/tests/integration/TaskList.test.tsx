@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@tests/test-utils';
 import userEvent from '@testing-library/user-event';
-import { apiClient } from './api/client';
-import { setRetryMs, TaskList } from './TaskList';
+import { apiClient } from '@/services/apiClient';
+import { setRetryMs, TaskList } from '@/features/tasks';
 
 // BPA-6 portal flow (review finding): the Analyst starts a request, completes the Create Work Pack screen, the save step
 // rejects it and the task comes back under a new key; the portal reopens it with the messages and the data entered. Then the
