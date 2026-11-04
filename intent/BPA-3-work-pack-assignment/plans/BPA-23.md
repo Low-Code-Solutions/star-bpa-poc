@@ -229,3 +229,8 @@ Non-scenario tests:
   for the instance. The same test passed alone (13/13) and in the full verify (67/67). Likely cause, not proven: a job
   held by a just-closed workers-on context. Watch it in CI. If it recurs, propose a test-infrastructure Task (for example,
   turn job streaming off in tests or give each class a longer wait).
+- 5 Nov, frontend function (skill new-task-screen):
+  - **Red:** the Confirm test file failed to import `./ConfirmWorkPack`, which did not exist yet.
+  - **Extraction:** `useWorkPackForm` and `WorkPackFields` came out of CreateWorkPack. Its 6 tests and the 6
+    integration tests stay green, unchanged.
+  - **Green:** ConfirmWorkPack registered in `taskScreens.ts`; `npm test` 18/18; lint, format and build clean.

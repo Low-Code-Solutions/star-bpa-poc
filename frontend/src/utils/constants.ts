@@ -4,4 +4,5 @@ export const PHASES = ['Engineering', 'Cutting', 'Welding', 'Finishing'];
 /** BPMN element IDs of the user tasks the portal has a screen for (Process_PPC_WorkPackAssignment). */
 export const USER_TASKS = {
   createWorkPack: 'UserTask_CreateWorkPack',
+  confirmWorkPack: 'UserTask_ConfirmWorkPack',
 } as const;
