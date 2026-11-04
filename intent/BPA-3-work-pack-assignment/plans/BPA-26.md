@@ -134,6 +134,9 @@ All error bodies asserted as `application/problem+json` with the exact `detail`.
   (Candidate Groups: project-engineer) and has no "completed by" field. Its Operations Log tab is the audit log, which
   names `bpa-service` (API above). Proposal for the PO: the AC is met through the assignee; the audit-log actor stays
   `bpa-service`, and D63's own "done by" columns hold the real user.
+- **Decided by Ahsan (Build Lead), 4 Nov 2026, in the session; no code change, all as built:** Q1 the AC is met through
+  the assignee (audit-log actor stays `bpa-service`; D63 columns hold the real user), Faraz to confirm in Jira as PO;
+  check order 404 → 403 → 409 → 400; read list = write list; non-Epic-1 or cancelled tasks answer 404 "Task not found".
 - Q2 (Khitaba). Read allow-lists, the 404/403/409/400 order, and 404 for non-Epic-1 tasks are ASSUMPTIONs; listed for the comment.
 - Q3. Spec.md names BPA-8 among the task-API users; Jira (comment 10376) lists BPA-6, 9, 11, 23. BPA-8's Confirm task
   is served either way; reported, no change.
