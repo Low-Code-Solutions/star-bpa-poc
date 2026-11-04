@@ -1,8 +1,8 @@
 # Plan: BPA-47 Set the React portal structure and add project skills for task screens and job workers
 Jira: BPA-47 (Task, epic BPA-3)
 Story last updated: 2026-11-04T15:05:41.110+0400 (comment 10470 only; no field change since 14:45:21)
-Status: Approved (Ahsan, Build Lead, 4 Nov 2026, with changes, in the Claude Code session)
-Approver: Ahsan (Build Lead)
+Status: Closed (2026-11-04)
+Approver: Ahsan (Build Lead), approved with changes 4 Nov 2026 in the Claude Code session
 Branch: BPA-47-frontend-structure-and-skills, from main 827a8ba
 
 

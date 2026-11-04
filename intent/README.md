@@ -33,5 +33,6 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-44](BPA-3-work-pack-assignment/plans/BPA-44.md) | Remove department/project scope: 7 personas, access by group only | Closed (2026-11-02) |
 | [BPA-45](BPA-3-work-pack-assignment/plans/BPA-45.md) | Record PO acceptance of Epic 1 intent and spec, repo-master sign-off and team change | Closed (2026-11-02) |
 | [BPA-46](BPA-3-work-pack-assignment/plans/BPA-46.md) | Draft the full api/openapi.yaml contract (09 S20, §4 item 4) | Closed (2026-11-04) |
+| [BPA-47](BPA-3-work-pack-assignment/plans/BPA-47.md) | Set the React portal structure and add project skills for task screens and job workers | Closed (2026-11-04) |
 | [BPA-6](BPA-3-work-pack-assignment/plans/BPA-6.md) | Time & Method Analyst can create a Work Pack with estimates | Closed (2026-11-04) |
 
