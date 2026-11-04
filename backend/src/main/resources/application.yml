@@ -42,3 +42,22 @@ bpa:
     file: classpath:personas.yaml
     demo-password: ${DEMO_PASSWORD:}
     service-password: ${BPA_SERVICE_PASSWORD:}
+  # Backend task API (09 S14, ADR 0004; BPA-26): the per-task variable allow-lists, keyed by BPMN element ID (brackets keep
+  # the key as written). write: the only names a completion may carry (400 otherwise); names from the CompleteTaskRequest
+  # description in api/openapi.yaml. read: what GET /api/v1/tasks/{key} returns in `variables`; equal to write for prefill
+  # (ASSUMPTION, no source names the read list). workpackNumber, validationMessages and confirmMessage have their own fields.
+  tasks:
+    process-id: Process_PPC_WorkPackAssignment
+    allow-lists:
+      "[UserTask_CreateWorkPack]": # time-method-analyst (G9), BPA-6
+        write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
+        read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
+      "[UserTask_ConfirmWorkPack]": # time-method-analyst (G9), BPA-8, BPA-23; a material line's id sits inside materials
+        write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
+        read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
+      "[UserTask_SignOffRelease]": # project-engineer (G9), BPA-9
+        write: [signOffDecision, declineReason]
+        read: [signOffDecision, declineReason]
+      "[UserTask_ScheduleWorkPack]": # production-planner (G9), BPA-11
+        write: [plannedStartDate, plannedEndDate]
+        read: [plannedStartDate, plannedEndDate]

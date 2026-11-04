@@ -58,7 +58,9 @@ Read lists = the write list of the task (prefill). ASSUMPTION: no source names t
   and connection errors to small exceptions; parses variable values (JSON strings) and fetches the full value with
   `GET /v2/variables/{key}` when `isTruncated`.
 - `backend/src/main/java/com/lcs/star/bpa/task/TaskService.java` (new): the checks and assign-then-complete.
-- `backend/src/main/java/com/lcs/star/bpa/task/TaskAllowList.java` (new): config record + bean wiring for the client.
+- `backend/src/main/java/com/lcs/star/bpa/task/TaskAllowList.java` (new): config record.
+- `backend/src/main/java/com/lcs/star/bpa/task/TaskConfig.java` (new, as built): bean wiring for the client and service
+  (split out of TaskAllowList so the record stays a plain properties binding).
 - `backend/src/main/java/com/lcs/star/bpa/api/TaskController.java` (new): implements generated `TasksApi`; session
   user and groups from the `SecurityContext` as `MeController` does.
 - `backend/src/main/resources/application.yml`: `bpa.tasks` allow-lists.
@@ -101,6 +103,9 @@ All error bodies asserted as `application/problem+json` with the exact `detail`.
 - **Eventual consistency** (BPA-25): searches and `GET /v2/user-tasks/{key}` read secondary storage. Right after a
   completion the task can still read CREATED, so the 409 also has to come from the engine's rejection of the assign
   or complete. The status Camunda returns for that (404 or 409) is unknown; I confirm it in step 3–4 and record it.
+  **Found 4 Nov:** it happens (BPA26_completedTaskCannotBeCompletedAgain). The second assign is rejected with
+  `404 NOT_FOUND` "Command 'ASSIGN' rejected with code 'NOT_FOUND': Expected to assign user task with key …, but no
+  such user task was found". The adapter treats 404 and 409 on assign/complete as "task gone", and the API answers 409.
   Tests poll for setup; the portal may list a just-completed task for about a second (React concern, noted for BPA-6).
 - **Completer in Operate** not confirmed by BPA-25 (2, 5b): see Q1.
 - **N+1 reads** for `workpackNumber` in the list: one variables search per task. Fine at POC sizes.
@@ -127,3 +132,11 @@ All error bodies asserted as `application/problem+json` with the exact `detail`.
 ## Human-gap log
 - 4 Nov: the repo's `atlassian` MCP server needs sign-in; Jira was read through the claude.ai Atlassian connector instead.
 - The Operate check and the local-stack run are human steps (L19).
+- 4 Nov: the dev machine had no git identity, no JDK 21 and Docker Desktop stopped. Ahsan set the repo identity and
+  installed Temurin 21; Claude started Docker Desktop. The Claude Code session predates JAVA_HOME, so each Maven call sets it.
+- 4 Nov: `openapi-generator-maven-plugin` 7.14.0 cannot resolve `$ref`s when the repo path holds a space
+  (`D:\LCS CLaude\…`: URISyntaxException "Illegal character in path"). CI (Linux) is unaffected. Worked round locally
+  with `subst S: "D:\LCS CLaude"` and building from `S:\star-bpa-poc\backend`. A pom fix is outside BPA-26: to be
+  proposed as a separate Jira item (needs confirmation before it is created).
+- 4 Nov, test-first (L15): before any production code all 7 BPA26 tests failed with 404 "No static resource
+  api/v1/tasks/…" (no controller); after the build all 7 pass and `./mvnw -B verify` passes (38 tests).

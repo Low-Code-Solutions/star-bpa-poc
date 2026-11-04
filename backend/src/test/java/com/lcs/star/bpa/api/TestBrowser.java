@@ -10,23 +10,23 @@ import java.net.http.HttpResponse;
 import java.util.List;
 
 /** Test helper: a cookie-keeping HTTP client that behaves like the React portal (S26: CSRF token from the XSRF-TOKEN cookie). */
-final class TestBrowser {
+public final class TestBrowser {
 
     private final String base;
     private final CookieManager cookies = new CookieManager();
     private final HttpClient http;
 
-    TestBrowser(int port) {
+    public TestBrowser(int port) {
         this.base = "http://localhost:" + port;
         this.http = HttpClient.newBuilder().cookieHandler(cookies).build();
     }
 
-    HttpResponse<String> get(String path) {
+    public HttpResponse<String> get(String path) {
         return send(HttpRequest.newBuilder(URI.create(base + path)).GET());
     }
 
     /** A state-changing call that sends the CSRF token back, as React does. */
-    HttpResponse<String> post(String path, String json) {
+    public HttpResponse<String> post(String path, String json) {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(base + path))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json));
@@ -37,19 +37,19 @@ final class TestBrowser {
         return send(request);
     }
 
-    HttpResponse<String> postWithoutCsrfToken(String path, String json) {
+    public HttpResponse<String> postWithoutCsrfToken(String path, String json) {
         return send(HttpRequest.newBuilder(URI.create(base + path))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json)));
     }
 
     /** GET /api/v1/me first so the XSRF-TOKEN cookie is set, then log in. */
-    HttpResponse<String> login(String username, String password) {
+    public HttpResponse<String> login(String username, String password) {
         get("/api/v1/me");
         return post("/api/v1/auth/login", "{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}");
     }
 
-    String cookie(String name) {
+    public String cookie(String name) {
         List<HttpCookie> all = cookies.getCookieStore().getCookies();
         return all.stream().filter(c -> c.getName().equals(name)).map(HttpCookie::getValue).findFirst().orElse(null);
     }
