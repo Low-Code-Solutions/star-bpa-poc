@@ -43,7 +43,7 @@ export function WorkPackFields({ api, state }: { api: Api; state: WorkPackFormSt
         <ActivitySelect activities={activities} value={form.activityRef} onChange={setActivityRef} />
       </Field>
 
-      <section aria-label="Activity context">
+      <section aria-label="Activity context" className="context-panel">
         <dl>
           <dt>Project</dt>
           <dd>{activity?.projectRef ?? ''}</dd>
@@ -74,10 +74,10 @@ export function WorkPackFields({ api, state }: { api: Api; state: WorkPackFormSt
         <DrawingSelect drawings={drawings} value={form.drawingRef} onChange={setDrawingRef} />
       </Field>
 
-      <fieldset>
+      <fieldset className="line-group">
         <legend>Phases and man hours</legend>
         {form.phases.map((row, i) => (
-          <div key={i}>
+          <div key={i} className="line">
             <select aria-label={`Phase ${i + 1}`} value={row.phase} onChange={(e) => setPhase(i, { phase: e.target.value })}>
               <option value="" />
               {PHASES.map((p) => (
@@ -98,10 +98,10 @@ export function WorkPackFields({ api, state }: { api: Api; state: WorkPackFormSt
         <Button onClick={() => setPhases((rows) => [...rows, { phase: '', manhours: '' }])}>Add phase</Button>
       </fieldset>
 
-      <fieldset>
+      <fieldset className="line-group">
         <legend>Materials</legend>
         {form.materials.map((row, i) => (
-          <div key={i}>
+          <div key={i} className="line">
             <MaterialSelect
               aria-label={`Material ${i + 1}`}
               materials={materialList}

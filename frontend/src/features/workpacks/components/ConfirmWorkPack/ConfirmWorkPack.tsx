@@ -32,12 +32,12 @@ export function ConfirmWorkPack({ api, taskKey, onDone }: TaskScreenProps) {
       check={state.check}
       variables={state.variables}
     >
-      <label>
+      <label className="field field--number">
         Workpack number
         <input value={workpackNumber} readOnly />
       </label>
       {returnReason && (
-        <section aria-label="Return reason">
+        <section aria-label="Return reason" className="notice notice--return">
           <p>{returnReason}</p>
         </section>
       )}

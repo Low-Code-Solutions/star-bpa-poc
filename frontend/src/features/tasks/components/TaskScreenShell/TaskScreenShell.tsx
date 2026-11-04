@@ -58,11 +58,13 @@ export function TaskScreenShell({ api, taskKey, title, onDone, onLoaded, check, 
   }
 
   return (
-    <form onSubmit={submit} noValidate aria-label={title}>
-      <h2>{title}</h2>
+    <form onSubmit={submit} noValidate aria-label={title} className="task-sheet">
+      <h2 className="task-tag">{title}</h2>
       <ErrorMessage messages={messages} />
       {children}
-      <Button type="submit">Complete task</Button>
+      <Button type="submit" className="button--primary">
+        Complete task
+      </Button>
     </form>
   );
 }

@@ -9,16 +9,18 @@ export function Header() {
   }
   return (
     <>
-      <h1>STAR BPA portal</h1>
-      <p>
+      <h1 className="portal__title">STAR BPA portal</h1>
+      <p className="portal__user">
         Logged in as <strong>{me.username}</strong>
       </p>
-      <ul aria-label="Groups">
+      <ul aria-label="Groups" className="portal__groups">
         {me.groups.map((g) => (
           <li key={g}>{g}</li>
         ))}
       </ul>
-      <Button onClick={logout}>Log out</Button>
+      <Button onClick={logout} className="portal__logout">
+        Log out
+      </Button>
     </>
   );
 }
