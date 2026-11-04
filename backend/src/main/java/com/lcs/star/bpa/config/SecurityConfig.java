@@ -37,6 +37,9 @@ public class SecurityConfig {
     /** Process start from the portal: actor {@code time-method-analyst} (D52, 09 S20; BPA-43 Q6). */
     static final String TIME_METHOD_ANALYST = "time-method-analyst";
 
+    /** Reads the Project Hour Journal Header (BPA-7). */
+    static final String PPC_TEAM = "ppc-team";
+
     @Bean
     SecurityFilterChain api(HttpSecurity http, ObjectMapper json) throws Exception {
         http
@@ -46,6 +49,8 @@ public class SecurityConfig {
                         // Error dispatches keep their own status instead of turning into a 401 for anonymous callers.
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/workpacks").hasAuthority(TIME_METHOD_ANALYST)
+                        // BPA-7 (D22): the Header is read by the PPC Team and the Analyst (groups ASSUMPTION in the story).
+                        .requestMatchers(HttpMethod.GET, "/api/v1/hour-journal-headers").hasAnyAuthority(PPC_TEAM, TIME_METHOD_ANALYST)
                         .anyRequest().authenticated())
                 // S26: token in the XSRF-TOKEN cookie (readable by React), sent back as X-XSRF-TOKEN on every state-changing call,
                 // the login included. The plain handler lets React send the cookie value unchanged.
