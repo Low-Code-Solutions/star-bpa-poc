@@ -297,18 +297,6 @@ class WorkPackApiTest {
 
     // --- decisions and data-model rules without a scenario of their own (BPA-6 review) -----------------------------------
 
-    /** Ahsan, 4 Nov: until BPA-23, a save-workpack job from the corrections step is an incident and saves nothing. */
-    @Test
-    void correctionsJobRaisesAnIncident() {
-        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
-
-        saveWorkPack.handle(client, job(3L, 4503599627370498L, "ServiceTask_SaveWorkPackCorrections", validWorkPack()));
-
-        Mockito.verify(client.newFailCommand(3L)).retries(0);
-        Mockito.verify(client.newFailCommand(3L).retries(0)).errorMessage("Save corrections is built by BPA-23");
-        assertThat(workPacks.find(4503599627370498L)).isEmpty();
-    }
-
     /** D63: completedBy is set by the task API from the session; a client that sends it is refused. */
     @Test
     void completedByCannotBeSentByTheClient() {

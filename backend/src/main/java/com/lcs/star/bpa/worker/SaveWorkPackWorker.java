@@ -22,20 +22,23 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Job type {@code save-workpack} on {@code ServiceTask_SaveWorkPack} (BPA-6; design pack N2; D56, D65). Re-checks the Create
- * Work Pack data; on any message throws BPMN error {@code WORKPACK_INVALID} with {@code validationMessages}, so
- * BoundaryEvent_WorkPackInvalid returns the task (G2). Otherwise saves the Work Pack (Draft) and completes the job with
- * {@code workpackId}, {@code workpackNumber} and an empty {@code validationMessages} (BPA-23: cleared after a successful save).
- *
- * <p>The same job type serves {@code ServiceTask_SaveWorkPackCorrections} (BPA-23). Until BPA-23 builds it, such a job is
- * failed with no retries, so Operate shows an incident and nothing is saved (Ahsan, 4 Nov 2026).
+ * Job type {@code save-workpack} (design pack N2, N3; D56, D65) on two elements:
+ * <ul>
+ * <li>{@code ServiceTask_SaveWorkPack} (BPA-6): re-checks the Create Work Pack data and saves the Work Pack (Draft).</li>
+ * <li>{@code ServiceTask_SaveWorkPackCorrections} (BPA-23): re-checks a Confirm Workpack correction and applies it in place
+ * to the Draft Work Pack (data model F13), with audit rows (D64).</li>
+ * </ul>
+ * On any message both throw BPMN error {@code WORKPACK_INVALID} with {@code validationMessages}, so the boundary event returns
+ * the task (G2). On success both complete with {@code workpackId}, {@code workpackNumber}, an empty
+ * {@code validationMessages} (cleared after a successful save, BPA-23) and the saved {@code phases} and {@code materials}, each
+ * material line with its {@code id}, so the Confirm screen can round-trip them (data model A4; Ahsan, 4 Nov 2026).
  */
 @Component
 public class SaveWorkPackWorker {
 
     static final String ELEMENT = "ServiceTask_SaveWorkPack";
+    static final String CORRECTIONS = "ServiceTask_SaveWorkPackCorrections";
     static final String ERROR_CODE = "WORKPACK_INVALID";
-    static final String CORRECTIONS_NOT_BUILT = "Save corrections is built by BPA-23";
     /** B12: who a worker writes as when no user is in context. */
     static final String SERVICE_USER = "bpa-service";
     static final String BAD_DATE = "Date to complete must be a date (YYYY-MM-DD)"; // ASSUMPTION
@@ -56,9 +59,8 @@ public class SaveWorkPackWorker {
 
     @JobWorker(type = "save-workpack", autoComplete = false)
     public void handle(JobClient client, ActivatedJob job) {
-        if (!ELEMENT.equals(job.getElementId())) {
-            LOG.warn("save-workpack job {} from {} refused: {}", job.getKey(), job.getElementId(), CORRECTIONS_NOT_BUILT);
-            client.newFailCommand(job.getKey()).retries(0).errorMessage(CORRECTIONS_NOT_BUILT).send().join();
+        if (CORRECTIONS.equals(job.getElementId())) {
+            correct(client, job);
             return;
         }
         // D65, S7: a retry after a committed save gets that Work Pack back, before any check. Re-validating could now fail
@@ -72,29 +74,84 @@ public class SaveWorkPackWorker {
         Map<String, Object> variables = job.getVariablesAsMap();
         List<String> messages = new ArrayList<>();
         WorkPackInput input = read(variables, messages);
-        List<String> rules = new ArrayList<>(WorkPackValidator.validate(input, LocalDate.ofInstant(clock.instant(), businessZone), known()));
-        if (messages.contains(BAD_DATE)) {
-            rules.remove("Date to complete is required"); // the date is there, only unreadable
-        }
-        messages.addAll(rules);
-        if (!messages.isEmpty()) {
-            List<String> distinct = messages.stream().distinct().toList();
-            LOG.info("Work Pack of instance {} rejected: {}", job.getProcessInstanceKey(), distinct);
-            client.newThrowErrorCommand(job.getKey()).errorCode(ERROR_CODE).errorMessage(String.join("; ", distinct))
-                    .variables(Map.of("validationMessages", distinct)).send().join();
+        messages.addAll(rules(input, messages));
+        if (rejected(client, job, messages)) {
             return;
         }
-        Object completedBy = variables.get(TaskService.COMPLETED_BY);
-        String username = completedBy instanceof String s && !s.isBlank() ? s : SERVICE_USER;
+        String username = username(variables);
         SavedWorkPack saved = workPacks.save(job.getProcessInstanceKey(), input, username);
         LOG.info("Work Pack {} saved for instance {} by {}", saved.workpackNumber(), job.getProcessInstanceKey(), username);
         complete(client, job, saved);
     }
 
-    private static void complete(JobClient client, ActivatedJob job, SavedWorkPack saved) {
-        client.newCompleteCommand(job.getKey())
-                .variables(Map.of("workpackId", saved.id().toString(), "workpackNumber", saved.workpackNumber(), "validationMessages", List.of()))
-                .send().join();
+    /**
+     * BPA-23: a Confirm Workpack correction. The Work Pack must exist (else an exception: Camunda's default retries, then an
+     * incident) and be Draft (else an incident with no retries; after Released no Confirm task exists, D8). The same checks as
+     * at create, plus: a material line id must be one of this Work Pack's lines. Applying the same correction twice changes
+     * nothing, so a retried job is harmless (D65).
+     */
+    private void correct(JobClient client, ActivatedJob job) {
+        SavedWorkPack wp = workPacks.find(job.getProcessInstanceKey()).orElseThrow(() -> new IllegalStateException(
+                "No Work Pack for process instance " + job.getProcessInstanceKey() + " (" + CORRECTIONS + ")"));
+        String status = workPacks.status(wp.id()).orElseThrow();
+        if (!"Draft".equals(status)) {
+            String reason = wp.workpackNumber() + " is " + status + "; corrections are closed (D8)"; // ASSUMPTION text
+            LOG.warn("save-workpack job {} refused: {}", job.getKey(), reason);
+            client.newFailCommand(job.getKey()).retries(0).errorMessage(reason).send().join();
+            return;
+        }
+        Map<String, Object> variables = job.getVariablesAsMap();
+        List<String> messages = new ArrayList<>();
+        WorkPackInput input = read(variables, messages);
+        messages.addAll(rules(input, messages));
+        var lineIds = workPacks.materialLineIds(wp.id());
+        for (WorkPackInput.Material material : input.materials()) {
+            if (material.id() != null && !lineIds.contains(material.id())) {
+                messages.add("Material line " + material.id() + " is not part of this Work Pack"); // ASSUMPTION text
+            }
+        }
+        if (rejected(client, job, messages)) {
+            return;
+        }
+        String username = username(variables);
+        workPacks.correct(wp.id(), input, username);
+        LOG.info("Work Pack {} corrected for instance {} by {}", wp.workpackNumber(), job.getProcessInstanceKey(), username);
+        complete(client, job, wp);
+    }
+
+    /** The validator's messages; an unreadable date has its own message instead of "is required". */
+    private List<String> rules(WorkPackInput input, List<String> readMessages) {
+        List<String> rules = new ArrayList<>(WorkPackValidator.validate(input, LocalDate.ofInstant(clock.instant(), businessZone), known()));
+        if (readMessages.contains(BAD_DATE)) {
+            rules.remove("Date to complete is required"); // the date is there, only unreadable
+        }
+        return rules;
+    }
+
+    /** Any message: BPMN error WORKPACK_INVALID with validationMessages, so the task comes back showing them (G2, D56). */
+    private boolean rejected(JobClient client, ActivatedJob job, List<String> messages) {
+        if (messages.isEmpty()) {
+            return false;
+        }
+        List<String> distinct = messages.stream().distinct().toList();
+        LOG.info("Work Pack of instance {} rejected ({}): {}", job.getProcessInstanceKey(), job.getElementId(), distinct);
+        client.newThrowErrorCommand(job.getKey()).errorCode(ERROR_CODE).errorMessage(String.join("; ", distinct))
+                .variables(Map.of("validationMessages", distinct)).send().join();
+        return true;
+    }
+
+    /** D63: the user who completed the task (set by the task API), else the service user (B12). */
+    private static String username(Map<String, Object> variables) {
+        Object completedBy = variables.get(TaskService.COMPLETED_BY);
+        return completedBy instanceof String s && !s.isBlank() ? s : SERVICE_USER;
+    }
+
+    private void complete(JobClient client, ActivatedJob job, SavedWorkPack saved) {
+        Map<String, Object> output = new java.util.LinkedHashMap<>(workPacks.lines(saved.id()));
+        output.put("workpackId", saved.id().toString());
+        output.put("workpackNumber", saved.workpackNumber());
+        output.put("validationMessages", List.of());
+        client.newCompleteCommand(job.getKey()).variables(output).send().join();
     }
 
     private WorkPackValidator.KnownRefs known() {
@@ -138,7 +195,8 @@ public class SaveWorkPackWorker {
         }
         List<WorkPackInput.Material> materials = new ArrayList<>();
         for (Map<?, ?> row : rows(variables.get("materials"))) {
-            materials.add(new WorkPackInput.Material(text(row.get("materialRef")), text(row.get("phase"))));
+            String id = text(row.get("id")); // the saved line's id, round-tripped by the Confirm screen (BPA-23, A4)
+            materials.add(new WorkPackInput.Material(text(row.get("materialRef")), text(row.get("phase")), id == null || id.isBlank() ? null : id));
         }
         return new WorkPackInput(text(variables.get("activityRef")), text(variables.get("drawingRef")),
                 text(variables.get("departmentRef")), completionDate, phases, materials);

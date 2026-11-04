@@ -219,3 +219,13 @@ Non-scenario tests:
 ## Human-gap log
 - Local Maven build uses the `subst S:` work-round; `npm.cmd` in PowerShell.
 - frontend-design plugin installed mid-session: not in the skill list until a new session, so it is read from its SKILL.md.
+- 5 Nov, test-first (L15), backend:
+  - **Red:** 7 of 8 tests failed for the expected reason. Every corrections job hit the temporary incident ("Save
+    corrections is built by BPA-23", 9 times in the log), so nothing was saved or returned. BPA23_otherRolesCannotCorrect
+    passed already: its group check is BPA-26's.
+  - **Green:** 8/8 BPA-23; BPA-7's class 8/8 on the real corrections step; `./mvnw -B verify` 67 tests.
+- 5 Nov, one flaky run: in a combined run (ConfirmWorkPackApiTest, then HourJournalHeaderApiTest, then WorkPackApiTest),
+  BPA6_duplicatePhaseIsRejected timed out. Its save-workpack job was never taken within 60 s, and the worker logged nothing
+  for the instance. The same test passed alone (13/13) and in the full verify (67/67). Likely cause, not proven: a job
+  held by a just-closed workers-on context. Watch it in CI. If it recurs, propose a test-infrastructure Task (for example,
+  turn job streaming off in tests or give each class a longer wait).
