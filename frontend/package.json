@@ -2,7 +2,7 @@
   "name": "star-bpa-portal",
   "private": true,
   "version": "0.1.0",
-  "description": "STAR BPA POC React portal (ADR 0004). Walking skeleton: login, /me, logout (BPA-43).",
+  "description": "STAR BPA POC React portal (ADR 0004, ADR 0017): login, /me, logout (BPA-43); task list and Create Work Pack (BPA-6).",
   "type": "module",
   "scripts": {
     "gen:api": "openapi-typescript ../api/openapi.yaml -o src/services/schema.d.ts",

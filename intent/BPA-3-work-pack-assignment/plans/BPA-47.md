@@ -1,6 +1,6 @@
 # Plan: BPA-47 Set the React portal structure and add project skills for task screens and job workers
 Jira: BPA-47 (Task, epic BPA-3)
-Story last updated: 2026-11-04T14:45:21.396+0400
+Story last updated: 2026-11-04T15:05:41.110+0400 (comment 10470 only; no field change since 14:45:21)
 Status: Approved (Ahsan, Build Lead, 4 Nov 2026, with changes, in the Claude Code session)
 Approver: Ahsan (Build Lead)
 Branch: BPA-47-frontend-structure-and-skills, from main 827a8ba
@@ -77,7 +77,7 @@ tests/
 - **Features take `api` as a prop**, as today: the tests pass `apiClient()`, and pages pass the single app client.
 
 ## Tooling
-- New dependencies: `react-router` (v7), `@tanstack/react-query` (v5). New dev dependencies: `eslint` (v9, flat config),
+- New dependencies: `react-router` (v7), `@tanstack/react-query` (v5). New dev dependencies (plus `@types/node`, as built): `eslint` (v9, flat config),
   `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `globals`, `eslint-config-prettier`, `prettier` (v3).
 - Exact versions are resolved by `npm install` and pinned in `package-lock.json`.
 - Scripts: `lint`, `format`, `format:check`; `gen:api` now writes `src/services/schema.d.ts` (`.gitignore` updated).
@@ -180,8 +180,27 @@ Not changed: `.claude/settings.json`, hooks, deny rules, any backend code, the c
 `./mvnw -B verify`. A manual run in the browser (`npm.cmd run dev`): login, /me, logout, the task list, Create Work Pack
 including a rejected save (Ahsan).
 
+## As built (4 Nov)
+- Extra dev dependency `@types/node` (^22), for `node:url` in `vite.config.ts` (path aliases).
+- `src/utils/constants.ts` also holds `USER_TASKS` (the element IDs with a screen). `taskScreens.ts` exposes
+  `screenFor(elementId)`, which reads own keys only.
+- `package.json` `description` updated.
+
+**Review fixes (qa-reviewer at 5758989; REVIEW.md):**
+- `AuthContext` clears the TanStack Query cache at login and logout. Without that, a second persona in the same tab saw
+  the first user's task list until the refetch returned. New test `tests/integration/Session.test.tsx`: it holds the
+  second user's list back while it checks, and was shown to fail without the fix.
+- The catch-all route renders the portal at any URL and keeps the URL, as before routing, instead of redirecting to `/`.
+  Covered by the same new test file.
+- `useCompleteTask` no longer awaits the task-list refetch, so the screen hands over straight after the POST, as before.
+- After the fixes: `npm test` 14/14 (the 10 existing, 2 ProtectedRoute, 2 Session); lint, format:check and build clean;
+  `./mvnw -B verify` 52 (no backend change since).
+
 ## Questions
-- Q1 (Faraz, via the Jira comment): accept the scope and estimate change agreed by Ahsan.
+- Q1 (Faraz, via Jira comment 10470): accept the scope and estimate change agreed by Ahsan. **Open at PR time.**
+  BPA-47's Description (no router) and estimate (3) differ from the delivered scope until Faraz answers. Ahsan accepts
+  this in the PR.
 
 ## Human-gap log
 - Local Maven build uses the `subst S:` work-round. In PowerShell, npm runs as `npm.cmd` (script policy).
+- Story last updated: Jira `updated` moved to 2026-11-04T15:05:41.110+0400 with comment 10470 only (no field change).

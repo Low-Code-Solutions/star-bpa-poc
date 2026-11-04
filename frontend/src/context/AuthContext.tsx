@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Api } from '@/services/apiClient';
 import type { Me } from '@/types/api';
 import type { AuthState } from '@/features/auth/auth.types';
@@ -8,6 +9,7 @@ import * as authService from '@/features/auth/services/authService';
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ api, children }: { api: Api; children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -22,17 +24,20 @@ export function AuthProvider({ api, children }: { api: Api; children: ReactNode 
     async (username: string, password: string) => {
       const result = await authService.login(api, username, password);
       if ('me' in result) {
+        // A new session starts with no cached server data: another user's task list must never show (BPA-47 review).
+        queryClient.clear();
         setMe(result.me);
       }
       return result;
     },
-    [api],
+    [api, queryClient],
   );
 
   const logout = useCallback(async () => {
     await authService.logout(api);
+    queryClient.clear();
     setMe(null);
-  }, [api]);
+  }, [api, queryClient]);
 
   const value = useMemo(() => ({ me, loading, login, logout }), [me, loading, login, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

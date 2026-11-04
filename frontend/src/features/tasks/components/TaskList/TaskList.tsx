@@ -5,7 +5,7 @@ import { useStartWorkPack } from '@/features/workpacks/hooks/useStartWorkPack';
 import type { Api } from '@/services/apiClient';
 import { USER_TASKS } from '@/utils/constants';
 import { useTasks } from '../../hooks/useTasks';
-import { taskScreens } from '../../taskScreens';
+import { screenFor } from '../../taskScreens';
 import type { TaskSummary } from '../../tasks.types';
 
 /** Pause between task-list reads while waiting for Camunda's search (BPA-25: eventually consistent). Tests shorten it. */
@@ -73,7 +73,7 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
     setNotice('Task completed; the Work Pack is saved');
   }
 
-  const Screen = open ? taskScreens[open.elementId] : undefined;
+  const Screen = open ? screenFor(open.elementId) : undefined;
   if (open && Screen) {
     return <Screen key={open.key} api={api} taskKey={open.key} onDone={() => awaitSaveOutcome(open)} />;
   }
@@ -89,7 +89,7 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
         <ul>
           {tasks.map((t) => (
             <li key={t.key}>
-              <Button onClick={() => setOpen(t)} disabled={!taskScreens[t.elementId]}>
+              <Button onClick={() => setOpen(t)} disabled={!screenFor(t.elementId)}>
                 {t.name}
                 {t.workpackNumber ? ` ${t.workpackNumber}` : ''}
               </Button>
