@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@tests/test-utils';
 import userEvent from '@testing-library/user-event';
-import { apiClient } from './api/client';
-import { setRetryMs, TaskList } from './TaskList';
+import { apiClient } from '@/services/apiClient';
+import { setRetryMs, TaskList } from '@/features/tasks';
 
 // BPA-6 portal flow (review finding): the Analyst starts a request, completes the Create Work Pack screen, the save step
 // rejects it and the task comes back under a new key; the portal reopens it with the messages and the data entered. Then the
@@ -12,8 +12,14 @@ const FIRST = '2251799813690093';
 const RETURNED = '2251799813690118';
 
 const ENTERED = {
-  activityRef: 'A-2201', drawingRef: 'DWG-118', departmentRef: 'Fabrication', completionDate: '2026-11-30',
-  phases: [{ phase: 'Cutting', manhours: 150 }, { phase: 'Cutting', manhours: 50 }],
+  activityRef: 'A-2201',
+  drawingRef: 'DWG-118',
+  departmentRef: 'Fabrication',
+  completionDate: '2026-11-30',
+  phases: [
+    { phase: 'Cutting', manhours: 150 },
+    { phase: 'Cutting', manhours: 50 },
+  ],
   materials: [{ materialRef: 'MAT-PIPE-06', phase: 'Cutting' }],
 };
 
@@ -23,7 +29,11 @@ function fakeBackend() {
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
   const summary = (key: string) => ({
-    key, name: 'Create Work Pack', elementId: 'UserTask_CreateWorkPack', processInstanceKey: INSTANCE, creationDate: '2026-10-21T06:00:00Z',
+    key,
+    name: 'Create Work Pack',
+    elementId: 'UserTask_CreateWorkPack',
+    processInstanceKey: INSTANCE,
+    creationDate: '2026-10-21T06:00:00Z',
   });
   const fetchMock = vi.fn(async (input: Request) => {
     const path = new URL(input.url).pathname;
@@ -50,7 +60,15 @@ function fakeBackend() {
     }
     switch (path) {
       case '/api/v1/activities':
-        return json(200, [{ activityRef: 'A-2201', activityName: 'Synthetic piping module M-01', wbsRef: '11031', projectRef: 'PRJ-139', jobCodeRef: 'JC-139' }]);
+        return json(200, [
+          {
+            activityRef: 'A-2201',
+            activityName: 'Synthetic piping module M-01',
+            wbsRef: '11031',
+            projectRef: 'PRJ-139',
+            jobCodeRef: 'JC-139',
+          },
+        ]);
       case '/api/v1/drawings':
         return json(200, [{ drawingRef: 'DWG-118', title: 'Synthetic drawing 118' }]);
       case '/api/v1/materials':
@@ -115,6 +133,9 @@ describe('TaskList', () => {
 
     expect(await screen.findByText('Task completed; the Work Pack is saved')).toBeInTheDocument();
     expect(completed.map((c) => c.key)).toEqual([FIRST, RETURNED]);
-    expect(completed[1].variables.phases).toEqual([{ phase: 'Cutting', manhours: 150 }, { phase: 'Welding', manhours: 50 }]);
+    expect(completed[1].variables.phases).toEqual([
+      { phase: 'Cutting', manhours: 150 },
+      { phase: 'Welding', manhours: 50 },
+    ]);
   });
 });

@@ -10,7 +10,7 @@ options considered. Where an ADR and 09 disagree, report it; precedence is in CL
 | [0001](0001-runtime-and-versions.md) | Runtime and versions | G1, S24 | Accepted |
 | [0002](0002-application-stack.md) | Application stack | Spring Boot workers (09 §1 note), S23 | Accepted |
 | [0003](0003-repo-layout.md) | Repo layout | L1 (amended by 0015), L17 | Accepted |
-| [0004](0004-ui-channel-and-task-api.md) | UI channel and task API | S2, S4, S14 (S15 rejected option) | Accepted |
+| [0004](0004-ui-channel-and-task-api.md) | UI channel and task API | S2, S4, S14 (S15 rejected option); amended 4 Nov 2026 (completedBy, BPA-6) | Accepted |
 | [0005](0005-identity-and-authorisation.md) | Identity and authorisation | S5, S6, G9, S22, S25-S29, L2, L4, L9, L18 | Accepted |
 | [0006](0006-validation-pattern.md) | Validation pattern | G2 (07 G2 / D56), S14 conditions | Accepted |
 | [0007](0007-reliability-and-idempotency.md) | Reliability and idempotency | S7, G10 (amended by D70) | Accepted |
@@ -23,6 +23,7 @@ options considered. Where an ADR and 09 disagree, report it; precedence is in CL
 | [0014](0014-test-strategy.md) | Test strategy | L15, L10 (lint and CI) | Accepted |
 | [0015](0015-delivery-artifact-chain.md) | Delivery artifact chain: intent → spec → plan → PR | L1 (amended), L14 (replaced) | Accepted |
 | [0016](0016-jira-source-of-truth.md) | Jira as source of truth for requirements | Jira BPA-19; L7, L13, L14 (`.mcp.json`) | Accepted |
+| [0017](0017-frontend-architecture.md) | Frontend architecture | Jira BPA-47; builds on S2, S14, S21 | Accepted |
 
 ## Every 09 row and its ADR
 

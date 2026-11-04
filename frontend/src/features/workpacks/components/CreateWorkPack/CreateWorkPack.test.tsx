@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@tests/test-utils';
 import userEvent from '@testing-library/user-event';
-import { apiClient } from './api/client';
+import { apiClient } from '@/services/apiClient';
 import { CreateWorkPack } from './CreateWorkPack';
 
 // BPA-6: the Create Work Pack screen (09 S14: React checks field rules before submission; the save step re-checks them,
@@ -17,22 +17,48 @@ function fakeBackend() {
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
   const fetchMock = vi.fn(async (input: Request) => {
     const path = new URL(input.url).pathname;
-    const body = input.method === 'GET' ? null : await input.clone().text().then((t) => (t ? JSON.parse(t) : null));
+    const body =
+      input.method === 'GET'
+        ? null
+        : await input
+            .clone()
+            .text()
+            .then((t) => (t ? JSON.parse(t) : null));
     calls.push({ method: input.method, path, body });
     switch (path) {
       case `/api/v1/tasks/${TASK}`:
         return json(200, {
-          key: TASK, name: 'Create Work Pack', elementId: 'UserTask_CreateWorkPack', processInstanceKey: '2251799813685501',
-          creationDate: '2026-10-21T06:00:00Z', variables: {}, validationMessages: [],
+          key: TASK,
+          name: 'Create Work Pack',
+          elementId: 'UserTask_CreateWorkPack',
+          processInstanceKey: '2251799813685501',
+          creationDate: '2026-10-21T06:00:00Z',
+          variables: {},
+          validationMessages: [],
         });
       case '/api/v1/activities':
         return json(200, [
           {
-            activityRef: 'A-2201', activityName: 'Synthetic piping module M-01', wbsRef: '11031', projectRef: 'PRJ-139',
-            jobCodeRef: 'JC-139', facCrpo: '139', facType: 'Module', facName: 'M-01', discipline: 'Piping',
-            baselineStart: '2026-11-01', baselineEnd: '2026-11-30', budgetedUnits: 1200,
+            activityRef: 'A-2201',
+            activityName: 'Synthetic piping module M-01',
+            wbsRef: '11031',
+            projectRef: 'PRJ-139',
+            jobCodeRef: 'JC-139',
+            facCrpo: '139',
+            facType: 'Module',
+            facName: 'M-01',
+            discipline: 'Piping',
+            baselineStart: '2026-11-01',
+            baselineEnd: '2026-11-30',
+            budgetedUnits: 1200,
           },
-          { activityRef: 'A-2299', activityName: 'Synthetic activity without plan data', wbsRef: '11031', projectRef: 'PRJ-139', jobCodeRef: 'JC-139' },
+          {
+            activityRef: 'A-2299',
+            activityName: 'Synthetic activity without plan data',
+            wbsRef: '11031',
+            projectRef: 'PRJ-139',
+            jobCodeRef: 'JC-139',
+          },
         ]);
       case '/api/v1/drawings':
         return json(200, [{ drawingRef: 'DWG-118', title: 'Synthetic drawing 118' }]);
@@ -103,7 +129,11 @@ async function fillValid(user: User, activity = 'A-2201') {
 
 function shownMessages(): string[] {
   const alert = screen.queryByRole('alert');
-  return alert ? within(alert).queryAllByRole('listitem').map((li) => li.textContent ?? '') : [];
+  return alert
+    ? within(alert)
+        .queryAllByRole('listitem')
+        .map((li) => li.textContent ?? '')
+    : [];
 }
 
 function contextValue(term: string): string {
@@ -163,10 +193,15 @@ describe('CreateWorkPack', () => {
 
     await user.click(screen.getByRole('button', { name: 'Complete task' }));
 
-    expect(shownMessages()).toEqual(expect.arrayContaining([
-      'Project activity is required', 'Drawing is required', 'At least one material is required',
-      'Department is required', 'Date to complete is required',
-    ]));
+    expect(shownMessages()).toEqual(
+      expect.arrayContaining([
+        'Project activity is required',
+        'Drawing is required',
+        'At least one material is required',
+        'Department is required',
+        'Date to complete is required',
+      ]),
+    );
 
     await addPhase(user, 'Cutting', '');
     await addMaterial(user, 'MAT-PIPE-06', '');
@@ -183,7 +218,9 @@ describe('CreateWorkPack', () => {
     await addPhase(user, 'Welding', '250');
     await user.click(screen.getByRole('button', { name: 'Add material' }));
 
-    const options = within(screen.getByLabelText('Material 1 phase')).getAllByRole('option').map((o) => o.textContent);
+    const options = within(screen.getByLabelText('Material 1 phase'))
+      .getAllByRole('option')
+      .map((o) => o.textContent);
     expect(options.filter((o) => o !== '')).toEqual(['Cutting', 'Welding']);
   });
 
@@ -243,7 +280,10 @@ describe('CreateWorkPack', () => {
         expect(shownMessages(), hours).toContain(message);
         expect(completions(), hours).toHaveLength(0);
       } else {
-        expect(shownMessages().filter((m) => manHourMessages.includes(m)), hours).toEqual([]);
+        expect(
+          shownMessages().filter((m) => manHourMessages.includes(m)),
+          hours,
+        ).toEqual([]);
         expect(completions(), hours).toHaveLength(1);
       }
       cleanup();

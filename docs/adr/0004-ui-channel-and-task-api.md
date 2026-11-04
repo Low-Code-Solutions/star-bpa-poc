@@ -53,6 +53,11 @@ and a server-side validation workaround (07 G2). The Work Pack print also has to
   the actor and start permission of D52 stand.
 - Stories BPA-6, 8, 9, 11, 23 refer to React screens instead of Tasklist forms (09 §4 item 7).
 - One React test and one backend test per condition (S14; ADR 0014).
+- Amended 4 Nov 2026 (BPA-6; D63; decided by Ahsan, Build Lead): on every completion the task API adds the process
+  variable `completedBy`, the session user's Camunda username, set from the session and never from the request. It is on
+  no allow-list, so a request that sends it is refused with 400 'Variable completedBy is not allowed for this task'. Save
+  workers use it for `created_by`, `updated_by` and the audit log; if it is missing they record the service user. Camunda's
+  own audit log still shows the service identity as the actor (BPA-26 Q1, open with the PO).
 
 ## Sources
 

@@ -222,3 +222,21 @@ Newest last. One entry per review; the full report goes in the PR description.
   (WorkPackApiTest 14), `npm test` 10/10, `npm run build` clean.
 - Not verified by the reviewer: test runs, failing-first output (tests and code in one commit, 12cc690), CI, SDK default backoff
   vs S7, test order across integration classes, React in a browser.
+
+### BPA-47 at 5758989, 4 Nov 2026 (qa-reviewer)
+- Task (frontend structure, docs, skills): 0 High, 2 Medium (Important), 4 Low. Reviewer read BPA-47 in Jira (evidence; comment 10470), the plan,
+  spec.md, the old (827a8ba) and new portal code, and every source the two skills cite; ran `eslint .` and `prettier --check .` (both clean); npm test,
+  build and `./mvnw -B verify` per the author (12/12, clean, 52).
+- Checks passed: DOM, texts, order, polling (500 ms x 10), password clear and error texts unchanged; the moved tests change imports and render wrapper only
+  (format-only commit 194a60a has identical tokens); layout and naming as planned; ADR 0004 amendment matches TaskService, SaveWorkPackWorker and WorkPackRepository,
+  Decision unchanged; ADR 0017 as briefed; skill citations all real; `.claude/settings.json`, hooks, api/, models/ and backend code untouched.
+- Important (2):
+  - TanStack Query cache not cleared at logout: a second persona in the same tab saw the previous user's task list until the refetch returned: fixed
+    (AuthContext clears the cache at login and logout; new tests/integration/Session.test.tsx, shown failing without the fix).
+  - Jira Description ("no router") and estimate (3) still differ from the agreed scope; comment 10470 awaits Faraz: open, recorded as plan Q1 and in the
+    PR for Ahsan to accept; plan "Story last updated" bumped (comment only).
+- Low (4), fixed: catch-all `Navigate` rewrote non-root URLs (now the portal renders at any URL, URL kept; tested); awaited task-list refetch after a
+  completion (no longer awaited); `@types/node`, `USER_TASKS` and the package.json description added to the plan / updated; `taskScreens` lookup now
+  own keys only (`screenFor`).
+- After the fixes: `npm test` 14/14, lint, format:check and build clean; `./mvnw -B verify` 52 (no backend change).
+- Not verified by the reviewer: test, build and Maven runs; CI; the brief's exact ADR 0004 wording; the browser run.

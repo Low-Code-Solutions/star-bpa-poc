@@ -1,6 +1,7 @@
 # Builds and tests the backend and the React portal, and lints the API contract, on every pull request and on pushes to
 # main (BPA-43, P4, S21). Camunda Process Test and Testcontainers (PostgreSQL, the integration Camunda) need Docker, which
-# ubuntu-latest provides. Same commands as a local run: ./mvnw -B verify (backend/), npm test and npm run build (frontend/).
+# ubuntu-latest provides. Same commands as a local run: ./mvnw -B verify (backend/), npm run lint, npm run format:check, npm test and
+# npm run build (frontend/).
 name: Backend
 
 on:
@@ -46,6 +47,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - name: Lint (ESLint) and format check (Prettier), ADR 0017
+        run: npm run lint && npm run format:check
       - run: npm test
       - run: npm run build
 

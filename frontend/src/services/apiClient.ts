@@ -1,6 +1,9 @@
 import createClient, { type Middleware } from 'openapi-fetch';
 import type { paths } from './schema';
 
+// The one API client (ADR 0017): openapi-fetch typed by schema.d.ts, which `npm run gen:api` generates from
+// ../api/openapi.yaml (S21). Never edit schema.d.ts by hand.
+//
 // S26: every state-changing call sends the XSRF-TOKEN cookie back as the X-XSRF-TOKEN header. The session cookie is
 // HttpOnly, so React never sees it and never holds the password after the login call (S5).
 const csrf: Middleware = {
@@ -28,3 +31,6 @@ export function apiClient() {
   client.use(csrf);
   return client;
 }
+
+/** The client type every service and feature takes as `api`. */
+export type Api = ReturnType<typeof apiClient>;
