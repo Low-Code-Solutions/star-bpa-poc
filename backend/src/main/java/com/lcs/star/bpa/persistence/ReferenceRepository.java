@@ -43,8 +43,8 @@ public class ReferenceRepository {
                     Date end = rs.getDate("baseline_end");
                     activity.setBaselineStart(start == null ? null : start.toLocalDate());
                     activity.setBaselineEnd(end == null ? null : end.toLocalDate());
-                    BigDecimal units = rs.getBigDecimal("budgeted_units");
-                    activity.setBudgetedUnits(units == null ? null : units.stripTrailingZeros());
+                    BigDecimal units = rs.getBigDecimal("budgeted_units"); // numeric(9,2): JSON 1200.00, read as 1200
+                    activity.setBudgetedUnits(units);
                     return activity;
                 });
     }

@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { apiClient } from './api/client';
+import { TaskList } from './TaskList';
 import type { components } from './api/schema';
 
 type Me = components['schemas']['Me'];
 
-// Walking-skeleton portal (BPA-43, L4): log in, see /me, log out. Stories add their screens (ADR 0004).
+// Portal (ADR 0004): log in, see /me, log out (BPA-43, L4); the task list and the Create Work Pack screen (BPA-6).
 export function App() {
   const [api] = useState(apiClient);
   const [me, setMe] = useState<Me | null>(null);
@@ -44,6 +45,7 @@ export function App() {
       >
         Log out
       </button>
+      <TaskList api={api} groups={me.groups} />
     </main>
   );
 }

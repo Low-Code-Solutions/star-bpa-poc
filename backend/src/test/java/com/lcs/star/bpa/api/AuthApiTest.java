@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.lcs.star.bpa.adapter.CamundaIdentityClient;
+import com.lcs.star.bpa.adapter.CamundaProcessClient;
 import com.lcs.star.bpa.adapter.CamundaIdentityClient.CamundaUser;
 import java.net.http.HttpResponse;
 import java.util.List;
@@ -40,6 +41,10 @@ class AuthApiTest {
 
     @MockitoBean
     CamundaIdentityClient camunda;
+
+    /** BPA-6: the process start is Camunda's side too; this class tests the gate in front of it. */
+    @MockitoBean
+    CamundaProcessClient processes;
 
     TestBrowser browser;
 
@@ -145,10 +150,18 @@ class AuthApiTest {
         assertThat(browser.postWithoutCsrfToken("/api/v1/workpacks", "{}").statusCode()).isEqualTo(403);
     }
 
+    /**
+     * Was BPA43_startWorkPackReturns501ForTimeMethodAnalyst: the skeleton's 501 stub, which BPA-6 replaced with the real start
+     * (said in the BPA-6 PR, L15). What the skeleton guarded still holds: the analyst passes the group gate.
+     */
     @Test
-    void BPA43_startWorkPackReturns501ForTimeMethodAnalyst() {
+    void BPA43_startWorkPackIsAllowedForTimeMethodAnalyst() {
+        when(processes.start("Process_PPC_WorkPackAssignment")).thenReturn("2251799813685501");
         browser.login("time-method-analyst", "right");
 
-        assertThat(browser.post("/api/v1/workpacks", "{}").statusCode()).isEqualTo(501);
+        HttpResponse<String> response = browser.post("/api/v1/workpacks", "{}");
+
+        assertThat(response.statusCode()).isEqualTo(201);
+        assertThat(response.body()).contains("2251799813685501");
     }
 }

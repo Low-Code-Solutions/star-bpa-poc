@@ -89,6 +89,18 @@ Asia/Riyadh). `validationMessages` from the task are shown. Other groups see the
 - `frontend/src/App.tsx`, new `frontend/src/TaskList.tsx`, `frontend/src/CreateWorkPack.tsx`
 - `REVIEW.md`, this plan. No BPMN, DMN, migration or contract change expected.
 
+**As built (4 Nov):**
+- The start client is its own class `adapter/CamundaProcessClient.java`, wired in new `config/CamundaClientsConfig.java`.
+- The save step is `persistence/WorkPackRepository.save` (the plan's "WorkPackService"); no separate service class.
+- Test helpers: new `IntegrationApp.java` (the Camunda background, moved out of `TaskApiTest`, which now uses it) and
+  `IntegrationCamunda.grpcUrl()`, so the app's job worker can reach the integration Camunda.
+- `AuthApiTest.BPA43_startWorkPackReturns501ForTimeMethodAnalyst` asserted the skeleton's 501 stub, which BPA-6 replaces.
+  Renamed `BPA43_startWorkPackIsAllowedForTimeMethodAnalyst` and changed to expect 201 with the Camunda start stubbed
+  (said in the PR, L15). `SkeletonWorkerProcessTest` itself is unchanged; only its test app leaves the worker out.
+- Extra validator messages for input the AC does not cover (ASSUMPTION texts, Q5): "Select a phase for each man-hour
+  line", "Phase <p> is not a valid phase", "Select a material for each material line", "<Field> <ref> is not known",
+  "Date to complete must be a date (YYYY-MM-DD)".
+
 ## Order of work
 1. Commit this plan (Approved). Ask before Ready → In Progress.
 2. Write the 11 backend tests and the React tests; run them; show each fails for the expected reason.
@@ -113,7 +125,7 @@ React tests use a stubbed fetch, as `App.test.tsx` does.
 | Material twice in one phase (2 rows) | BPA6_duplicateMaterialInOnePhaseIsRejected | — |
 | Date to complete boundary (3 rows) | BPA6_dateToCompleteBoundary (settable clock) | same name: past date blocked |
 | Man hours boundary (5 rows) | BPA6_manHoursBoundary | same name: 0, 0.001, 100000 blocked |
-| Retried save | BPA6_rerunDoesNotCreateSecondWorkPack: `WorkPackService.save` twice for instance 2251799813685501 → one row, same number and estimates | — |
+| Retried save | BPA6_rerunDoesNotCreateSecondWorkPack: `WorkPackRepository.save` twice for one instance key → one row, same number and estimates. As built: key 4503599627370497 (partition 2's range) instead of the AC's illustrative 2251799813685501, which the single-partition test Camunda could generate itself | — |
 | Other roles cannot create | BPA6_otherRolesCannotCreateWorkPack: production-team POST → 403; its task list has no Create task | — |
 
 Outlines run their rows inside the one test (one test per scenario).
@@ -136,3 +148,11 @@ screen, the Work Pack row exists; a rejected save shows messages on the returned
 
 ## Human-gap log
 - Local Maven build uses the `subst S:` work-round (BPA-26 Human-gap log) until the pom is fixed.
+- 4 Nov, test-first (L15). Backend red run: 10 of 11 BPA6 tests failed for the expected reason. 9 failed on
+  `POST /api/v1/workpacks` 501 or `GET /api/v1/activities` 404; BPA6_rerunDoesNotCreateSecondWorkPack failed on the
+  stub's "not built yet" (a compile-only stub of `WorkPackRepository.save`, said in the PR). BPA6_otherRolesCannotCreateWorkPack
+  already passed: its 403 rule came with BPA-43 and its task list with BPA-26, so BPA-6 adds nothing there.
+  React red run: the test file failed to import `./CreateWorkPack` (not written yet).
+- 4 Nov, green: 11/11 BPA6 backend tests pass with the real worker on the integration Camunda; `./mvnw -B verify` 49
+  tests; React 6/6 BPA6 tests and 3/3 BPA43, `npm run build` clean. BPA6_manHoursBoundary (React) runs five full form
+  fills and needed a 20 s timeout instead of Vitest's 5 s default (timeout only; assertions unchanged).
