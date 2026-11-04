@@ -1,7 +1,7 @@
 # Plan: BPA-46 Draft the full api/openapi.yaml contract (09 S20, §4 item 4)
 Jira: BPA-46 (Task, epic BPA-3)
 Story last updated: 2026-11-02T19:03:57.272+0400
-Status: Approved (Faraz, 2026-11-02)
+Status: Closed (2026-11-04)
 Approver: Faraz (Product Owner and Architect); Ahsan (Build Lead) reviews and merges
 Branch: BPA-46-openapi-contract, from main fdef8d1
 
@@ -64,7 +64,7 @@ found; those must carry `x-assumption: true`.
 1. POST workpacks 201 body (`processInstanceKey`); and 503 "The process engine is not available right now;
    try again later" on every call that reaches Camunda (start, task API, drawing-revisions). *Built:
    503 added to the task API and drawing-revisions too.*
-2. 403 text on non-task endpoints (BPA-6, 7, 10, 12, 14, 15 give only the code): "You are not allowed to do this".
+2. 403 text on non-task endpoints (BPA-6, 7, 10, 12, 14, 15 give only the code): "Your groups do not allow this call, or the CSRF token is missing" (the SecurityConfig text, as built after review Medium 2).
 3. 400 for a missing or malformed `workpackNumber` query/path value: "Workpack number must match WP-######"
    (one text for both cases, as built).
 4. GET workpacks/{n}/print for an unknown Work Pack: reuse "Work Pack not found" (BPA-10 states only the not-scheduled case).
@@ -181,4 +181,4 @@ Asked:
   stories be tested out of order and let BPA-16 run in parallel with BPA-26. Proposed as a new Jira Task;
   not created.
 - Q1–Q4 not answered at approval; the plan's defaults are applied (Q1 no body; Q2 data-model names;
-  Q3 JSON only). Q4 does not change the contract.
+  Q3 JSON only, later answered JSON and CSV). Q4 does not change the contract.
