@@ -124,6 +124,12 @@ All error bodies asserted as `application/problem+json` with the exact `detail`.
   screen. Proposal: the test asserts assignee + COMPLETED, and the Operate check is a manual screenshot in the PR. If
   Operate shows `bpa-service` as the actor, that is a contradiction to log, not to work round. To be posted as a
   Jira comment after your yes.
+  **Found 4 Nov (local stack, instance 2251799813686051, task 2251799813686055):** the task reads COMPLETED with
+  `assignee: project-engineer`, but Camunda's audit log (`POST /v2/audit-logs/search`) records `actorId: bpa-service`
+  for both ASSIGN and COMPLETE. So Camunda keeps the real user as assignee, and the service user as the actor. Whether
+  Operate's screen shows the assignee or the actor is the open part (screenshot pending). This contradicts "Operate shows
+  project-engineer as the user who completed the task" if Operate shows the actor. Reported for the PO, not worked round:
+  the backend cannot call Camunda as the user, because it does not keep the password (S5).
 - Q2 (Khitaba). Read allow-lists, the 404/403/409/400 order, and 404 for non-Epic-1 tasks are ASSUMPTIONs; listed for the comment.
 - Q3. Spec.md names BPA-8 among the task-API users; Jira (comment 10376) lists BPA-6, 9, 11, 23. BPA-8's Confirm task
   is served either way; reported, no change.
