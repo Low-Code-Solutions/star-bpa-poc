@@ -46,6 +46,18 @@ Project and Claude Code use identical names. All file paths below are from the r
   (stories); Risks; Proof; Questions; Human-gap log
 - intent/README.md is generated and non-authoritative; never edit it by hand
 
+## Frontend (React portal; ADR 0017)
+- Layout by feature: `frontend/src/features/{auth,tasks,workpacks,reference-data}/`, each with `components/`, `hooks/`,
+  `services/` and a `*.types.ts`. Shared UI goes in `src/components/common/` and `src/components/layout/`, route-level
+  pages in `src/pages/`, routes in `src/routes/`.
+- Naming: a PascalCase folder per component with an `index.ts` barrel; hooks `use*.ts`; API modules `*Service.ts`.
+- Imports: `@/` for `frontend/src/`, `@tests/` for `frontend/tests/`.
+- API calls go only through `src/services/apiClient.ts` (openapi-fetch) with the types generated from `api/openapi.yaml` into
+  `src/services/schema.d.ts` (`npm run gen:api`; never edit it by hand). No axios, no store.
+- Task screens are built on `TaskScreenShell` and registered in `src/features/tasks/taskScreens.ts` by BPMN element ID.
+- Tests sit beside their code; integration tests and the test setup are in `frontend/tests/`. Lint (ESLint) and format
+  (Prettier) checks run in CI.
+
 ## Tests
 - One test per Gherkin scenario, named after the story key and scenario,
   e.g. BPA14_validNearMissStartsIncidentProcess
