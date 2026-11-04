@@ -257,21 +257,31 @@ class HourJournalHeaderApiTest {
         assertThat(headers(loggedInAs("time-method-analyst"), wp.number())).hasSize(1);
     }
 
-    // --- stand-in for BPA-23 --------------------------------------------------------------------------------------------
+    // --- the real corrections step (BPA-23) --------------------------------------------------------------------------------
 
     /**
-     * "The Time & Method Analyst changes Welding from 250 to 300 in the Confirm Workpack task". The corrections save is BPA-23's
-     * (today save-workpack refuses those jobs with an incident, BPA-6). So the test changes the phase as that save will, and
-     * moves the token from Confirm Workpack to ServiceTask_UpdateHourJournalHeader, where the real worker runs.
-     * BPA-23: replace this with completing the Confirm task through the task API with Welding 300. The header's audit row
-     * (table_name 'hour_journal_header', column_name 'estimated_manhours', 400 -> 450) is already asserted; BPA-23 adds its
-     * own workpack_phase row (250 -> 300).
+     * "The Time & Method Analyst changes Welding from 250 to 300 in the Confirm Workpack task", now through the real path
+     * (BPA-23 re-check; until BPA-23 this was a stand-in that set the phase in the database and moved the token). The Analyst
+     * opens the Confirm task, keeps its variables (with the material line ids) and completes it with Welding 300; then
+     * ServiceTask_SaveWorkPackCorrections and ServiceTask_UpdateHourJournalHeader run for real.
      * BPA-8: nothing to change; Confirm is still where the token is when this runs.
      */
+    @SuppressWarnings("unchecked")
     private void correctWeldingTo300(Saved wp) {
-        awaitOpenTask(wp.instance(), CONFIRM);
-        jdbc.update("UPDATE bpa.workpack_phase SET manhours = 300 WHERE workpack_id = ? AND phase = 'Welding'", wp.id());
-        moveToken(wp.instance(), CONFIRM, UPDATE_HEADER);
+        String confirm = awaitOpenTask(wp.instance(), CONFIRM).path("userTaskKey").asText();
+        TestBrowser analyst = loggedInAs("time-method-analyst");
+        Map<String, Object> variables = JSON.convertValue(json(analyst.get("/api/v1/tasks/" + confirm).body()).path("variables"), Map.class);
+        List<Map<String, Object>> phases = new java.util.ArrayList<>();
+        for (Object p : (List<Object>) variables.get("phases")) {
+            Map<String, Object> line = new LinkedHashMap<>((Map<String, Object>) p);
+            if ("Welding".equals(line.get("phase"))) {
+                line.put("manhours", 300);
+            }
+            phases.add(line);
+        }
+        variables.put("phases", phases);
+        HttpResponse<String> done = analyst.post("/api/v1/tasks/" + confirm + "/complete", toJson(Map.of("variables", variables)));
+        assertThat(done.statusCode()).as("complete Confirm: " + done.body()).isEqualTo(204);
     }
 
     // --- the portal's steps and Camunda helpers -------------------------------------------------------------------------
@@ -323,13 +333,6 @@ class HourJournalHeaderApiTest {
         return elements(found.body().path("items"));
     }
 
-    /** Process instance modification as the demo admin: terminate this active element, activate another (test stand-in). */
-    private static void moveToken(long instance, String fromElementId, String toElementId) {
-        JsonNode active = poll(() -> activeElements(instance).stream().filter(e -> fromElementId.equals(e.path("elementId").asText())).toList(),
-                list -> !list.isEmpty(), fromElementId + " active in " + instance).get(0);
-        modify(instance, List.of(active), toElementId);
-    }
-
     /**
      * Terminate whatever is active in the instance and activate one element (test stand-in). Retried, because the search may
      * still list an element the engine has already left (eventual consistency, BPA-25): the engine then rejects it.
@@ -348,11 +351,6 @@ class HourJournalHeaderApiTest {
             pause();
         }
         throw new AssertionError("could not move " + instance + " to " + toElementId + "; last: " + (last == null ? "nothing active" : last.body()));
-    }
-
-    private static void modify(long instance, List<JsonNode> terminate, String toElementId) {
-        Reply modified = IntegrationApp.admin.post("/v2/process-instances/" + instance + "/modification", modification(terminate, toElementId));
-        assertThat(modified.status()).as("modification -> " + toElementId + ": " + modified.body()).isEqualTo(204);
     }
 
     private static Map<String, Object> modification(List<JsonNode> terminate, String toElementId) {

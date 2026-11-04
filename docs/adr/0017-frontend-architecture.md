@@ -68,6 +68,14 @@ agreed structure they would be built four different ways, and restructuring late
 - **Later clean-up:** the task list still polls Camunda's eventually consistent search with its own loop (500 ms × 10,
   BPA-6). That polling moves into TanStack Query later; BPA-47 kept the loop to keep behaviour unchanged.
 - `docs/04-conventions.md` has a Frontend section that points here.
+- **Amended 5 Nov 2026 (BPA-23; decided by Ahsan, Build Lead, 4 Nov):** the visual design starts with BPA-23, not a later
+  task. "No theme or visual change" above held until then. The design follows the frontend-design skill (plugin 1.1.1),
+  with the brief and the review against its default looks recorded in plan BPA-23. It uses:
+  - plain CSS: tokens as custom properties and class names in `src/styles/global.css`;
+  - one self-hosted typeface, `@fontsource/barlow` (no CDN);
+  - still **no UI library**.
+
+  Styling adds class names only. Elements, roles, labels and texts stay as the stories and tests state them.
 
 ## Sources
 

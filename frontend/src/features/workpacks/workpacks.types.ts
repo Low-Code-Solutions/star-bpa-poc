@@ -2,7 +2,8 @@ import type { StartWorkPackResponse } from '@/types/api';
 
 /** A phase line and a material line as the Create Work Pack screen holds them (man hours as typed). */
 export type PhaseRow = { phase: string; manhours: string };
-export type MaterialRow = { materialRef: string; phase: string };
+/** id: the saved line's id on the Confirm screen, round-tripped so the save step updates the line in place (BPA-23, A4). */
+export type MaterialRow = { id?: string; materialRef: string; phase: string };
 
 /** The Create Work Pack screen's fields; names as the BPA-26 write allow-list for UserTask_CreateWorkPack. */
 export type CreateWorkPackForm = {

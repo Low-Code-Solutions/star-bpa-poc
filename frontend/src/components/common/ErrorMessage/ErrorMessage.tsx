@@ -5,7 +5,7 @@
 export function ErrorMessage({ messages, text }: { messages?: string[]; text?: string | null }) {
   if (messages && messages.length > 0) {
     return (
-      <div role="alert">
+      <div role="alert" className="notice notice--error">
         <ul>
           {messages.map((m) => (
             <li key={m}>{m}</li>
@@ -15,7 +15,11 @@ export function ErrorMessage({ messages, text }: { messages?: string[]; text?: s
     );
   }
   if (text) {
-    return <p role="alert">{text}</p>;
+    return (
+      <p role="alert" className="notice notice--error">
+        {text}
+      </p>
+    );
   }
   return null;
 }

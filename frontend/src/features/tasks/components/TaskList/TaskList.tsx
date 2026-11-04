@@ -79,14 +79,14 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
   }
 
   return (
-    <section aria-label="My tasks">
+    <section aria-label="My tasks" className="tasks">
       <h2>My tasks</h2>
       {groups.includes('time-method-analyst') && <Button onClick={startRequest}>Start Work Pack request</Button>}
       {notice && <p role="status">{notice}</p>}
       {tasks.length === 0 ? (
         <p>No open tasks</p>
       ) : (
-        <ul>
+        <ul className="register">
           {tasks.map((t) => (
             <li key={t.key}>
               <Button onClick={() => setOpen(t)} disabled={!screenFor(t.elementId)}>

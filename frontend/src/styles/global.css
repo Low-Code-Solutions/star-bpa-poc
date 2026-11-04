@@ -1,1 +1,407 @@
-/* Global styles only (ADR 0017). Empty on purpose: no visual change until the redesign. */
+/*
+ * STAR BPA portal: global styles (ADR 0017, amended by BPA-23; frontend-design skill). Plain CSS, no UI library.
+ * Subject: production planning at a steel fabrication yard. Audience: Time & Method Analysts and planners at a desk.
+ * Primary job: complete a task correctly; errors impossible to miss.
+ * One memorable thing: the task heading as a fabrication job tag. Everything else stays quiet.
+ * Elements, labels and roles are the ones the tests use; styling never changes them.
+ */
+
+:root {
+  /* Colour */
+  --steel-ink: #1e2933; /* text */
+  --mill-scale: #5b6670; /* secondary text, rules */
+  --plate: #eceeef; /* page */
+  --sheet: #ffffff; /* the working surface */
+  --marking-paint: #f2b705; /* the job tag and keyboard focus, nowhere else */
+  --signal-red: #b3261e; /* errors */
+  --rule: #c9cfd3;
+
+  /* Type: one family, Barlow (industrial signage roots), tabular figures for numbers */
+  --font: 'Barlow', system-ui, sans-serif;
+  --step--1: 0.875rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.6rem;
+  --step-3: 2.1rem;
+
+  /* Space and shape */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2.5rem;
+  --radius: 3px;
+  --measure: 72ch;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font);
+  font-size: 100%;
+  line-height: 1.5;
+  color: var(--steel-ink);
+  background: var(--plate);
+  font-variant-numeric: tabular-nums;
+}
+
+body {
+  margin: 0;
+}
+
+/* --- The portal frame ------------------------------------------------------------------------------------------------ */
+
+.portal {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-6);
+  display: grid;
+  gap: var(--space-4);
+}
+
+.portal__title {
+  margin: 0;
+  font-size: var(--step-2);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.portal__user {
+  margin: 0;
+  color: var(--mill-scale);
+}
+
+.portal__user strong {
+  color: var(--steel-ink);
+  font-weight: 600;
+}
+
+.portal__groups {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--mill-scale);
+  font-size: var(--step--1);
+}
+
+.portal__groups li {
+  padding: 0 var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--sheet);
+}
+
+.portal__logout {
+  justify-self: start;
+}
+
+/* Header row on wider screens: title, user and groups on the left, Log out on the right. */
+@media (min-width: 48rem) {
+  .portal {
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+  }
+
+  /* Only the header items (BPA-23 review: a :not() selector out-ranked the full-width task list and sheet). */
+  .portal__title,
+  .portal__user,
+  .portal__groups {
+    grid-column: 1;
+  }
+
+  .portal__logout {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+}
+
+/* --- Login ------------------------------------------------------------------------------------------------------------ */
+
+.portal--login {
+  max-width: 26rem;
+  padding-top: 15vh;
+  grid-template-columns: 1fr;
+}
+
+.portal--login form {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--sheet);
+  border-left: 4px solid var(--steel-ink);
+}
+
+.portal--login label {
+  display: grid;
+  gap: var(--space-1);
+  font-weight: 500;
+}
+
+/* --- Controls ---------------------------------------------------------------------------------------------------------- */
+
+input,
+select,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input,
+select {
+  min-height: 2.5rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--mill-scale);
+  border-radius: var(--radius);
+  background: var(--sheet);
+  width: 100%;
+}
+
+input[readonly] {
+  background: var(--plate);
+  border-style: dashed;
+}
+
+.button {
+  min-height: 2.5rem;
+  padding: var(--space-1) var(--space-4);
+  border: 1px solid var(--steel-ink);
+  border-radius: var(--radius);
+  background: var(--sheet);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:disabled {
+  border-color: var(--rule);
+  color: var(--mill-scale);
+  cursor: not-allowed;
+}
+
+.button--primary {
+  background: var(--steel-ink);
+  color: var(--sheet);
+}
+
+/* Keyboard focus is always visible, in the marking-paint colour, with an ink edge so it reads on any ground. */
+:focus-visible {
+  outline: 3px solid var(--marking-paint);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px var(--steel-ink);
+}
+
+/* --- The task list: a register, not cards ------------------------------------------------------------------------------ */
+
+.tasks {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+
+.tasks h2 {
+  margin: var(--space-4) 0 0;
+  font-size: var(--step-1);
+  font-weight: 600;
+}
+
+.tasks > .button {
+  justify-self: start;
+}
+
+.tasks p {
+  margin: 0;
+  color: var(--mill-scale);
+}
+
+.register {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--sheet);
+  border-top: 2px solid var(--steel-ink);
+}
+
+.register li {
+  border-bottom: 1px solid var(--rule);
+}
+
+.register .button {
+  width: 100%;
+  min-height: 3rem;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  font-weight: 500;
+  background: transparent;
+}
+
+.register .button:not(:disabled):hover {
+  background: var(--plate);
+}
+
+/* --- A task screen: one sheet, headed by its job tag --------------------------------------------------------------------- */
+
+.task-sheet {
+  grid-column: 1 / -1;
+  max-width: var(--measure);
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--sheet);
+}
+
+/* The job tag: a stamped, punched fabrication tag (the one bold element). */
+.task-tag {
+  justify-self: start;
+  position: relative;
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-6);
+  background: var(--marking-paint);
+  color: var(--steel-ink);
+  font-size: var(--step-2);
+  font-weight: 700;
+  line-height: 1.15;
+  clip-path: polygon(0.9rem 0, 100% 0, 100% 100%, 0.9rem 100%, 0 50%);
+}
+
+.task-tag::before {
+  content: '';
+  position: absolute;
+  left: 1.2rem;
+  top: 50%;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-top: -0.35rem;
+  border-radius: 50%;
+  background: var(--sheet);
+  box-shadow: inset 0 0 0 2px var(--steel-ink);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+  font-weight: 500;
+}
+
+.field--number input {
+  max-width: 12rem;
+  font-weight: 700;
+  font-size: var(--step-1);
+}
+
+/* The activity context panel: read-only facts, in two columns of term and value. */
+.context-panel dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--plate);
+  font-size: var(--step--1);
+}
+
+.context-panel dt {
+  color: var(--mill-scale);
+}
+
+.context-panel dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Phases and materials: grouped lines on a plate edge. */
+.line-group {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 0;
+  border-left: 4px solid var(--mill-scale);
+  background: var(--plate);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.line-group legend {
+  padding: 0;
+  font-weight: 600;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: 1fr 9rem;
+  gap: var(--space-2);
+}
+
+.line-group > .button {
+  justify-self: start;
+}
+
+.task-sheet > .button--primary {
+  justify-self: start;
+  margin-top: var(--space-2);
+}
+
+/* --- Messages: errors and the return reason, impossible to miss ------------------------------------------------------- */
+
+.notice {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid currentColor;
+  background: var(--sheet);
+}
+
+.notice ul {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.notice--error {
+  color: var(--signal-red);
+  font-weight: 600;
+  background: #fbeceb;
+}
+
+.notice--return {
+  color: var(--steel-ink);
+  background: var(--plate);
+}
+
+.notice--return p {
+  margin: 0;
+}
+
+/* --- Small screens ------------------------------------------------------------------------------------------------------ */
+
+@media (max-width: 40rem) {
+  .task-sheet {
+    padding: var(--space-4);
+  }
+
+  .line {
+    grid-template-columns: 1fr;
+  }
+
+  .context-panel dl {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+.notice__label {
+  font-weight: 700;
+}

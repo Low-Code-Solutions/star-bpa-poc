@@ -35,8 +35,12 @@ screen, use the `new-task-screen` skill.
 - **Tests:** one React test per screen condition (ADR 0014, S14). A scenario test is named `BPA<n>_<camelCaseScenario>` and
   is shown failing before the code (L15). Feature components are rendered with `render` from `@tests/test-utils`.
 - **Before a PR:** `npm run lint`, `npm run format:check`, `npm test`, `npm run build` (CI runs the same).
-- **Visual design:** the frontend-design plugin, if installed, covers visual design only. The rules in this file and the
-  root CLAUDE.md come first. No UI library, theme or visual change until the redesign task.
+- **Visual design** (ADR 0017, amended by BPA-23):
+  - Use the tokens and class names in `src/styles/global.css` (plain CSS, Barlow); no UI library.
+  - New visuals follow the frontend-design plugin, which covers visual design only. The rules in this file and the root
+    CLAUDE.md come first.
+  - Styling adds class names; it never changes an element, role, label or text that a story or test states.
+  - The marking-paint yellow is kept for the job tag and keyboard focus.
 
 ## Running locally
 
