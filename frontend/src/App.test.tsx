@@ -14,7 +14,13 @@ function fakeBackend() {
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': type } });
   const fetchMock = vi.fn(async (input: Request) => {
     const path = new URL(input.url).pathname;
-    const body = input.method === 'GET' ? null : await input.clone().text().then((t) => (t ? JSON.parse(t) : null));
+    const body =
+      input.method === 'GET'
+        ? null
+        : await input
+            .clone()
+            .text()
+            .then((t) => (t ? JSON.parse(t) : null));
     calls.push({ method: input.method, path, xsrf: input.headers.get('X-XSRF-TOKEN'), body });
     if (path === '/api/v1/me') {
       return session ? json(200, session) : json(401, { status: 401, title: 'Unauthorized' }, 'application/problem+json');
@@ -22,7 +28,11 @@ function fakeBackend() {
     if (path === '/api/v1/auth/login') {
       const { username, password } = body as { username: string; password: string };
       if (username === 'camunda-down') {
-        return json(503, { status: 503, detail: 'Login is not available right now; try again later' }, 'application/problem+json');
+        return json(
+          503,
+          { status: 503, detail: 'Login is not available right now; try again later' },
+          'application/problem+json',
+        );
       }
       if (username === 'time-method-analyst' && password === 'right') {
         session = { username, groups: ['time-method-analyst'] };

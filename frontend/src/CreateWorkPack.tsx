@@ -17,7 +17,9 @@ type MaterialRow = { materialRef: string; phase: string };
 
 /** Today in Asia/Riyadh as YYYY-MM-DD (D28, 09 S9): business dates are Riyadh dates whatever the browser's zone. */
 function todayInRiyadh(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(
+    new Date(),
+  );
 }
 
 /** 2026-11-01 -> 01 Nov 2026, without going through a time zone. */
@@ -34,7 +36,12 @@ function showDate(iso?: string): string {
  * re-checks all of these and the cross-field rules (duplicate phase or material) and returns its own messages.
  */
 export function fieldMessages(form: {
-  activityRef: string; drawingRef: string; departmentRef: string; completionDate: string; phases: PhaseRow[]; materials: MaterialRow[];
+  activityRef: string;
+  drawingRef: string;
+  departmentRef: string;
+  completionDate: string;
+  phases: PhaseRow[];
+  materials: MaterialRow[];
 }): string[] {
   const messages: string[] = [];
   const add = (m: string) => {
@@ -91,12 +98,20 @@ export function CreateWorkPack({ api, taskKey, onDone }: { api: Api; taskKey: st
       setDepartmentRef(text(v.departmentRef));
       setCompletionDate(text(v.completionDate));
       if (Array.isArray(v.phases)) {
-        setPhases(v.phases.map((p: { phase?: unknown; manhours?: unknown }) => ({
-          phase: text(p.phase), manhours: p.manhours === undefined || p.manhours === null ? '' : String(p.manhours),
-        })));
+        setPhases(
+          v.phases.map((p: { phase?: unknown; manhours?: unknown }) => ({
+            phase: text(p.phase),
+            manhours: p.manhours === undefined || p.manhours === null ? '' : String(p.manhours),
+          })),
+        );
       }
       if (Array.isArray(v.materials)) {
-        setMaterials(v.materials.map((m: { materialRef?: unknown; phase?: unknown }) => ({ materialRef: text(m.materialRef), phase: text(m.phase) })));
+        setMaterials(
+          v.materials.map((m: { materialRef?: unknown; phase?: unknown }) => ({
+            materialRef: text(m.materialRef),
+            phase: text(m.phase),
+          })),
+        );
       }
     });
     api.GET('/api/v1/activities').then(({ data }) => setActivities(data ?? []));
@@ -121,7 +136,10 @@ export function CreateWorkPack({ api, taskKey, onDone }: { api: Api; taskKey: st
       params: { path: { taskKey } },
       body: {
         variables: {
-          activityRef, drawingRef, departmentRef, completionDate,
+          activityRef,
+          drawingRef,
+          departmentRef,
+          completionDate,
           phases: phases.map((p) => ({ phase: p.phase, manhours: Number(p.manhours) })),
           materials: materials.map((m) => ({ materialRef: m.materialRef, phase: m.phase })),
         },
@@ -164,17 +182,28 @@ export function CreateWorkPack({ api, taskKey, onDone }: { api: Api; taskKey: st
 
       <section aria-label="Activity context">
         <dl>
-          <dt>Project</dt><dd>{activity?.projectRef ?? ''}</dd>
-          <dt>Job Code</dt><dd>{activity?.jobCodeRef ?? ''}</dd>
-          <dt>WBS</dt><dd>{activity?.wbsRef ?? ''}</dd>
-          <dt>Activity</dt><dd>{activity ? `${activity.activityRef} ${activity.activityName}` : ''}</dd>
-          <dt>FAC CRPO</dt><dd>{activity?.facCrpo ?? ''}</dd>
-          <dt>FAC Type</dt><dd>{activity?.facType ?? ''}</dd>
-          <dt>FAC Name</dt><dd>{activity?.facName ?? ''}</dd>
-          <dt>Discipline</dt><dd>{activity?.discipline ?? ''}</dd>
-          <dt>Baseline start</dt><dd>{showDate(activity?.baselineStart)}</dd>
-          <dt>Baseline end</dt><dd>{showDate(activity?.baselineEnd)}</dd>
-          <dt>Budgeted units</dt><dd>{activity?.budgetedUnits === undefined ? '' : String(activity.budgetedUnits)}</dd>
+          <dt>Project</dt>
+          <dd>{activity?.projectRef ?? ''}</dd>
+          <dt>Job Code</dt>
+          <dd>{activity?.jobCodeRef ?? ''}</dd>
+          <dt>WBS</dt>
+          <dd>{activity?.wbsRef ?? ''}</dd>
+          <dt>Activity</dt>
+          <dd>{activity ? `${activity.activityRef} ${activity.activityName}` : ''}</dd>
+          <dt>FAC CRPO</dt>
+          <dd>{activity?.facCrpo ?? ''}</dd>
+          <dt>FAC Type</dt>
+          <dd>{activity?.facType ?? ''}</dd>
+          <dt>FAC Name</dt>
+          <dd>{activity?.facName ?? ''}</dd>
+          <dt>Discipline</dt>
+          <dd>{activity?.discipline ?? ''}</dd>
+          <dt>Baseline start</dt>
+          <dd>{showDate(activity?.baselineStart)}</dd>
+          <dt>Baseline end</dt>
+          <dd>{showDate(activity?.baselineEnd)}</dd>
+          <dt>Budgeted units</dt>
+          <dd>{activity?.budgetedUnits === undefined ? '' : String(activity.budgetedUnits)}</dd>
         </dl>
       </section>
 
@@ -195,35 +224,56 @@ export function CreateWorkPack({ api, taskKey, onDone }: { api: Api; taskKey: st
             <select aria-label={`Phase ${i + 1}`} value={row.phase} onChange={(e) => setPhase(i, { phase: e.target.value })}>
               <option value="" />
               {PHASES.map((p) => (
-                <option key={p} value={p}>{p}</option>
+                <option key={p} value={p}>
+                  {p}
+                </option>
               ))}
             </select>
-            <input aria-label={`Man hours ${i + 1}`} type="number" inputMode="decimal" value={row.manhours}
-              onChange={(e) => setPhase(i, { manhours: e.target.value })} />
+            <input
+              aria-label={`Man hours ${i + 1}`}
+              type="number"
+              inputMode="decimal"
+              value={row.manhours}
+              onChange={(e) => setPhase(i, { manhours: e.target.value })}
+            />
           </div>
         ))}
-        <button type="button" onClick={() => setPhases((rows) => [...rows, { phase: '', manhours: '' }])}>Add phase</button>
+        <button type="button" onClick={() => setPhases((rows) => [...rows, { phase: '', manhours: '' }])}>
+          Add phase
+        </button>
       </fieldset>
 
       <fieldset>
         <legend>Materials</legend>
         {materials.map((row, i) => (
           <div key={i}>
-            <select aria-label={`Material ${i + 1}`} value={row.materialRef} onChange={(e) => setMaterial(i, { materialRef: e.target.value })}>
+            <select
+              aria-label={`Material ${i + 1}`}
+              value={row.materialRef}
+              onChange={(e) => setMaterial(i, { materialRef: e.target.value })}
+            >
               <option value="" />
               {materialList.map((m) => (
                 <option key={m.materialRef} value={m.materialRef}>{`${m.materialRef} ${m.description}`}</option>
               ))}
             </select>
-            <select aria-label={`Material ${i + 1} phase`} value={row.phase} onChange={(e) => setMaterial(i, { phase: e.target.value })}>
+            <select
+              aria-label={`Material ${i + 1} phase`}
+              value={row.phase}
+              onChange={(e) => setMaterial(i, { phase: e.target.value })}
+            >
               <option value="" />
               {enteredPhases.map((p) => (
-                <option key={p} value={p}>{p}</option>
+                <option key={p} value={p}>
+                  {p}
+                </option>
               ))}
             </select>
           </div>
         ))}
-        <button type="button" onClick={() => setMaterials((rows) => [...rows, { materialRef: '', phase: '' }])}>Add material</button>
+        <button type="button" onClick={() => setMaterials((rows) => [...rows, { materialRef: '', phase: '' }])}>
+          Add material
+        </button>
       </fieldset>
 
       <label>

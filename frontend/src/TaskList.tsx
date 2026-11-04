@@ -40,7 +40,9 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
     // The new Create Work Pack task reaches the task search a moment later (BPA-25: eventually consistent).
     for (let attempt = 0; attempt < 10; attempt++) {
       const list = await refresh();
-      const created = list.find((t) => t.processInstanceKey === data.processInstanceKey && t.elementId === 'UserTask_CreateWorkPack');
+      const created = list.find(
+        (t) => t.processInstanceKey === data.processInstanceKey && t.elementId === 'UserTask_CreateWorkPack',
+      );
       if (created) {
         setOpen(created);
         setNotice(null);
@@ -61,7 +63,9 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
     for (let attempt = 0; attempt < 10; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
       const list = await refresh();
-      const back = list.find((t) => t.processInstanceKey === done.processInstanceKey && t.elementId === done.elementId && t.key !== done.key);
+      const back = list.find(
+        (t) => t.processInstanceKey === done.processInstanceKey && t.elementId === done.elementId && t.key !== done.key,
+      );
       if (back) {
         setNotice(null);
         setOpen(back);
@@ -80,7 +84,9 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
     <section aria-label="My tasks">
       <h2>My tasks</h2>
       {groups.includes('time-method-analyst') && (
-        <button type="button" onClick={startRequest}>Start Work Pack request</button>
+        <button type="button" onClick={startRequest}>
+          Start Work Pack request
+        </button>
       )}
       {notice && <p role="status">{notice}</p>}
       {tasks.length === 0 ? (
@@ -90,7 +96,8 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
           {tasks.map((t) => (
             <li key={t.key}>
               <button type="button" onClick={() => setOpen(t)} disabled={t.elementId !== 'UserTask_CreateWorkPack'}>
-                {t.name}{t.workpackNumber ? ` ${t.workpackNumber}` : ''}
+                {t.name}
+                {t.workpackNumber ? ` ${t.workpackNumber}` : ''}
               </button>
             </li>
           ))}
