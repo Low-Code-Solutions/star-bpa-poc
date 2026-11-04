@@ -1,8 +1,8 @@
 # Plan: BPA-6 Time & Method Analyst can create a Work Pack with estimates
 Jira: BPA-6 (Story, epic BPA-3)
 Story last updated: 2026-11-04T13:48:15+0400 (the move to In Progress only; last content change 2 Nov, the PO's Q4 comment 10465)
-Status: Approved (Ahsan, Build Lead, 4 Nov 2026, in the Claude Code session)
-Approver: Ahsan (Build Lead); Faraz (Product Owner and Architect) for the questions below
+Status: Closed (2026-11-04)
+Approver: Ahsan (Build Lead), approved 4 Nov 2026 in the Claude Code session; Faraz (Product Owner and Architect) for the questions below
 Branch: BPA-6-create-work-pack, from main efcf784
 
 
@@ -156,6 +156,7 @@ screen, the Work Pack row exists; a rejected save shows messages on the returned
 ## Questions
 - Q1–Q3 answered by Ahsan 4 Nov (above).
 - Q4 (Faraz): estimate stays 3 with the React screen in scope?
+- Q4 and Q5 posted to Jira (BPA-6 comment 10469, 4 Nov) with the proposed Riyadh-only date row.
 - Q5 (Khitaba): ASSUMPTIONs — message order, "<Field> is not known" for unknown refs, reference-list order, Total
   Activity hours = sum of phases. For the Jira comment after the developer's yes.
 
