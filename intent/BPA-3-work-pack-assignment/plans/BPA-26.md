@@ -1,6 +1,6 @@
 # Plan: BPA-26 Portal user can get, view and complete their tasks through the backend task API
 Jira: BPA-26 (Story, epic BPA-3)
-Story last updated: 2026-11-02T16:20:42.128+0400 (content; 2026-11-04T12:24 is the Ready → In Progress move only)
+Story last updated: 2026-11-02T16:20:42.128+0400 (Jira `updated`; per the changelog a Rank change, content last changed 2026-11-02T13:04:54; 2026-11-04T12:24 is the Ready → In Progress move only)
 Status: Approved (Ahsan, Build Lead, 4 Nov 2026, in the Claude Code session)
 Approver: Ahsan (Build Lead); Faraz (Product Owner and Architect) for the questions below
 Branch: BPA-26-task-api, from main 83cf6ca
@@ -44,7 +44,8 @@ Check order 404 → 403 → 409 → 400 is an ASSUMPTION (no source orders them)
 `EngineUnavailable` text from the contract. A task outside the configured four elementIds answers 404 (ASSUMPTION).
 No validity conditions are added here (none in BPA-26; BPA-9's "Reason is required" is the first, built by BPA-9).
 
-Allow-list in `application.yml` (`bpa.tasks.<elementId>.read` / `.write`), bound to a `@ConfigurationProperties` record.
+Allow-list in `application.yml` (as built: `bpa.tasks.process-id` plus `bpa.tasks.allow-lists."[<elementId>]".read` /
+`.write`; the brackets keep the element ID as written), bound to a `@ConfigurationProperties` record.
 Write lists from the `CompleteTaskRequest` description in the contract:
 - CreateWorkPack: activityRef, drawingRef, departmentRef, completionDate, phases, materials
 - ConfirmWorkPack: same (material line `id` sits inside `materials`)
@@ -54,9 +55,13 @@ Write lists from the `CompleteTaskRequest` description in the contract:
 Read lists = the write list of the task (prefill). ASSUMPTION: no source names the read list.
 
 ## Files that change
-- `backend/src/main/java/com/lcs/star/bpa/adapter/CamundaTaskClient.java` (new): the five REST calls; maps 404, 409
-  and connection errors to small exceptions; parses variable values (JSON strings) and fetches the full value with
-  `GET /v2/variables/{key}` when `isTruncated`.
+- `backend/src/main/java/com/lcs/star/bpa/adapter/CamundaTaskClient.java` (new): the five REST calls BPA-25 proved; maps 404, 409
+  and connection errors to small exceptions; parses variable values (JSON strings). As built after review: no
+  `GET /v2/variables/{key}` (`bpa-service` gets 403 on it, checked on the local stack 4 Nov); the variable search asks
+  for `truncateValues=false` instead (200, checked the same day). A Camunda 400 on reading a task (key above int64) is
+  treated as not found; searches log a warning when Camunda holds more than one page of 100.
+- `backend/src/main/resources/application.yml` also sets `spring.jackson.default-property-inclusion: non_null`
+  (as built after review): the contract leaves optional fields out instead of sending null.
 - `backend/src/main/java/com/lcs/star/bpa/task/TaskService.java` (new): the checks and assign-then-complete.
 - `backend/src/main/java/com/lcs/star/bpa/task/TaskAllowList.java` (new): config record.
 - `backend/src/main/java/com/lcs/star/bpa/task/TaskConfig.java` (new, as built): bean wiring for the client and service
@@ -138,6 +143,9 @@ All error bodies asserted as `application/problem+json` with the exact `detail`.
   the assignee (audit-log actor stays `bpa-service`; D63 columns hold the real user), Faraz to confirm in Jira as PO;
   check order 404 → 403 → 409 → 400; read list = write list; non-Epic-1 or cancelled tasks answer 404 "Task not found".
 - Q2 (Khitaba). Read allow-lists, the 404/403/409/400 order, and 404 for non-Epic-1 tasks are ASSUMPTIONs; listed for the comment.
+  Also ASSUMPTIONs (found by the QA review): cancelled or failed tasks answer 404 and the short-lived listener states
+  (CREATING, ASSIGNING, UPDATING) count as open; one page of 100 per Camunda search; the list is sorted oldest first;
+  a taskKey outside the contract's pattern, or above int64, answers 404 "Task not found".
 - Q3. Spec.md names BPA-8 among the task-API users; Jira (comment 10376) lists BPA-6, 9, 11, 23. BPA-8's Confirm task
   is served either way; reported, no change.
 - Q4 (Ahsan). Confirm the 5-point estimate (Jira DoR line).

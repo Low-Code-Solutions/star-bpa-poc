@@ -10,17 +10,22 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 /**
- * Camunda 8.10.1 user-task REST calls made as {@code bpa-service} (S25) for the backend task API (S14, ADR 0004). Only the
+ * Camunda 8.10.1 user-task REST calls made as {@code bpa-service} (S25) for the backend task API (S14, ADR 0004). The five
  * calls BPA-25 proved: search by candidate group (check 1), read a task and its variables (checks 2 and 4), assign to the
- * real user and then complete (checks 2 and 5). Search and read go to secondary storage and are eventually consistent.
+ * real user and then complete (checks 2 and 5); the variable search adds {@code truncateValues=false} (checked on the local
+ * stack, 4 Nov). Search and read go to secondary storage and are eventually consistent.
  */
 public class CamundaTaskClient {
+
+    private static final Logger LOG = LoggerFactory.getLogger(CamundaTaskClient.class);
 
     private static final int PAGE_LIMIT = 100; // POC sizes; ASSUMPTION, no source sizes the task list
 
@@ -42,17 +47,22 @@ public class CamundaTaskClient {
                 .body(Map.of(
                         "filter", Map.of("candidateGroup", candidateGroup, "processDefinitionId", processDefinitionId, "state", "CREATED"),
                         "page", Map.of("limit", PAGE_LIMIT)))
-                .exchange((request, response) -> ok(response.getStatusCode(), "user task search", read(response.getBody()))));
+                .exchange((request, response) -> warnIfCut(ok(response.getStatusCode(), "user task search", read(response.getBody())),
+                        "user task search")));
         List<UserTask> tasks = new ArrayList<>();
         body.path("items").forEach(item -> tasks.add(UserTask.of(item)));
         return tasks;
     }
 
-    /** The task, or empty when Camunda knows no task with this key (404). */
+    /**
+     * The task, or empty when Camunda knows no task with this key (404), or rejects the key itself (400, for example 19 digits
+     * above the int64 range, which the contract's pattern lets through).
+     */
     public Optional<UserTask> get(String taskKey) {
         return call(() -> rest.get().uri("/v2/user-tasks/{key}", taskKey)
                 .exchange((request, response) -> {
-                    if (response.getStatusCode().value() == 404) {
+                    int status = response.getStatusCode().value();
+                    if (status == 404 || status == 400) {
                         return Optional.<UserTask>empty();
                     }
                     return Optional.of(UserTask.of(ok(response.getStatusCode(), "user task read", read(response.getBody()))));
@@ -60,14 +70,17 @@ public class CamundaTaskClient {
     }
 
     /**
-     * The variables visible to the task, values parsed from Camunda's JSON strings. Where a name exists in several scopes, the
-     * innermost (the task's own element instance) wins. Truncated values are read in full.
+     * The variables visible to the task, values parsed from Camunda's JSON strings. Where a name exists both on the task's own
+     * element instance and on another scope, the task's own value wins; between other scopes the first one returned wins (the
+     * four Epic 1 tasks sit in no subprocess, so today the only other scope is the process instance). Values come untruncated
+     * ({@code truncateValues=false}): {@code bpa-service} may not read {@code GET /v2/variables/{key}} (403, BPA-26 review).
      */
     public Map<String, Object> variables(UserTask task) {
-        JsonNode body = call(() -> rest.post().uri("/v2/user-tasks/{key}/variables/search", task.key())
+        JsonNode body = call(() -> rest.post().uri("/v2/user-tasks/{key}/variables/search?truncateValues=false", task.key())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("page", Map.of("limit", PAGE_LIMIT)))
-                .exchange((request, response) -> ok(response.getStatusCode(), "task variable search", read(response.getBody()))));
+                .exchange((request, response) -> warnIfCut(ok(response.getStatusCode(), "task variable search", read(response.getBody())),
+                        "task variable search")));
         Map<String, Object> variables = new LinkedHashMap<>();
         Map<String, Boolean> fromTaskScope = new LinkedHashMap<>();
         for (JsonNode item : body.path("items")) {
@@ -76,8 +89,7 @@ public class CamundaTaskClient {
             if (variables.containsKey(name) && (fromTaskScope.get(name) || !local)) {
                 continue;
             }
-            String value = item.path("isTruncated").asBoolean() ? fullValue(item.path("variableKey").asText()) : item.path("value").asText();
-            variables.put(name, parse(value));
+            variables.put(name, parse(item.path("value").asText()));
             fromTaskScope.put(name, local);
         }
         return variables;
@@ -108,10 +120,14 @@ public class CamundaTaskClient {
                 }));
     }
 
-    private String fullValue(String variableKey) {
-        JsonNode body = call(() -> rest.get().uri("/v2/variables/{key}", variableKey)
-                .exchange((request, response) -> ok(response.getStatusCode(), "variable read", read(response.getBody()))));
-        return body.path("value").asText();
+    /** Searches return one page; say so when Camunda holds more than that page (POC sizes should never reach it). */
+    private static JsonNode warnIfCut(JsonNode body, String what) {
+        long total = body.path("page").path("totalItems").asLong(0);
+        int returned = body.path("items").size();
+        if (total > returned) {
+            LOG.warn("Camunda {} returned {} of {} items; the rest are not shown (PAGE_LIMIT {})", what, returned, total, PAGE_LIMIT);
+        }
+        return body;
     }
 
     private Object parse(String value) {

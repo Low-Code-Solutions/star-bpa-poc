@@ -104,7 +104,9 @@ class TaskApiTest {
 
     @Test
     void BPA26_getsOneTask() {
-        String signOff = taskAt(SIGN_OFF, "WP-000457");
+        // declineReason is on the task's read allow-list; workpackStatus is not (application.yml, bpa.tasks).
+        String signOff = taskAt(SIGN_OFF, Map.of("workpackNumber", "WP-000457", "declineReason", "Wrong drawing revision",
+                "workpackStatus", "Draft"));
         TestBrowser browser = loggedInAs("project-engineer");
 
         HttpResponse<String> response = browser.get("/api/v1/tasks/" + signOff);
@@ -115,7 +117,10 @@ class TaskApiTest {
         assertThat(task.path("name").asText()).isEqualTo("Sign off release");
         assertThat(task.path("workpackNumber").asText()).isEqualTo("WP-000457");
         assertThat(task.path("variables").isObject()).as("task variables").isTrue();
+        assertThat(task.path("variables").path("declineReason").asText()).isEqualTo("Wrong drawing revision");
+        assertThat(task.path("variables").has("workpackStatus")).as("not on the read allow-list").isFalse();
         assertThat(task.path("validationMessages").isArray()).isTrue();
+        assertThat(task.has("confirmMessage")).as("absent on the sign-off task (contract), not null").isFalse();
     }
 
     @Test
@@ -166,6 +171,9 @@ class TaskApiTest {
         HttpResponse<String> response = browser.get("/api/v1/tasks/9999999999");
 
         assertProblem(response, 404, "Task not found");
+        // Keys no task can have: outside the contract's pattern, and 19 digits above Camunda's int64 range (BPA-26 review).
+        assertProblem(browser.get("/api/v1/tasks/not-a-key"), 404, "Task not found");
+        assertProblem(browser.get("/api/v1/tasks/9999999999999999999"), 404, "Task not found");
     }
 
     @Test
@@ -175,17 +183,25 @@ class TaskApiTest {
         String body = "{\"variables\":{\"signOffDecision\":\"Approved\"}}";
         assertThat(browser.post("/api/v1/tasks/" + signOff + "/complete", body).statusCode()).as("first completion").isEqualTo(204);
 
-        // Straight away, while Camunda's search may still read the task as CREATED (eventual consistency, BPA-25).
+        // Straight away, while Camunda's search may still read the task as CREATED: the engine refuses (eventual consistency, BPA-25).
         HttpResponse<String> response = browser.post("/api/v1/tasks/" + signOff + "/complete", body);
 
         assertProblem(response, 409, "Task is already completed");
+
+        // Once the search reads it as COMPLETED: the backend's own state check answers.
+        completed(signOff);
+        assertProblem(browser.post("/api/v1/tasks/" + signOff + "/complete", body), 409, "Task is already completed");
     }
 
-    /** Starts an instance at the given user task with its Work Pack number and returns the task key once it is searchable. */
     private static String taskAt(String elementId, String workpackNumber) {
+        return taskAt(elementId, Map.of("workpackNumber", workpackNumber));
+    }
+
+    /** Starts an instance at the given user task with these variables and returns the task key once it is searchable. */
+    private static String taskAt(String elementId, Map<String, Object> variables) {
         Reply started = admin.post("/v2/process-instances", Map.of(
                 "processDefinitionId", PROCESS,
-                "variables", Map.of("workpackNumber", workpackNumber),
+                "variables", variables,
                 "startInstructions", List.of(Map.of("elementId", elementId))));
         assertThat(started.status()).as("start at " + elementId + ": " + started.body()).isEqualTo(200);
         String instance = started.body().path("processInstanceKey").asText();
@@ -207,10 +223,14 @@ class TaskApiTest {
         return admin.pollGet("/v2/user-tasks/" + taskKey, r -> "COMPLETED".equals(r.body().path("state").asText())).body();
     }
 
-    private static void assertStaysOpen(String taskKey) {
-        Reply task = admin.get("/v2/user-tasks/" + taskKey);
-        assertThat(task.status()).isEqualTo(200);
-        assertThat(task.body().path("state").asText()).isEqualTo("CREATED");
+    /**
+     * "The task stays open", proved by the engine rather than the eventually consistent search (BPA-26 review): the rightful
+     * user can still complete it. The engine refuses a command on a completed task, which the API would answer with 409.
+     */
+    private void assertStaysOpen(String taskKey) {
+        HttpResponse<String> completion = loggedInAs("project-engineer").post("/api/v1/tasks/" + taskKey + "/complete",
+                "{\"variables\":{\"signOffDecision\":\"Approved\"}}");
+        assertThat(completion.statusCode()).as("still open, so the project engineer can complete it: " + completion.body()).isEqualTo(204);
     }
 
     private static void assertProblem(HttpResponse<String> response, int status, String detail) {

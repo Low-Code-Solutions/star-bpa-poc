@@ -88,10 +88,12 @@ public class TaskService {
             UserTask task = served(taskKey);
             requireCandidate(task, groups);
             switch (task.state()) {
-                case "CREATED" -> {
+                // Open, including the short-lived states while a task listener runs (none in the model today); the engine
+                // has the last word on those through the assign and complete below.
+                case "CREATED", "CREATING", "ASSIGNING", "UPDATING" -> {
                 }
                 case "COMPLETED", "COMPLETING" -> throw problem(HttpStatus.CONFLICT, ALREADY_COMPLETED);
-                // Cancelled with its instance, or failed: no longer open (ASSUMPTION, no source states it).
+                // Cancelled with its instance, or failed: no longer open (ASSUMPTION, decided by Ahsan 4 Nov: 404).
                 default -> throw problem(HttpStatus.NOT_FOUND, NOT_FOUND);
             }
             var writable = allowList.forElement(task.elementId()).orElseThrow().writable();
