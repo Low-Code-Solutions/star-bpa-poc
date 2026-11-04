@@ -1,7 +1,7 @@
 package com.lcs.star.bpa.api;
 
 import com.lcs.star.bpa.api.generated.WorkpacksApi;
-import java.util.Map;
+import com.lcs.star.bpa.api.generated.model.StartWorkPackResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkPackController implements WorkpacksApi {
 
     @Override
-    public ResponseEntity<Void> startWorkPack(Map<String, Object> requestBody) {
+    public ResponseEntity<StartWorkPackResponse> startWorkPack() {
         throw new ErrorResponseException(HttpStatus.NOT_IMPLEMENTED,
                 ProblemDetail.forStatusAndDetail(HttpStatus.NOT_IMPLEMENTED, "Starting a Work Pack is built by BPA-6"), null);
     }

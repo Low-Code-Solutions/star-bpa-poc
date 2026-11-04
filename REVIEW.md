@@ -143,3 +143,17 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Low (6): fixed: 09 change log now names S20 owner column and L19; plan Status format per docs/04; skeleton line explains full V1;
   ADR 0015 note moved out of Decision. Open for Faraz (plan Q1, Q2): owner of items waiting on Usama; BPA-46 not in a sprint.
 - Not verified by the reviewer: CI; `intent/generate-index.sh` rerun (author reran it).
+
+### BPA-46 at 198cca5, 2 Nov 2026 (qa-reviewer)
+- Contract only: 1 High, 5 Medium (Important), 9 Low. Reviewer read BPA-46 in Jira and the 14 stories' AC and SOR Notes saved from Jira the
+  same session; lint, `./mvnw -B verify` (31 tests) and the frontend build were run by the author, not the reviewer.
+- Checks passed: all 20 S20/ADR 0011 endpoints present with a source cited; 20 problem texts = 11 verbatim from stories + 9 x-assumption
+  (independently recounted); names and types follow the data model; task API matches S14 and BPA-26 apart from the High.
+- High, fixed: the Confirm task's release/decline reason is the process variable `confirmMessage` (BPMN), not `validationMessages`;
+  `Task.confirmMessage` added.
+- Medium, fixed: 401/403 texts now match SecurityConfig; tags split so no two stories share an interface; drawing-revisions documented as
+  CSRF-exempt (x-assumption, BPA-16); `x-assumption` added to the reused TaskForbidden/TaskNotFound texts.
+- Medium, answered by Faraz (plan Q1): POST workpacks keeps no body; scope wording proposed as a Jira comment on BPA-46.
+- Low, fixed: `x-assumption: true` (reason in `x-assumption-note`); required fields per NOT NULL columns; invented orderings removed; plan
+  enum line corrected. Low, left: no `multipleOf: 0.01`; TaskKey and CamundaKey patterns duplicated; Jira BPA-46 still Backlog; reference
+  lists have no implementing story (plan Q4); generated validation needs exception handlers in BPA-16 and the 400-text stories (noted in plan).
