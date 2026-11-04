@@ -94,7 +94,10 @@ Class `HourJournalHeaderApiTest`, built on the `WorkPackApiTest` pattern: app on
 - **When BPA-23 lands, re-check:**
   1. Replace steps 2–3 with completing Confirm Workpack through the task API with Welding 300.
   2. The test then runs fully through the process: SaveWorkPackCorrections, then UpdateHourJournalHeader.
-  3. Same assertions, plus one `audit_log` row 400 → 450 by time-method-analyst.
+  3. Same assertions. The header's audit row (`table_name = 'hour_journal_header'`, `column_name = 'estimated_manhours'`,
+     400 → 450, by time-method-analyst) is already asserted since the review. BPA-23 adds its own `workpack_phase` row
+     (250 → 300). With BPA-23 the username comes from the Confirm Workpack completion, not Create's; both are
+     time-method-analyst, so the assertion holds.
   4. BPA-23 removes the incident rule from `SaveWorkPackWorker` and the `new-job-worker` skill.
 
   I'll add this as a `// BPA-23:` comment in the test and a Jira comment on BPA-23 (shown to you first).
@@ -112,12 +115,24 @@ Class `HourJournalHeaderApiTest`, built on the `WorkPackApiTest` pattern: app on
   5. BPA-7's own part of D8: the worker runs again on the locked header after `workpack_phase` changes (`handle`, elementId
      Update). The header stays 450, so locked is never overwritten.
 - **When BPA-9 lands, re-check:**
-  1. Replace step 2 with the real path: Confirm (BPA-8/23) → release check → the Project Engineer approves Sign off
-     release through the task API → `record-release-signoff` sets locked.
-  2. Assert the same three things.
-  3. BPA-9's own tests own the lock writing.
+  1. Replace step 2 with the real path: Confirm (BPA-8/23) → release check Ready → the Project Engineer approves Sign off
+     release through the task API → `record-release-signoff` sets locked. The release check is Ready only with reserved
+     materials and an approved drawing for DWG-118 / MAT-PIPE-06 / MAT-FLG-02 (D1, D10).
+  2. Assert the same things: locked true, estimated 450, no Confirm task. The "no Confirm task" check holds today
+     because the corrections stand-in ended Confirm; it gains meaning only with the real sign-off.
+  3. Keep the locked re-run (step 5): that part is BPA-7's. BPA-9's own tests own the lock writing.
 
   I'll add a `// BPA-9:` comment in the test and a Jira comment on BPA-9 (shown first).
+
+### BPA-8: what changes when it lands (found by the review)
+- **Today** the token waits at `ServiceTask_EvaluateReleaseInputs` after the corrections stand-in, because nothing handles
+  `evaluate-release-inputs`.
+- **With BPA-8's worker** the token moves on by itself: to Sign off release, or (Not ready) back to a new Confirm task.
+- **So the lock stand-in no longer names an element.** Since the review it terminates **whatever is active** in the
+  instance and activates `UserTask_ScheduleWorkPack`, retrying while the search lags.
+- **When BPA-8 lands, re-check:** run `HourJournalHeaderApiTest` and confirm it stays green (no change expected). The
+  corrections stand-in still terminates Confirm, where the token is when it runs. I'll add a `// BPA-8:` note in the test
+  and a Jira comment on BPA-8 (shown first).
 
 ## Files that change
 - New: `worker/HourJournalHeaderWorker.java`, `persistence/HourJournalHeaderRepository.java`,
@@ -140,8 +155,11 @@ Class `HourJournalHeaderApiTest`, built on the `WorkPackApiTest` pattern: app on
 
 ## Risks
 - **Process modification** request shape on 8.10.1 is not yet proven (BPA-25 did not cover it). Fallback stated above.
-- **Shared integration Camunda:** the new worker class runs only while this class's context is up (`@DirtiesContext`).
-  Bpa25 and SkeletonWorker tests complete header jobs themselves or use the Process Test engine.
+- **Shared integration Camunda:** corrected after review. `HourJournalHeaderWorker` is a main component, so it runs in
+  every workers-on context (this class and `WorkPackApiTest`), each closed after its class (`@DirtiesContext`).
+  `Bpa25CamundaChecksTest` completes only `save-workpack` jobs by hand. Its leftover header jobs, for instances with no
+  Work Pack in that database, are taken by the next workers-on context and end as incidents after three tries: log noise,
+  not a failure. `SkeletonWorkerProcessTest` uses the Process Test engine and completes the header job itself.
 
 ## Proof
 `./mvnw -B verify` output (red first, then green); the local-stack GET; audit rows; an Operate screenshot of the header step.
@@ -163,3 +181,4 @@ Class `HourJournalHeaderApiTest`, built on the `WorkPackApiTest` pattern: app on
 - As built: `HourJournalHeaderRepository.upsert` returns CREATED, UPDATED, UNCHANGED or LOCKED (logged); the worker
   completes with no variables. The header worker throws when an instance has no Work Pack, so leftover header jobs from
   other test classes (BPA-25 checks) end as incidents in the shared test Camunda, where the skeleton used to complete them.
+- 4 Nov, after review: 8/8 in HourJournalHeaderApiTest (7 scenarios + invalidOrMissingWorkpackNumberIs400); `./mvnw -B verify` 60 tests.

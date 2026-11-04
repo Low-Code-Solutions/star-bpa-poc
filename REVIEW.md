@@ -240,3 +240,30 @@ Newest last. One entry per review; the full report goes in the PR description.
   own keys only (`screenFor`).
 - After the fixes: `npm test` 14/14, lint, format:check and build clean; `./mvnw -B verify` 52 (no backend change).
 - Not verified by the reviewer: test, build and Maven runs; CI; the brief's exact ADR 0004 wording; the browser run.
+
+### BPA-7 at d91ef06, 4 Nov 2026 (qa-reviewer)
+- Code: 0 High, 3 Medium (Important), 8 Low. Reviewer read BPA-7 in Jira (evidence; comment 10379), the plan, spec.md, the
+  new-job-worker skill, backend/CLAUDE.md, data model §1.2, §5.5, §6.1, V1 (hour_journal_header, workpack_phase), the contract
+  (hour-journal-headers, HourJournalHeader, WorkPackNotFound, InvalidWorkpackNumber, Forbidden) and the BPMN create/update/sign-off
+  path; no test was run by the reviewer (author: 7 BPA7 red for the expected reasons, then 7/7 green, `./mvnw -B verify` 59).
+- Checks passed: SUM in SQL exact (150.5 + 249.5 = 400, 0.01); ON CONFLICT then SELECT ... FOR UPDATE safe for racing retries;
+  locked header never written; audit values in §6.1 form, audit columns not logged, times from the injected clock, users from
+  completedBy else bpa-service; worker per the skill (autoComplete false, Camunda default retries, no Work Pack -> incident);
+  403 before the parameter check; 404 problem text exact; 400.00 is a valid JSON number; 7 scenarios, 7 tests, names as in the
+  Jira DoD; diff inside the plan.
+- Important (3):
+  - Lock stand-in terminated ServiceTask_EvaluateReleaseInputs, which breaks once BPA-8 moves the token on: fixed (the stand-in
+    terminates whatever is active and retries; BPA-8 re-check in the plan and test).
+  - Audit rows and created_by/updated_by not asserted: fixed (insert rows, the 400 -> 450 update row, no row on an UNCHANGED or
+    LOCKED re-run, created_at/changed_at from the clock, the locked re-run's job completion).
+  - ASSUMPTIONs and the "group and scope" contradiction not commented in Jira: comment drafted for the developer's yes.
+- Low (8): missing workpackNumber gave Spring's 400 text: fixed (InvalidWorkpackNumber; new non-scenario test
+  invalidOrMissingWorkpackNumberIs400). "No Confirm task" assertion vacuous and not polled: polled, and the BPA-9 re-check says
+  when it gains meaning. BPA-23 and BPA-9 re-checks imprecise: fixed (table/column named; release-Ready data; keep the locked
+  re-run). otherRoles thin: fixed (403 problem body; time-method-analyst 200). Plan Risks wrong: corrected. Left: Jira still
+  Ready (Ahsan moves statuses); worker fetches all variables (as SaveWorkPackWorker); rerun calls handle directly (skill pattern).
+- Tests strengthened after review (said here and in the PR, L15): BPA7_headerIsCreatedWithEstimatedManHours,
+  BPA7_headerIsNotDuplicatedOnRerun, BPA7_headerFollowsCorrectionsWhileDraft, BPA7_headerIsLockedOnceReleased,
+  BPA7_otherRolesCannotReadHeader.
+- Not verified by the reviewer: test runs, failing-first output (tests and code in one commit, d91ef06; red run used an
+  uncommitted stub), CI, the local-stack run, Spring's missing-parameter text, SDK fail-on-exception with autoComplete false.

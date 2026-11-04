@@ -109,6 +109,23 @@ class HourJournalHeaderApiTest {
         assertThat(header.path("workpackNumber").asText()).isEqualTo(wp.number());
         assertThat(header.path("estimatedManhours").decimalValue()).isEqualByComparingTo("400");
         assertThat(header.path("locked").asBoolean(true)).isFalse();
+
+        // Added after review (L15, said in the PR): who and when (D63, S9) and the audit rows (D64, data model §6.1).
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT id, created_by, updated_by, created_at FROM bpa.hour_journal_header WHERE workpack_id = ?", wp.id());
+        assertThat(row.get("created_by")).isEqualTo("time-method-analyst");
+        assertThat(row.get("updated_by")).isEqualTo("time-method-analyst");
+        assertThat(((java.sql.Timestamp) row.get("created_at")).toInstant()).isEqualTo(TODAY);
+        List<Map<String, Object>> audit = jdbc.queryForList("""
+                SELECT column_name, old_value, new_value, username, changed_at FROM bpa.audit_log
+                WHERE table_name = 'hour_journal_header' AND record_id = ? ORDER BY column_name""", row.get("id"));
+        assertThat(audit).extracting(r -> r.get("column_name") + "=" + r.get("new_value"))
+                .containsExactly("estimated_manhours=400", "locked=false", "workpack_id=" + wp.id());
+        assertThat(audit).allSatisfy(r -> {
+            assertThat(r.get("old_value")).isNull();
+            assertThat(r.get("username")).isEqualTo("time-method-analyst");
+            assertThat(((java.sql.Timestamp) r.get("changed_at")).toInstant()).isEqualTo(TODAY);
+        });
     }
 
     @Test
@@ -122,6 +139,7 @@ class HourJournalHeaderApiTest {
         JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
 
         headerWorker.handle(client, job(11L, instance, "ServiceTask_CreateHourJournalHeader"));
+        int auditRows = headerAuditRows(saved.id());
         headerWorker.handle(client, job(12L, instance, "ServiceTask_CreateHourJournalHeader"));
 
         Mockito.verify(client).newCompleteCommand(11L);
@@ -129,6 +147,7 @@ class HourJournalHeaderApiTest {
         List<JsonNode> headers = headers(ppcTeam(), saved.workpackNumber());
         assertThat(headers).as("exactly one Header for " + saved.workpackNumber()).hasSize(1);
         assertThat(headers.get(0).path("estimatedManhours").decimalValue()).isEqualByComparingTo("400");
+        assertThat(headerAuditRows(saved.id())).as("no audit row for an unchanged re-run (added after review)").isEqualTo(auditRows);
     }
 
     @Test
@@ -156,6 +175,14 @@ class HourJournalHeaderApiTest {
         assertThat(headers(ppcTeam(), wp.number())).as("exactly one Header").hasSize(1);
         assertThat(header.path("estimatedManhours").decimalValue()).isEqualByComparingTo("450");
         assertThat(header.path("locked").asBoolean(true)).isFalse();
+
+        // Added after review (L15): the update is BPA-7's own write, so its audit row is asserted now (D64, §6.1).
+        // The username is the last task completer's: today Create Work Pack's; with BPA-23, Confirm Workpack's (both TMA).
+        assertThat(jdbc.queryForList("""
+                SELECT a.old_value || '->' || a.new_value || ' by ' || a.username FROM bpa.audit_log a
+                JOIN bpa.hour_journal_header h ON h.id = a.record_id
+                WHERE a.table_name = 'hour_journal_header' AND a.column_name = 'estimated_manhours' AND a.old_value IS NOT NULL
+                  AND h.workpack_id = ?""", String.class, wp.id())).containsExactly("400->450 by time-method-analyst");
     }
 
     @Test
@@ -167,21 +194,42 @@ class HourJournalHeaderApiTest {
         awaitHeader(wp.number(), h -> h.path("estimatedManhours").decimalValue().compareTo(new BigDecimal("450")) == 0);
 
         // Stand-in for BPA-9's sign-off (record-release-signoff sets Released and locks the Header, D8), which has no worker
-        // yet. BPA-9: replace these lines with the real path (Confirm → release check → the Project Engineer approves Sign off
-        // release through the task API) and keep the assertions below.
+        // yet. The token is moved past Confirm from wherever it is: today it waits at ServiceTask_EvaluateReleaseInputs;
+        // once BPA-8 has a worker it moves on by itself, to Sign off release or (Not ready) back to Confirm Workpack.
+        // BPA-8: nothing to change here; the stand-in terminates whatever is active.
+        // BPA-9: replace these three lines with the real path. Confirm (BPA-8/23) → release check Ready, which needs reserved
+        // materials and an approved drawing for DWG-118 / MAT-PIPE-06 / MAT-FLG-02 (D1, D10) → the Project Engineer approves
+        // Sign off release through the task API. Keep every assertion below, including the locked re-run (BPA-7's own part).
         jdbc.update("UPDATE bpa.workpack SET status = 'Released' WHERE id = ?", wp.id());
         jdbc.update("UPDATE bpa.hour_journal_header SET locked = true WHERE workpack_id = ?", wp.id());
-        moveToken(wp.instance(), "ServiceTask_EvaluateReleaseInputs", "UserTask_ScheduleWorkPack");
+        moveTokenTo(wp.instance(), "UserTask_ScheduleWorkPack");
 
         JsonNode header = headers(ppcTeam(), wp.number()).get(0);
         assertThat(header.path("locked").asBoolean(false)).isTrue();
         assertThat(header.path("estimatedManhours").decimalValue()).isEqualByComparingTo("450");
-        assertThat(openTasks(wp.instance(), CONFIRM)).as("no Confirm Workpack task for " + wp.number()).isEmpty();
+        // Today this holds already (the corrections stand-in ended Confirm); it gains meaning with BPA-9's real sign-off.
+        // Polled for a few seconds, since the task search is eventually consistent (BPA-25).
+        assertStaysEmpty(() -> openTasks(wp.instance(), CONFIRM), "Confirm Workpack task for " + wp.number());
 
         // BPA-7's own part of D8: the upsert never changes a locked Header, even if the phases change later.
+        int auditRows = headerAuditRows(wp.id());
         jdbc.update("UPDATE bpa.workpack_phase SET manhours = 999 WHERE workpack_id = ? AND phase = 'Cutting'", wp.id());
-        headerWorker.handle(Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS), job(21L, wp.instance(), UPDATE_HEADER));
+        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+        headerWorker.handle(client, job(21L, wp.instance(), UPDATE_HEADER));
+        Mockito.verify(client).newCompleteCommand(21L);
         assertThat(headers(ppcTeam(), wp.number()).get(0).path("estimatedManhours").decimalValue()).isEqualByComparingTo("450");
+        assertThat(headerAuditRows(wp.id())).as("no audit row for a locked Header").isEqualTo(auditRows);
+    }
+
+    /** Not a scenario: the contract's 400 (InvalidWorkpackNumber) for a number outside WP-###### or none at all. */
+    @Test
+    void invalidOrMissingWorkpackNumberIs400() {
+        TestBrowser ppc = ppcTeam();
+        for (String query : List.of("?workpackNumber=WP-12", "")) {
+            HttpResponse<String> response = ppc.get("/api/v1/hour-journal-headers" + query);
+            assertThat(response.statusCode()).as("'" + query + "': " + response.body()).isEqualTo(400);
+            assertThat(json(response.body()).path("detail").asText()).isEqualTo("Workpack number must match WP-######");
+        }
     }
 
     @Test
@@ -203,6 +251,10 @@ class HourJournalHeaderApiTest {
 
         assertThat(response.statusCode()).isEqualTo(403);
         assertThat(response.body()).doesNotContain("estimatedManhours").doesNotContain(wp.number());
+        // Added after review (L15): the 403 is the contract's Forbidden problem, and the other allowed group can read it.
+        assertThat(response.headers().firstValue("Content-Type")).hasValueSatisfying(t -> assertThat(t).startsWith("application/problem+json"));
+        assertThat(json(response.body()).path("status").asInt()).isEqualTo(403);
+        assertThat(headers(loggedInAs("time-method-analyst"), wp.number())).hasSize(1);
     }
 
     // --- stand-in for BPA-23 --------------------------------------------------------------------------------------------
@@ -211,8 +263,10 @@ class HourJournalHeaderApiTest {
      * "The Time & Method Analyst changes Welding from 250 to 300 in the Confirm Workpack task". The corrections save is BPA-23's
      * (today save-workpack refuses those jobs with an incident, BPA-6). So the test changes the phase as that save will, and
      * moves the token from Confirm Workpack to ServiceTask_UpdateHourJournalHeader, where the real worker runs.
-     * BPA-23: replace this with completing the Confirm task through the task API with Welding 300, and add an assertion for
-     * the audit_log row 400 -> 450.
+     * BPA-23: replace this with completing the Confirm task through the task API with Welding 300. The header's audit row
+     * (table_name 'hour_journal_header', column_name 'estimated_manhours', 400 -> 450) is already asserted; BPA-23 adds its
+     * own workpack_phase row (250 -> 300).
+     * BPA-8: nothing to change; Confirm is still where the token is when this runs.
      */
     private void correctWeldingTo300(Saved wp) {
         awaitOpenTask(wp.instance(), CONFIRM);
@@ -269,16 +323,74 @@ class HourJournalHeaderApiTest {
         return elements(found.body().path("items"));
     }
 
-    /** Process instance modification as the demo admin: terminate the active element, activate another (test stand-in). */
+    /** Process instance modification as the demo admin: terminate this active element, activate another (test stand-in). */
     private static void moveToken(long instance, String fromElementId, String toElementId) {
-        JsonNode active = poll(() -> elements(IntegrationApp.admin.post("/v2/element-instances/search",
-                        Map.of("filter", Map.of("processInstanceKey", Long.toString(instance), "elementId", fromElementId, "state", "ACTIVE")))
-                        .body().path("items")),
+        JsonNode active = poll(() -> activeElements(instance).stream().filter(e -> fromElementId.equals(e.path("elementId").asText())).toList(),
                 list -> !list.isEmpty(), fromElementId + " active in " + instance).get(0);
-        Reply modified = IntegrationApp.admin.post("/v2/process-instances/" + instance + "/modification", Map.of(
+        modify(instance, List.of(active), toElementId);
+    }
+
+    /**
+     * Terminate whatever is active in the instance and activate one element (test stand-in). Retried, because the search may
+     * still list an element the engine has already left (eventual consistency, BPA-25): the engine then rejects it.
+     */
+    private static void moveTokenTo(long instance, String toElementId) {
+        long until = System.nanoTime() + Duration.ofSeconds(60).toNanos();
+        Reply last = null;
+        while (System.nanoTime() < until) {
+            List<JsonNode> active = activeElements(instance);
+            if (!active.isEmpty()) {
+                last = IntegrationApp.admin.post("/v2/process-instances/" + instance + "/modification", modification(active, toElementId));
+                if (last.status() == 204) {
+                    return;
+                }
+            }
+            pause();
+        }
+        throw new AssertionError("could not move " + instance + " to " + toElementId + "; last: " + (last == null ? "nothing active" : last.body()));
+    }
+
+    private static void modify(long instance, List<JsonNode> terminate, String toElementId) {
+        Reply modified = IntegrationApp.admin.post("/v2/process-instances/" + instance + "/modification", modification(terminate, toElementId));
+        assertThat(modified.status()).as("modification -> " + toElementId + ": " + modified.body()).isEqualTo(204);
+    }
+
+    private static Map<String, Object> modification(List<JsonNode> terminate, String toElementId) {
+        return Map.of(
                 "activateInstructions", List.of(Map.of("elementId", toElementId)),
-                "terminateInstructions", List.of(Map.of("elementInstanceKey", active.path("elementInstanceKey").asText()))));
-        assertThat(modified.status()).as("modification " + fromElementId + " -> " + toElementId + ": " + modified.body()).isEqualTo(204);
+                "terminateInstructions", terminate.stream().map(e -> Map.of("elementInstanceKey", e.path("elementInstanceKey").asText())).toList());
+    }
+
+    /** The instance's active flow elements (not the process itself). */
+    private static List<JsonNode> activeElements(long instance) {
+        return elements(IntegrationApp.admin.post("/v2/element-instances/search",
+                        Map.of("filter", Map.of("processInstanceKey", Long.toString(instance), "state", "ACTIVE"), "page", Map.of("limit", 50)))
+                .body().path("items")).stream()
+                .filter(e -> !"PROCESS".equals(e.path("type").asText()) && !PROCESS.equals(e.path("elementId").asText()))
+                .toList();
+    }
+
+    private static <T> void assertStaysEmpty(java.util.function.Supplier<List<T>> read, String what) {
+        long until = System.nanoTime() + Duration.ofSeconds(3).toNanos();
+        while (System.nanoTime() < until) {
+            assertThat(read.get()).as("no " + what).isEmpty();
+            pause();
+        }
+    }
+
+    private int headerAuditRows(java.util.UUID workpackId) {
+        return jdbc.queryForObject("""
+                SELECT count(*) FROM bpa.audit_log a JOIN bpa.hour_journal_header h ON h.id = a.record_id
+                WHERE a.table_name = 'hour_journal_header' AND h.workpack_id = ?""", Integer.class, workpackId);
+    }
+
+    private static void pause() {
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
     }
 
     private TestBrowser ppcTeam() {

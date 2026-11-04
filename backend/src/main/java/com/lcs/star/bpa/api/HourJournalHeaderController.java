@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.ErrorResponseException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -34,8 +35,12 @@ public class HourJournalHeaderController implements HourJournalHeadersApi {
                 HttpStatus.NOT_FOUND, ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Work Pack not found"), null)));
     }
 
-    /** A workpackNumber outside WP-###### (generated @Pattern): the contract's InvalidWorkpackNumber (x-assumption text). */
-    @ExceptionHandler({ConstraintViolationException.class, HandlerMethodValidationException.class})
+    /**
+     * A workpackNumber that is missing or outside WP-###### (generated @NotNull, @Pattern): the contract's InvalidWorkpackNumber
+     * ("missing or does not match", x-assumption text).
+     */
+    @ExceptionHandler({ConstraintViolationException.class, HandlerMethodValidationException.class,
+            MissingServletRequestParameterException.class})
     ResponseEntity<ProblemDetail> invalidWorkpackNumber(Exception e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .body(ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Workpack number must match WP-######"));
