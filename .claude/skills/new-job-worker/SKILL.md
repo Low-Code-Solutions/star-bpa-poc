@@ -51,10 +51,15 @@ rules the sources do not give. Worked example: `backend/src/main/java/com/lcs/st
   `today()`/`now()` in FEEL or DMN: the worker passes today (S9).
 - **Variables:** read them with `job.getVariablesAsMap()`. Numbers arrive as Integer, Long or Double; turn them into
   `BigDecimal` with `new BigDecimal(value.toString())`. A value of the wrong type reads as missing.
-- **A job type shared with a step a later story builds (temporary).** Until that story exists, fail such jobs with no
-  retries and a plain message, so Operate shows an incident and nothing is saved. Today: `save-workpack` jobs from
-  `ServiceTask_SaveWorkPackCorrections` fail with "Save corrections is built by BPA-23" (Ahsan, 4 Nov 2026; BPA-6 plan).
-  **This rule ends when BPA-23 builds the corrections path.** Do not copy it for a job type with no such later story.
+- **A job type shared with a step a later story builds.** Until that story exists, fail such jobs with no retries and a
+  plain message, so Operate shows an incident and nothing is saved (Ahsan, 4 Nov 2026; BPA-6 plan). The one use,
+  `save-workpack` on `ServiceTask_SaveWorkPackCorrections`, **ended with BPA-23** (5 Nov 2026), which built that path.
+  Use the pattern again only for a job type that has such a later story.
+- **Corrections update rows in place** (data model F13, A4; BPA-23, `WorkPackRepository.correct`). Match child rows by
+  their natural key (phases by name) or by the `id` the screen round-trips (material lines). Update changed columns,
+  insert new rows and delete only those no longer present; never delete-and-reinsert, which would change ids and break the
+  audit row. One audit row per changed column, old → new. Applying the same correction twice changes nothing, which is
+  what makes a retried job harmless.
 - Repository code in `persistence/` (JdbcTemplate, `@Transactional`), pure checks in `domain/` (as `WorkPackValidator`).
 - Do not add Micrometer (pom enforcer; BPA-43).
 

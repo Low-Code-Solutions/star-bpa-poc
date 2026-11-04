@@ -43,7 +43,11 @@ Worked example throughout: BPA-6, Create Work Pack (`frontend/src/features/workp
   `new-job-worker` skill.
 - Pick lists come from `src/features/reference-data` (`ActivitySelect`, `useActivities`, …). A new list gets a service
   function, a hook and a select there.
-- Wrap labelled controls in `Field`, buttons in `Button`, and leave messages to the shell. No UI library or styling (ADR 0017).
+- Wrap labelled controls in `Field`, buttons in `Button`, and leave messages to the shell. Style with the class names in
+  `src/styles/global.css` (`field`, `line-group`, `line`, `context-panel`, `notice`); the shell already gives the job tag
+  and the sheet. No UI library (ADR 0017, amended by BPA-23).
+- Fields shared with another screen go in one component and a form hook: BPA-23's Confirm Workpack reuses Create's
+  `WorkPackFields` and `useWorkPackForm`. Saved lines keep their `id`, so a correction updates them in place (A4).
 - Business dates: `todayInRiyadh()` and `showDate()` from `src/utils/dates.ts` (09 S9).
 
 ## 4. Register it
