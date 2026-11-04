@@ -152,3 +152,14 @@ Class `HourJournalHeaderApiTest`, built on the `WorkPackApiTest` pattern: app on
 
 ## Human-gap log
 - Local Maven build uses the `subst S:` work-round; `npm.cmd` in PowerShell.
+- 4 Nov, test-first (L15). Red run: all 7 BPA7 tests failed for the expected reason.
+  - 5 failed on `GET /api/v1/hour-journal-headers` → 404 "No static resource".
+  - BPA7_unknownWorkPackReturnsNotFound got that 404's detail instead of "Work Pack not found".
+  - BPA7_headerIsNotDuplicatedOnRerun failed on the compile-only stub's "not built yet" (a stub with no `@JobWorker`,
+    said in the PR).
+- 4 Nov, green: 7/7 BPA7 tests pass; `./mvnw -B verify` 59 tests. Process instance modification
+  (`POST /v2/process-instances/{key}/modification`, terminate plus activate, as the demo admin) works on 8.10.1 and answers
+  204. The fallback was not needed.
+- As built: `HourJournalHeaderRepository.upsert` returns CREATED, UPDATED, UNCHANGED or LOCKED (logged); the worker
+  completes with no variables. The header worker throws when an instance has no Work Pack, so leftover header jobs from
+  other test classes (BPA-25 checks) end as incidents in the shared test Camunda, where the skeleton used to complete them.

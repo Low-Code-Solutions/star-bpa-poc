@@ -35,6 +35,7 @@ class SkeletonWorkerProcessTest {
 
         processTestContext.completeUserTask("UserTask_CreateWorkPack");
         processTestContext.completeJob("save-workpack");
+        processTestContext.completeJob("create-hour-journal-header"); // BPA-7 replaced the skeleton stub; its worker needs a database
 
         assertThat(byKey(instance.getProcessInstanceKey()))
                 .hasCompletedElements("ServiceTask_SaveWorkPack", "ServiceTask_CreateHourJournalHeader")
