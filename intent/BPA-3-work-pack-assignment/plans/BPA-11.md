@@ -171,3 +171,28 @@ A stub worker and a stub endpoint keep the classes compiling for the red run, as
 ## Human-gap log
 - Local Maven build uses the `subst S:` work-round and JAVA_HOME per command; `npm.cmd` in PowerShell; Docker Desktop must be
   running.
+
+## Build notes (5 Nov 2026, as built)
+- Built as planned, with these details:
+  - `ScheduleValidator.validate(start, end, today, leadTimeDays)` returns the messages in the plan order: required texts, then the lead-time text once
+    ("Date cannot be earlier than 28 Oct 2026"), then end before start only when both dates are present and pass the lead time.
+  - `SaveWorkPackScheduleWorker` order: find the Work Pack, `completedBy` (a fault if missing), an existing schedule (completes, no change),
+    Released (a fault otherwise), then the dates. A date that is not a date gives "Planned start is not a valid date" or "Planned end is not a valid
+    date" (ASSUMPTION texts, added with the worker: its test, `unreadableDatesAreRefusedByTheSaveStep`, was written with the worker, not before it).
+  - `app.lead-time-days: 7` in application.yml; the worker reads it with `@Value` (no default in code); a test asserts it is 7.
+  - Look-ahead: `LookAheadController` and `LookAheadRepository` (a LEFT JOIN from the Work Pack, so a drawing with no row gives 200 with no dates).
+  - Screen: a "Work Pack details" panel, a "Look-Ahead PPC plan dates" panel (shown only when a row has at least one date), a one-line "No Look-Ahead
+    plan dates for DWG-121" when it has none, two date inputs, and the late-end notice. The screen never prefills the dates from a first visit, only from a
+    returned task. A failed look-ahead call shows nothing (not "no dates").
+- Red run (41e8b1d): ScheduleApiTest 14 of 15 failed (the schedule never saved: no worker; the look-ahead path gave a Spring 404 with its own text, not the
+  contract; the lead-time property was missing), ScheduleValidatorTest 6 of 7, React 6 of 6 (the stub rendered nothing). BPA11_otherRolesCannotSchedule
+  passed already (BPA-26).
+- Green (fa776c6): ScheduleApiTest 16/16 and ScheduleValidatorTest 7/7 alone; full `./mvnw -B verify` 117 tests, 0 failures, with no combined-run flake
+  (the BPA-9 test-only job lock is in place); `npm test` 33/33, lint, Prettier and build clean.
+- Local stack (rebuilt bpa-app, through the API, real clock: today 5 Nov Asia/Riyadh, earliest allowed 12 Nov): a drawing with no row gives 200 with no dates;
+  unknown Work Pack 404 "Work Pack not found"; malformed number 400; the planner sees the Work Pack and its date to complete; the Analyst does not list the task
+  and gets 403; a start of 11 Nov returns "Date cannot be earlier than 12 Nov 2026"; end before start returns "Planned end cannot be before planned start";
+  12 Nov to 15 Nov is saved (`scheduled_by` production-planner) and the instance waits at Generate Workpack print (BPA-10). Not checked in a browser.
+- The task list says "Task completed; the Work Pack is saved" after a valid completion, and shows the returned task after a rejected one (BPA-26/BPA-23 wording
+  and watch, left as they are).
+- Not done on purpose: the "Earliest allowed" hint and the live end-before-start hint of the form spec (the frontend does not know the lead time).
