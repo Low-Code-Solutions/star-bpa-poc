@@ -267,3 +267,29 @@ Newest last. One entry per review; the full report goes in the PR description.
   BPA7_otherRolesCannotReadHeader.
 - Not verified by the reviewer: test runs, failing-first output (tests and code in one commit, d91ef06; red run used an
   uncommitted stub), CI, the local-stack run, Spring's missing-parameter text, SDK fail-on-exception with autoComplete false.
+
+### BPA-23 at de8af72, 5 Nov 2026 (qa-reviewer)
+- Code: 0 High, 7 Medium (Important), 9 Low. Reviewer read BPA-23 in Jira (evidence, changelog; comment 10390), the plan, spec.md,
+  data model §4.1-4.3, §6.1, §6.3, V1, the BPMN corrections path, Form_ConfirmWorkPack.form, both skills, ADR 0017, frontend/CLAUDE.md
+  and the frontend-design SKILL.md; no test, build or browser run by the reviewer (author: backend red 7/8 for the expected reason,
+  green 8/8 + BPA-7 8/8 on the real step, `./mvnw -B verify` 67; React red on import, `npm test` 18/18; lint, format, build clean).
+- Checks passed: AC texts exact; Draft check, BPMN error and non-Draft incident (retries 0); phases in place (F13); §6.1 audit values;
+  clock and completedBy; outputs on both paths (plain-number manhours, string ids); temporary incident and its BPA-6 test removed and
+  said; BPA-7 helper only changed; CreateWorkPack unchanged after extraction; styling changes no role, label or text; contrast AA,
+  focus visible, reduced motion, small screens.
+- Important (7):
+  - Material matching trusted client ids and input order: fixed (two passes, duplicate id refused).
+  - Retry idempotency untested, D20 re-check after midnight: fixed per Ahsan's rule (an unchanged target completes without re-checking);
+    new test correctionRetryAfterMidnightCompletesWithoutRechecking.
+  - Most correct() branches untested: fixed (multiChangeCorrectionIsAppliedInPlace, exact audit set incl. delete rows).
+  - BPA23_noCorrectionAfterRelease asserted only the stand-in: fixed (non-Draft incident asserted inside it); stand-in said in the PR.
+  - Portal-wide redesign outside the item's AC: Ahsan's decision, said in the PR and the BPA-23 Jira comment.
+  - ASSUMPTIONs and decisions not in Jira: BPA-23 comment drafted for Ahsan's yes. The proposed CLAUDE.md rule is not taken
+    (Ahsan's choice).
+  - Plan design log uncommitted; spec.md order; files table: log committed, files table completed; spec.md left as it is (Ahsan),
+    the order agreement stays in the plan.
+- Low (9): CSS :not() specificity: fixed. Job tag lacks the number: plan wording matches the build. Return reason visible label:
+  added "Returned:". No remove-line control: noted for the PO. Material order: created_at, id. Deferrable wording: fixed.
+  CamundaSteps wording: fixed. Story last updated and plate hex: fixed. Q1 date item: dropped.
+- After the fixes: `./mvnw -B verify` 68 (ConfirmWorkPackApiTest 9); `npm test` 18/18; lint, format, build clean.
+- Not verified by the reviewer: test and build runs, CI, the browser render, the local-stack run, the flaky BPA-6 run.

@@ -15,8 +15,10 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -103,11 +105,25 @@ public class SaveWorkPackWorker {
         Map<String, Object> variables = job.getVariablesAsMap();
         List<String> messages = new ArrayList<>();
         WorkPackInput input = read(variables, messages);
+        // A correction that asks for exactly what is saved completes without re-checking (Ahsan, 5 Nov 2026; BPA-23 review):
+        // a retried job whose first run committed, or a confirm of unchanged data. Re-checking could now fail (D20 after
+        // Riyadh midnight) and return the task although the correction is saved.
+        if (messages.isEmpty() && workPacks.alreadySaved(wp.id(), input)) {
+            LOG.info("save-workpack job {}: correction of {} already saved", job.getKey(), wp.workpackNumber());
+            complete(client, job, wp);
+            return;
+        }
         messages.addAll(rules(input, messages));
         var lineIds = workPacks.materialLineIds(wp.id());
+        Set<String> seen = new HashSet<>();
         for (WorkPackInput.Material material : input.materials()) {
-            if (material.id() != null && !lineIds.contains(material.id())) {
+            if (material.id() == null) {
+                continue;
+            }
+            if (!lineIds.contains(material.id())) {
                 messages.add("Material line " + material.id() + " is not part of this Work Pack"); // ASSUMPTION text
+            } else if (!seen.add(material.id())) {
+                messages.add("Material line " + material.id() + " is listed twice"); // ASSUMPTION text (BPA-23 review)
             }
         }
         if (rejected(client, job, messages)) {

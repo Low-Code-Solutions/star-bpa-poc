@@ -14,7 +14,8 @@ import java.util.stream.StreamSupport;
 
 /**
  * Test helper (BPA-23): Camunda reads and stand-in moves as the demo admin, and polling for Camunda's eventually consistent
- * search (BPA-25). The same steps as in HourJournalHeaderApiTest (BPA-7), shared from here for new test classes.
+ * search (BPA-25). The steps BPA-7 first wrote inside HourJournalHeaderApiTest, shared from here for new test classes; the
+ * older classes keep their own copies until a clean-up moves them here.
  */
 final class CamundaSteps {
 

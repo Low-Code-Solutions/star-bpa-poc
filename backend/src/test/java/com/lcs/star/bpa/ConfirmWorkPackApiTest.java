@@ -16,6 +16,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lcs.star.bpa.api.TestBrowser;
+import com.lcs.star.bpa.domain.WorkPackInput;
+import com.lcs.star.bpa.persistence.WorkPackRepository;
 import com.lcs.star.bpa.worker.SaveWorkPackWorker;
 import io.camunda.client.api.response.ActivatedJob;
 import io.camunda.client.api.worker.JobClient;
@@ -86,6 +88,9 @@ class ConfirmWorkPackApiTest {
 
     @Autowired
     SaveWorkPackWorker saveWorkPack;
+
+    @Autowired
+    WorkPackRepository workPacks;
 
     @BeforeEach
     void today() {
@@ -208,20 +213,122 @@ class ConfirmWorkPackApiTest {
 
         assertStaysEmpty(() -> openTasks(wp.instance(), CONFIRM), "Confirm Workpack task for " + wp.number());
         assertThat(headers(wp.number()).get(0).path("locked").asBoolean(false)).as("man hours locked").isTrue();
-    }
 
-    /** Not a scenario (Ahsan, 4 Nov): a corrections job for a Work Pack that is no longer Draft is an incident; nothing saved. */
-    @Test
-    void correctionOfNonDraftWorkPackRaisesAnIncident() {
-        Draft wp = draftWithConfirmOpen();
-        jdbc.update("UPDATE bpa.workpack SET status = 'Released' WHERE id = ?", wp.id());
+        // BPA-23's own part (Ahsan, 4 Nov): a corrections job for a Work Pack that is no longer Draft is an incident (retries 0)
+        // and saves nothing. The lines above only stand in for BPA-9; this is the code BPA-23 adds for D8.
         JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
-
-        saveWorkPack.handle(client, job(31L, wp.instance(), SAVE_CORRECTIONS, withManhours(wp.variables(), "Welding", 300)));
-
+        saveWorkPack.handle(client, job(31L, wp.instance(), SAVE_CORRECTIONS, withManhours(wp.variables(), "Welding", 999)));
         Mockito.verify(client.newFailCommand(31L)).retries(0);
         Mockito.verify(client.newFailCommand(31L).retries(0)).errorMessage(wp.number() + " is Released; corrections are closed (D8)");
-        assertThat(manhours(wp, "Welding")).as("nothing saved").isEqualByComparingTo("250");
+        assertThat(manhours(wp, "Welding")).as("nothing saved").isEqualByComparingTo("300");
+    }
+
+    /**
+     * Not a scenario (BPA-23 review): every branch of the in-place correction (F13, A4) and its exact audit set (D64, §6.1).
+     * Workpack columns change; a phase is added and one removed; a line moves phase by id; a line is removed; a new line is
+     * added. Then an id-less copy of the saved lines changes nothing, and an id-less line listed before an id line cannot take
+     * that line's row.
+     */
+    @Test
+    void multiChangeCorrectionIsAppliedInPlace() {
+        long instance = 4503599627370511L;
+        var saved = workPacks.save(instance, new WorkPackInput("A-2201", "DWG-118", "Fabrication", java.time.LocalDate.parse("2026-11-06"),
+                List.of(new WorkPackInput.Phase("Cutting", new BigDecimal("150")), new WorkPackInput.Phase("Welding", new BigDecimal("250"))),
+                List.of(new WorkPackInput.Material("MAT-PIPE-06", "Cutting"), new WorkPackInput.Material("MAT-FLG-02", "Welding"))),
+                "time-method-analyst");
+        UUID wp = saved.id();
+        String pipe = lineId(wp, "MAT-PIPE-06");
+        java.time.Instant later = WorkPackApiTest.TODAY.plusSeconds(3600);
+        clock.set(later);
+
+        workPacks.correct(wp, new WorkPackInput("A-2201", "DWG-119", "Painting", java.time.LocalDate.parse("2026-11-20"),
+                List.of(new WorkPackInput.Phase("Cutting", new BigDecimal("150")), new WorkPackInput.Phase("Engineering", new BigDecimal("10"))),
+                List.of(new WorkPackInput.Material("MAT-PIPE-06", "Engineering", pipe), new WorkPackInput.Material("MAT-PLATE-12", "Cutting"))),
+                "time-method-analyst");
+
+        assertThat(jdbc.queryForList("SELECT phase || ' ' || manhours FROM bpa.workpack_phase WHERE workpack_id = ? ORDER BY phase", String.class, wp))
+                .containsExactly("Cutting 150.00", "Engineering 10.00");
+        assertThat(jdbc.queryForList("SELECT material_ref || ' ' || phase FROM bpa.workpack_material WHERE workpack_id = ? ORDER BY 1", String.class, wp))
+                .containsExactly("MAT-PIPE-06 Engineering", "MAT-PLATE-12 Cutting");
+        assertThat(lineId(wp, "MAT-PIPE-06")).as("moved in place, same id").isEqualTo(pipe);
+        String id = wp.toString();
+        assertThat(auditSince(wp, later)).containsExactlyInAnyOrder(
+                "workpack.drawing_ref DWG-118->DWG-119", "workpack.department_ref Fabrication->Painting",
+                "workpack.completion_date 2026-11-06->2026-11-20",
+                "workpack_phase.workpack_id null->" + id, "workpack_phase.phase null->Engineering", "workpack_phase.manhours null->10",
+                "workpack_phase.workpack_id " + id + "->null", "workpack_phase.phase Welding->null", "workpack_phase.manhours 250->null",
+                "workpack_material.phase Cutting->Engineering",
+                "workpack_material.workpack_id " + id + "->null", "workpack_material.material_ref MAT-FLG-02->null", "workpack_material.phase Welding->null",
+                "workpack_material.workpack_id null->" + id, "workpack_material.material_ref null->MAT-PLATE-12", "workpack_material.phase null->Cutting");
+
+        // An id-less copy of what is saved: matched by material and phase, nothing changes.
+        int rows = auditSince(wp, later).size();
+        workPacks.correct(wp, new WorkPackInput("A-2201", "DWG-119", "Painting", java.time.LocalDate.parse("2026-11-20"),
+                List.of(new WorkPackInput.Phase("Cutting", new BigDecimal("150")), new WorkPackInput.Phase("Engineering", new BigDecimal("10"))),
+                List.of(new WorkPackInput.Material("MAT-PIPE-06", "Engineering"), new WorkPackInput.Material("MAT-PLATE-12", "Cutting"))),
+                "time-method-analyst");
+        assertThat(auditSince(wp, later)).as("no change, no audit row").hasSize(rows);
+        assertThat(lineId(wp, "MAT-PIPE-06")).isEqualTo(pipe);
+
+        // An id-less line listed first cannot take the row an id line claims (two passes): it is a new line.
+        workPacks.correct(wp, new WorkPackInput("A-2201", "DWG-119", "Painting", java.time.LocalDate.parse("2026-11-20"),
+                List.of(new WorkPackInput.Phase("Cutting", new BigDecimal("150")), new WorkPackInput.Phase("Engineering", new BigDecimal("10"))),
+                List.of(new WorkPackInput.Material("MAT-PIPE-06", "Engineering"), new WorkPackInput.Material("MAT-PIPE-06", "Cutting", pipe),
+                        new WorkPackInput.Material("MAT-PLATE-12", "Cutting"))),
+                "time-method-analyst");
+        assertThat(jdbc.queryForList("SELECT material_ref || ' ' || phase FROM bpa.workpack_material WHERE workpack_id = ? ORDER BY 1", String.class, wp))
+                .containsExactly("MAT-PIPE-06 Cutting", "MAT-PIPE-06 Engineering", "MAT-PLATE-12 Cutting");
+        assertThat(jdbc.queryForObject("SELECT phase FROM bpa.workpack_material WHERE id = ?::uuid", String.class, pipe)).isEqualTo("Cutting");
+    }
+
+    /**
+     * Not a scenario (BPA-23 review; rule by Ahsan, 5 Nov): a retried corrections job whose first run committed completes
+     * without re-checking, even after Riyadh midnight has made its date to complete "past" (D20), and adds no audit row.
+     */
+    @Test
+    void correctionRetryAfterMidnightCompletesWithoutRechecking() {
+        long instance = 4503599627370512L;
+        var saved = workPacks.save(instance, new WorkPackInput("A-2201", "DWG-118", "Fabrication", java.time.LocalDate.parse("2026-10-21"),
+                List.of(new WorkPackInput.Phase("Cutting", new BigDecimal("150")), new WorkPackInput.Phase("Welding", new BigDecimal("250"))),
+                List.of(new WorkPackInput.Material("MAT-PIPE-06", "Cutting"))), "time-method-analyst");
+        Map<String, Object> variables = new LinkedHashMap<>();
+        variables.put("activityRef", "A-2201");
+        variables.put("drawingRef", "DWG-118");
+        variables.put("departmentRef", "Fabrication");
+        variables.put("completionDate", "2026-10-21"); // today in Riyadh at 21 Oct 06:00 UTC
+        variables.put("phases", List.of(Map.of("phase", "Cutting", "manhours", 150), Map.of("phase", "Welding", "manhours", 300)));
+        variables.put("materials", List.of(Map.of("id", lineId(saved.id(), "MAT-PIPE-06"), "materialRef", "MAT-PIPE-06", "phase", "Cutting")));
+        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+
+        saveWorkPack.handle(client, job(41L, instance, SAVE_CORRECTIONS, variables));
+        int rows = auditSince(saved.id(), WorkPackApiTest.TODAY.minusSeconds(1)).size();
+        clock.set(java.time.Instant.parse("2026-10-21T21:30:00Z")); // 22 Oct 00:30 in Riyadh: 21 Oct is now past
+        saveWorkPack.handle(client, job(42L, instance, SAVE_CORRECTIONS, variables));
+
+        Mockito.verify(client, Mockito.never()).newThrowErrorCommand(Mockito.anyLong());
+        Mockito.verify(client).newCompleteCommand(41L);
+        Mockito.verify(client).newCompleteCommand(42L);
+        assertThat(jdbc.queryForObject("SELECT manhours FROM bpa.workpack_phase WHERE workpack_id = ? AND phase = 'Welding'", BigDecimal.class,
+                saved.id())).isEqualByComparingTo("300");
+        assertThat(auditSince(saved.id(), WorkPackApiTest.TODAY.minusSeconds(1))).as("the retry adds no audit row").hasSize(rows);
+    }
+
+    private String lineId(UUID workpackId, String materialRef) {
+        return jdbc.queryForObject("SELECT id::text FROM bpa.workpack_material WHERE workpack_id = ? AND material_ref = ? ORDER BY created_at LIMIT 1",
+                String.class, workpackId, materialRef);
+    }
+
+    /** Audit rows written from this instant on, for the Work Pack and its phase and material rows, as "table.column old->new". */
+    private List<String> auditSince(UUID workpackId, java.time.Instant from) {
+        return jdbc.queryForList("""
+                SELECT a.table_name || '.' || a.column_name || ' ' || coalesce(a.old_value, 'null') || '->' || coalesce(a.new_value, 'null')
+                FROM bpa.audit_log a
+                WHERE a.changed_at >= ? AND a.table_name IN ('workpack', 'workpack_phase', 'workpack_material')
+                  AND (a.record_id = ?
+                       -- child rows, deleted ones included: linked by their audited workpack_id
+                       OR a.record_id IN (SELECT w.record_id FROM bpa.audit_log w
+                                          WHERE w.column_name = 'workpack_id' AND (w.old_value = ? OR w.new_value = ?)))""",
+                String.class, Timestamp.from(from), workpackId, workpackId.toString(), workpackId.toString());
     }
 
     // --- the portal's steps ---------------------------------------------------------------------------------------------

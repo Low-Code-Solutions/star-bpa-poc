@@ -111,7 +111,10 @@ body {
     align-items: baseline;
   }
 
-  .portal > :not(.portal__logout) {
+  /* Only the header items (BPA-23 review: a :not() selector out-ranked the full-width task list and sheet). */
+  .portal__title,
+  .portal__user,
+  .portal__groups {
     grid-column: 1;
   }
 
@@ -397,4 +400,8 @@ input[readonly] {
     transition: none !important;
     animation: none !important;
   }
+}
+
+.notice__label {
+  font-weight: 700;
 }

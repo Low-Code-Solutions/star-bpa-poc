@@ -38,7 +38,9 @@ export function ConfirmWorkPack({ api, taskKey, onDone }: TaskScreenProps) {
       </label>
       {returnReason && (
         <section aria-label="Return reason" className="notice notice--return">
-          <p>{returnReason}</p>
+          <p>
+            <span className="notice__label">Returned:</span> <span>{returnReason}</span>
+          </p>
         </section>
       )}
       <WorkPackFields api={api} state={state} />

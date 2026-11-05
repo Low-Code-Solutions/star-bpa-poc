@@ -6,6 +6,7 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -117,7 +118,7 @@ public class WorkPackRepository {
                     return line;
                 }, workpackId);
         List<Map<String, Object>> materials = jdbc.query(
-                "SELECT id, material_ref, phase FROM bpa.workpack_material WHERE workpack_id = ? ORDER BY created_at, material_ref, phase",
+                "SELECT id, material_ref, phase FROM bpa.workpack_material WHERE workpack_id = ? ORDER BY created_at, id",
                 (rs, n) -> {
                     Map<String, Object> line = new LinkedHashMap<>();
                     line.put("id", rs.getObject("id", UUID.class).toString());
@@ -132,7 +133,8 @@ public class WorkPackRepository {
      * Applies a Confirm Workpack correction to a Draft Work Pack in place (BPA-23; data model F13, A4), in one transaction:
      * changed workpack columns are updated; phases are matched by name (update, insert, delete); material lines are matched by
      * id, an id-less line by an unclaimed line with the same material and phase, else inserted; unclaimed lines are deleted.
-     * The deferred FK and UNIQUE make statement order irrelevant. One audit row per changed business column, old -> new
+     * The material FK and UNIQUE are DEFERRABLE, so statement order does not matter for lines (phases are matched by name, so
+     * their non-deferrable UNIQUE is never hit). One audit row per changed business column, old -> new
      * (D64, §6.1). Applying the same correction again changes nothing, so a retried job is harmless (D65, S7).
      */
     @Transactional
@@ -192,10 +194,16 @@ public class WorkPackRepository {
         Map<String, Map<String, Object>> lines = new LinkedHashMap<>();
         jdbc.queryForList("SELECT id::text AS id, material_ref, phase FROM bpa.workpack_material WHERE workpack_id = ?", workpackId)
                 .forEach(row -> lines.put((String) row.get("id"), row));
+        // Two passes (BPA-23 review): lines with an id claim their rows first, so an id-less line listed earlier can never take a
+        // row that an id line also updates. Duplicate ids are refused by the worker before this runs.
         Set<String> claimed = new HashSet<>();
         for (WorkPackInput.Material material : input.materials()) {
             if (material.id() != null && lines.containsKey(material.id())) {
                 claimed.add(material.id());
+            }
+        }
+        for (WorkPackInput.Material material : input.materials()) {
+            if (material.id() != null && lines.containsKey(material.id())) {
                 Map<String, Object> existing = lines.get(material.id());
                 UUID id = UUID.fromString(material.id());
                 if (!material.materialRef().equals(existing.get("material_ref"))) {
@@ -235,6 +243,66 @@ public class WorkPackRepository {
                 audit("workpack_material", id, "phase", (String) existing.getValue().get("phase"), null, username, now);
             }
         }
+    }
+
+    /**
+     * True when the correction asks for exactly what is saved: the same workpack columns, the same phases and man hours, and
+     * the same material lines (each id naming a saved line with the same values, the rest matching by material and phase).
+     * The worker then completes without re-checking: a retried job whose first run committed, or a confirm of unchanged data
+     * (Ahsan, 5 Nov 2026; BPA-23 review).
+     */
+    public boolean alreadySaved(UUID workpackId, WorkPackInput input) {
+        Map<String, Object> current = jdbc.queryForMap(
+                "SELECT activity_ref, drawing_ref, department_ref, completion_date FROM bpa.workpack WHERE id = ?", workpackId);
+        if (!java.util.Objects.equals(current.get("activity_ref"), input.activityRef())
+                || !java.util.Objects.equals(current.get("drawing_ref"), input.drawingRef())
+                || !java.util.Objects.equals(current.get("department_ref"), input.departmentRef())
+                || !java.util.Objects.equals(((java.sql.Date) current.get("completion_date")).toLocalDate(), input.completionDate())) {
+            return false;
+        }
+        Map<String, BigDecimal> phases = new HashMap<>();
+        jdbc.queryForList("SELECT phase, manhours FROM bpa.workpack_phase WHERE workpack_id = ?", workpackId)
+                .forEach(row -> phases.put((String) row.get("phase"), (BigDecimal) row.get("manhours")));
+        if (phases.size() != input.phases().size()) {
+            return false;
+        }
+        for (WorkPackInput.Phase phase : input.phases()) {
+            BigDecimal saved = phases.get(phase.phase());
+            if (saved == null || phase.manhours() == null || saved.compareTo(phase.manhours()) != 0) {
+                return false;
+            }
+        }
+        Map<String, Map<String, Object>> lines = new HashMap<>();
+        jdbc.queryForList("SELECT id::text AS id, material_ref, phase FROM bpa.workpack_material WHERE workpack_id = ?", workpackId)
+                .forEach(row -> lines.put((String) row.get("id"), row));
+        if (lines.size() != input.materials().size()) {
+            return false;
+        }
+        Set<String> claimed = new HashSet<>();
+        for (WorkPackInput.Material material : input.materials()) {
+            if (material.id() == null) {
+                continue;
+            }
+            Map<String, Object> saved = lines.get(material.id());
+            if (saved == null || !claimed.add(material.id()) || !saved.get("material_ref").equals(material.materialRef())
+                    || !saved.get("phase").equals(material.phase())) {
+                return false;
+            }
+        }
+        for (WorkPackInput.Material material : input.materials()) {
+            if (material.id() != null) {
+                continue;
+            }
+            String same = lines.entrySet().stream()
+                    .filter(e -> !claimed.contains(e.getKey()) && e.getValue().get("material_ref").equals(material.materialRef())
+                            && e.getValue().get("phase").equals(material.phase()))
+                    .map(Map.Entry::getKey).findFirst().orElse(null);
+            if (same == null) {
+                return false;
+            }
+            claimed.add(same);
+        }
+        return true;
     }
 
     private void updateIfChanged(UUID workpackId, String column, String before, String after, String username, Timestamp at, Instant now) {

@@ -1,6 +1,6 @@
 # Plan: BPA-23 Time & Method Analyst can correct a Draft Work Pack before confirming it
 Jira: BPA-23 (Story, epic BPA-3)
-Story last updated: 2026-11-02T16:20:49.629+0400
+Story last updated: 2026-11-04T17:46:15.286+0400 (status In Progress and assignee only; content last changed 2 Nov)
 Status: Approved (Ahsan, Build Lead, 4 Nov 2026, in the Claude Code session; design brief confirmed with the plan)
 Approver: Ahsan (Build Lead)
 Branch: BPA-23-correct-draft-work-pack, from main 604eb8c
@@ -94,7 +94,7 @@ audit rows; an id-less line is matched by its natural key rather than inserted a
   - Colour, cool and industrial, not cream:
     - steel ink `#1E2933` (text);
     - mill-scale grey `#5B6670` (secondary);
-    - plate `#ECEFEE` (page);
+    - plate `#ECEEEF` (page);
     - sheet `#FFFFFF` (form surface);
     - marking-paint yellow `#F2B705`, used in **one place**: the Work Pack tag and the focus ring;
     - signal red `#B3261E` (errors).
@@ -105,7 +105,7 @@ audit rows; an id-less line is matched by its natural key rather than inserted a
     - labels above controls;
     - fieldsets as grouped sheets with a left rule;
     - the task list as a register (rows, not cards).
-  - The one memorable thing: the task heading set as a fabrication **job tag** carrying the Workpack number.
+  - The one memorable thing: the task heading set as a fabrication **job tag**. As built, the tag carries the screen title; the Workpack number sits beside it on a read-only plate.
   - Quality floor: visible keyboard focus, reduced motion respected, contrast AA, works down to mobile width.
 - **Constraints:**
   - plain CSS (tokens as custom properties in `styles/global.css`, class names on the existing elements);
@@ -212,8 +212,6 @@ Non-scenario tests:
 - Q1 (Khitaba, ASSUMPTIONs for the comment):
   - "Material line <id> is not part of this Work Pack";
   - the not-Draft incident text;
-  - corrections also re-check "no past date" (a Work Pack whose date has since passed must get a new date before
-    confirming).
 - Q2 (you): confirm the design brief above (subject, audience, primary job), as the frontend-design skill asks.
 
 ## Human-gap log
@@ -234,3 +232,50 @@ Non-scenario tests:
   - **Extraction:** `useWorkPackForm` and `WorkPackFields` came out of CreateWorkPack. Its 6 tests and the 6
     integration tests stay green, unchanged.
   - **Green:** ConfirmWorkPack registered in `taskScreens.ts`; `npm test` 18/18; lint, format and build clean.
+- 5 Nov, design pass 1 (frontend-design skill). The draft tokens were reviewed against the skill's five default looks:
+  - **Cream, serif and terracotta:** not used. The page is cool plate grey and the type is a sans (Barlow).
+  - **Near-black with one acid accent:** avoided. The page is light; the yellow appears only on the job tag and the focus
+    ring, on light ground.
+  - **Broadsheet hairlines and zero radius:** **revised.** Thin rules with square corners everywhere read as that default.
+    Instead, line groups get a solid 4 px left edge (a plate edge), and controls get a 3 px radius.
+  - **SaaS card kit:** avoided. The task list is a register of rows with a rule between them, not cards. There is one sheet
+    per screen, not a card per section.
+  - **Template chrome:**
+    - **revised:** the Workpack number first got a monospace "data label" look; it now uses Barlow's tabular figures;
+    - no all-caps eyebrows, no middle-dot meta strings, no arrows on buttons;
+    - labels stay sentence case.
+  - **The one memorable thing:** the task heading as a fabrication job tag (marking-paint yellow, a punched hole). Everything
+    else stays quiet.
+  - **No motion:** restraint, and reduced motion holds by default.
+- Screenshots: no headless browser here (Playwright is not installed, and the artifact emulator is cloud-only). The visual
+  critique is Ahsan's, in the browser (`npm.cmd run dev`).
+
+## Review fixes (qa-reviewer at de8af72; REVIEW.md)
+- **Material matching:** lines with an id now claim their rows first (two passes), and a duplicate id is refused with
+  "Material line <id> is listed twice" (ASSUMPTION). A crafted or out-of-order request can no longer lose a line.
+- **Retry rule (Ahsan, 5 Nov):** a correction that equals what is saved (`WorkPackRepository.alreadySaved`) completes
+  without re-checking. A retried job after Riyadh midnight therefore no longer returns the task. A plain confirm of
+  unchanged data also skips the server checks; the screen still blocks a past date.
+- **New non-scenario tests:**
+  - `multiChangeCorrectionIsAppliedInPlace`: every branch of `correct()` and the exact audit set.
+  - `correctionRetryAfterMidnightCompletesWithoutRechecking`.
+- **Release scenario:** the non-Draft incident is asserted inside BPA23_noCorrectionAfterRelease, as the plan said, and
+  the separate test is folded in. The stand-in for BPA-9 is said in the PR.
+- **Frontend:** the CSS specificity bug is fixed (a `:not()` selector kept the task list and sheet out of full width), and
+  the return reason has a visible "Returned:" label (form spec).
+- **Wording:** material lines are ordered by `created_at, id`; "deferrable" now covers only the material FK and UNIQUE; the
+  CamundaSteps Javadoc is reworded; Story last updated is bumped; the plate hex is corrected; the date re-check is dropped
+  from Q1 (it is sourced in the Description); the job-tag wording matches the build.
+- **Files that change, as built (adds to the list above):**
+  - backend test helper `CamundaSteps.java`;
+  - skill `new-task-screen`;
+  - `frontend/src/main.tsx` (fonts), `package-lock.json`;
+  - `features/workpacks/index.ts`, `workpacks.types.ts` (line `id`);
+  - `Button`, `Field`, `ErrorMessage` (a `className` prop).
+- **Not done here (Ahsan):**
+  - the spec.md order change and a BPA-3 comment: Faraz's agreement stays recorded in this plan;
+  - the CLAUDE.md proposal on posting ASSUMPTION comments before the PR.
+- **No remove-line control** on Create or Confirm (as before). The backend's delete branches are reachable through the API
+  and are tested; noted for the PO in the Jira comment.
+- **After the fixes:** `./mvnw -B verify` 68 tests (ConfirmWorkPackApiTest 9); `npm test` 18/18; lint, format and build
+  clean.
