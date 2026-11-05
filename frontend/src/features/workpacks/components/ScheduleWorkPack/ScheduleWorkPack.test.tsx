@@ -12,7 +12,7 @@ const TASK = '2251799813692000';
 
 type Call = { method: string; path: string; body: unknown };
 
-type Options = { lookAhead?: Record<string, string>; task?: Record<string, unknown> };
+type Options = { lookAhead?: Record<string, string>; task?: Record<string, unknown>; lookAheadStatus?: number };
 
 const LOOK_AHEAD = {
   workpackNumber: 'WP-000457',
@@ -22,7 +22,7 @@ const LOOK_AHEAD = {
   weldMapPlanDate: '2026-11-05',
 };
 
-function fakeBackend({ lookAhead = LOOK_AHEAD, task = {} }: Options = {}) {
+function fakeBackend({ lookAhead = LOOK_AHEAD, task = {}, lookAheadStatus = 200 }: Options = {}) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -55,7 +55,7 @@ function fakeBackend({ lookAhead = LOOK_AHEAD, task = {} }: Options = {}) {
           ...task,
         });
       case '/api/v1/workpacks/WP-000457/look-ahead':
-        return json(200, lookAhead);
+        return json(lookAheadStatus, lookAheadStatus === 200 ? lookAhead : {});
       case `/api/v1/tasks/${TASK}/complete`:
         return new Response(null, { status: 204 });
       default:
@@ -132,6 +132,9 @@ describe('ScheduleWorkPack', () => {
   it('BPA11_lateEndShowsNotice', async () => {
     const { user, completions, onDone } = await renderScreen();
 
+    // One day after the date to complete is already late (pins the comparison against "equal": the next test).
+    enter('2026-11-03', '2026-11-07');
+    expect(screen.getByText('Planned end is after the date to complete (06 Nov 2026)')).toBeInTheDocument();
     enter('2026-11-03', '2026-11-12');
 
     expect(screen.getByText('Planned end is after the date to complete (06 Nov 2026)')).toBeInTheDocument();
@@ -162,6 +165,28 @@ describe('ScheduleWorkPack', () => {
     await user.click(screen.getByRole('button', { name: 'Complete task' }));
     expect(completions()).toHaveLength(1);
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows no Look-Ahead dates, and no claim that there are none, when the look-ahead call fails (added after review)', async () => {
+    const { user, completions } = await renderScreen({ lookAheadStatus: 500 });
+
+    // Give the failed query time to settle, then check that nothing was claimed; the Planner can still schedule.
+    await waitFor(() => expect(screen.getByLabelText('Planned start')).toBeInTheDocument());
+    expect(screen.queryByRole('region', { name: 'Look-Ahead PPC plan dates' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/No Look-Ahead plan dates/)).not.toBeInTheDocument();
+    enter('2026-11-03', '2026-11-06');
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+    expect(completions()).toHaveLength(1);
+  });
+
+  it('shows "Not set" for a plan date the Look-Ahead row does not have (added after review)', async () => {
+    await renderScreen({
+      lookAhead: { workpackNumber: 'WP-000457', drawingRef: 'DWG-118', shopDrgMarkPlanDate: '2026-11-03' },
+    });
+
+    const plan = await screen.findByRole('region', { name: 'Look-Ahead PPC plan dates' });
+    expect(within(plan).getByText('03 Nov 2026')).toBeInTheDocument();
+    expect(within(plan).getAllByText('Not set')).toHaveLength(2);
   });
 
   it('blocks a completion with a missing date (ASSUMPTION texts)', async () => {

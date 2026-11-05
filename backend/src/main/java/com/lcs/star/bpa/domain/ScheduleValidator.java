@@ -20,8 +20,8 @@ import java.util.Locale;
  */
 public final class ScheduleValidator {
 
-    static final String START_REQUIRED = "Planned start is required";
-    static final String END_REQUIRED = "Planned end is required";
+    public static final String START_REQUIRED = "Planned start is required";
+    public static final String END_REQUIRED = "Planned end is required";
     static final String END_BEFORE_START = "Planned end cannot be before planned start";
     private static final DateTimeFormatter SHOWN = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
 

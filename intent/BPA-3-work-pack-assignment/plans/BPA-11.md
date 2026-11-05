@@ -1,7 +1,7 @@
 # Plan: BPA-11 Production Planner can schedule a Released Work Pack
 Jira: BPA-11 (Story, epic BPA-3)
 Story last updated: 2026-11-05T15:20:36.118+0400
-Status: Approved (Ahsan, Build Lead, 2026-11-05)
+Status: Closed (2026-11-05)
 Approver: Ahsan (Build Lead)
 Branch: BPA-11-schedule-work-pack, from main f3207ac
 
@@ -164,7 +164,7 @@ A stub worker and a stub endpoint keep the classes compiling for the red run, as
 
 ## Questions (for Khitaba, ASSUMPTIONs)
 - Q1: the seed vs AC look-ahead rows (above).
-- Q2: the texts "Planned start is required" and "Planned end is required" (the AC states none).
+- Q2: the texts "Planned start is required", "Planned end is required", "Planned start is not a valid date" and "Planned end is not a valid date" (the AC states none).
 - Q3: one message when both dates fail the lead-time check (de-duplicated), and end ≥ start is checked only when both pass
   (PO note of 28 Oct).
 
@@ -196,3 +196,14 @@ A stub worker and a stub endpoint keep the classes compiling for the red run, as
 - The task list says "Task completed; the Work Pack is saved" after a valid completion, and shows the returned task after a rejected one (BPA-26/BPA-23 wording
   and watch, left as they are).
 - Not done on purpose: the "Earliest allowed" hint and the live end-before-start hint of the form spec (the frontend does not know the lead time).
+- Review fixes (qa-reviewer, 5 Nov):
+  - A test that the lead time counts from the Riyadh day, not the UTC day (the clock at 22:00 UTC on 20 Oct, which is 01:00 on 21 Oct in Riyadh: 27 Oct is
+    rejected); the Risks line of this plan promised it and it was missing.
+  - The save step now runs every rule on what can be read: an unreadable date adds its own text and no duplicate "required" text, and the lead-time and order
+    rules still run (several messages at once, D56); tests for three combinations.
+  - React: a test for a failed look-ahead call (nothing shown, no claim of "no dates"), a one-day-late end, and "Not set" for a plan date the row lacks.
+  - The unreadable-date texts were written with the worker, not before it (said in the PR); they are listed in Q2 above and go to Khitaba in the Jira comment.
+- Files that changed beyond the "Files that change" list: `frontend/src/features/workpacks/scheduleMessages.ts` (the screen field checks),
+  `frontend/src/features/workpacks/hooks/useLookAhead.ts`, `frontend/src/features/workpacks/services/workpackService.ts` (getLookAhead),
+  `frontend/src/types/api.ts` (the LookAhead type), `frontend/src/features/tasks/taskScreens.ts` and `frontend/src/utils/constants.ts` (the registry entry),
+  and `backend/src/main/java/com/lcs/star/bpa/domain/ScheduleValidator.java` constants made public for the worker. `CamundaSteps` was not changed.

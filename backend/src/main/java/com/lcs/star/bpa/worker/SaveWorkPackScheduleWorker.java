@@ -72,12 +72,20 @@ public class SaveWorkPackScheduleWorker {
             throw new IllegalStateException(workPack.workpackNumber() + " is not Released, so it cannot be scheduled (D25)");
         }
 
+        // Every rule runs on what can be read (all messages are returned at once, D56): a date that is not a date adds its own
+        // text and counts as read-nothing, so the validator does not also call it missing.
         List<String> messages = new ArrayList<>();
         LocalDate start = date(variables.get("plannedStartDate"), BAD_START, messages);
         LocalDate end = date(variables.get("plannedEndDate"), BAD_END, messages);
-        if (messages.isEmpty()) {
-            LocalDate today = LocalDate.ofInstant(clock.instant(), businessZone);
-            messages.addAll(ScheduleValidator.validate(start, end, today, leadTimeDays));
+        boolean startUnreadable = messages.contains(BAD_START);
+        boolean endUnreadable = messages.contains(BAD_END);
+        LocalDate today = LocalDate.ofInstant(clock.instant(), businessZone);
+        for (String message : ScheduleValidator.validate(start, end, today, leadTimeDays)) {
+            boolean duplicate = (startUnreadable && ScheduleValidator.START_REQUIRED.equals(message))
+                    || (endUnreadable && ScheduleValidator.END_REQUIRED.equals(message));
+            if (!duplicate) {
+                messages.add(message);
+            }
         }
         if (!messages.isEmpty()) {
             LOG.info("save-workpack-schedule job {}: {} invalid: {}", job.getKey(), workPack.workpackNumber(), messages);

@@ -390,20 +390,47 @@ class ScheduleApiTest {
      * the task comes back (ASSUMPTION text). Added with the worker, not before it: it fails on the stub by construction.
      */
     @Test
-    @SuppressWarnings("unchecked")
     void unreadableDatesAreRefusedByTheSaveStep() {
         Scheduling wp = atSchedule("DWG-118");
-        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
 
-        worker.handle(client, job(97L, wp.instance(), Map.of("completedBy", "production-planner",
-                "plannedStartDate", "next week", "plannedEndDate", "2026-11-06")));
+        assertRefused(wp, 97L, Map.of("plannedStartDate", "next week", "plannedEndDate", "2026-11-06"),
+                List.of("Planned start is not a valid date"));
+        // Every rule still runs on what can be read, so all the messages come back at once (D56; added after review):
+        assertRefused(wp, 98L, Map.of("plannedStartDate", "next week", "plannedEndDate", "2026-10-27"),
+                List.of("Planned start is not a valid date", TOO_EARLY));
+        assertRefused(wp, 99L, Map.of("plannedStartDate", "", "plannedEndDate", "tomorrow"),
+                List.of("Planned end is not a valid date", "Planned start is required"));
+        assertThat(scheduleRows(wp)).isZero();
+    }
+
+    /**
+     * The scheduling day is the Asia/Riyadh calendar day, not the UTC day (S9, D28; added after review). At 22:00 UTC on 20 Oct it is
+     * already 01:00 on 21 Oct in Riyadh, so the earliest allowed date is 28 Oct; a check on the UTC day would let 27 Oct through.
+     */
+    @Test
+    void theLeadTimeCountsFromTheRiyadhDayNotTheUtcDay() {
+        Scheduling wp = atSchedule("DWG-118");
+        clock.set(Instant.parse("2026-10-20T22:00:00Z"));
+
+        Outcome outcome = submit(loggedInAs("production-planner"), wp, "2026-10-27", "2026-11-06");
+
+        assertThat(outcome.saved()).as("27 Oct is before 21 Oct + 7 days in Riyadh").isFalse();
+        assertThat(outcome.messages()).containsExactly(TOO_EARLY);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertRefused(Scheduling wp, long jobKey, Map<String, Object> dates, List<String> expected) {
+        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+        Map<String, Object> variables = new LinkedHashMap<>(dates);
+        variables.put("completedBy", "production-planner");
+
+        worker.handle(client, job(jobKey, wp.instance(), variables));
 
         ArgumentCaptor<Map<String, Object>> output = ArgumentCaptor.forClass(Map.class);
-        Mockito.verify(client.newThrowErrorCommand(97L).errorCode("SCHEDULE_INVALID").errorMessage("Planned start is not a valid date"))
+        Mockito.verify(client.newThrowErrorCommand(jobKey).errorCode("SCHEDULE_INVALID").errorMessage(String.join("; ", expected)))
                 .variables(output.capture());
-        assertThat(output.getValue()).containsEntry("validationMessages", List.of("Planned start is not a valid date"));
+        assertThat(output.getValue()).containsEntry("validationMessages", expected);
         Mockito.verify(client, Mockito.never()).newCompleteCommand(Mockito.anyLong());
-        assertThat(scheduleRows(wp)).isZero();
     }
 
     // --- arranging the Given, and putting the seed back ---------------------------------------------------------------------

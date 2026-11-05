@@ -83,7 +83,7 @@ export function ScheduleWorkPack({ api, taskKey, onDone }: TaskScreenProps) {
             {dates.map(([label, date]) => (
               <div key={label} className="context-panel__pair">
                 <dt>{label}</dt>
-                <dd>{showDate(date)}</dd>
+                <dd>{date ? showDate(date) : 'Not set'}</dd>
               </div>
             ))}
           </dl>
