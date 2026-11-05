@@ -165,9 +165,11 @@ class ScheduleApiTest {
                 ORDER BY column_name""", String.class, row.get("id")))
                 .containsExactly("planned_end_date=2026-11-06", "planned_start_date=2026-11-03", "scheduled_by=production-planner",
                         "workpack_id=" + wp.id());
-        // The process moves on to Generate Workpack print (BPA-10 builds its worker; until then it waits there).
+        // The process moves on after the schedule. BPA-11 re-check (BPA-10 built the Generate Workpack print step, where this used to
+        // wait): the print is generated for real and the process then waits for the Worker assignment file (BPA-12).
         poll(() -> CamundaSteps.activeElements(wp.instance()).stream().map(e -> e.path("elementId").asText()).toList(),
-                ids -> ids.contains("ServiceTask_GenerateWorkPackPrint"), "the instance of " + wp.number() + " at Generate Workpack print");
+                ids -> ids.contains("IntermediateCatchEvent_AssignmentFileReceived"),
+                "the instance of " + wp.number() + " waiting for the assignment file after its print");
     }
 
     @Test

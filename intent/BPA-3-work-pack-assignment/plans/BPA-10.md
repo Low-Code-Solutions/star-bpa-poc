@@ -186,3 +186,29 @@ Stubs (worker, renderer, controller methods) keep the classes compiling for the 
 ## Human-gap log
 - Local Maven build uses the `subst S:` work-round and JAVA_HOME per command; `npm.cmd` in PowerShell; Docker Desktop must be
   running.
+
+## Build notes (5 Nov 2026, as built)
+- Built as planned, with these departures and details:
+  - The Thymeleaf template is `backend/src/main/resources/print/workpack-print.html`, not `templates/print/`: the repo-root `templates/` folder is copied onto the
+    classpath as `templates/` for files users download (CLAUDE.md), and an internal print template should not share that folder.
+  - OpenHTMLtoPDF 1.1.108 (the maintained fork under `io.github.openhtmltopdf`, the latest release; it brings PDFBox 3.0.8, so the tests use `Loader.loadPDF`).
+    Thymeleaf runs standalone in XML mode (the output stays well-formed XHTML). DejaVu Sans Regular and Bold 2.37 with their licence are in `resources/fonts/`.
+  - Deterministic bytes: after the conversion a PDFBox pass sets CreationDate, ModDate and the document /ID from the injected clock's instant (the /ID from the
+    HTML and that instant), and fixes Producer and Creator. A unit test shows the same data and instant give the same bytes, and another instant changes the creation date.
+  - The worker: Work Pack by instance key, existing print (completes, changes nothing), scheduled (a fault if not), Released (a fault if not), render, sha256, one
+    transaction (`ON CONFLICT (workpack_id)`, audit rows, assignment_state NULL to AwaitingFile only when still empty). Recorded as `completedBy` (the Planner whose
+    completion led here), else `bpa-service`.
+  - A print is read from `workpack_print` for the API: unknown Work Pack 404 "Work Pack not found", no print 404 "Workpack print not available", else 200 `application/pdf`
+    with `inline; filename="<WP>.pdf"`. The new `GET /api/v1/workpack-prints` (x-assumption, in api/openapi.yaml) lists printed Work Packs newest first, for the same three groups.
+  - Portal: a "Workpack prints" section under My tasks for the three print groups; Print PDF fetches the blob and shows it in an iframe (S4, ADR 0004; no new tab, as decided).
+- Red run (4be7b68): PrintApiTest 12 of 12 failed (no print was ever stored: no worker; the print path gave a Spring 404 with its own text; the list path did too),
+  WorkPackPrintRendererTest 6 of 6 (the stub rendered nothing), React 5 of 6 (the stub rendered nothing; "not shown for other groups" passed already).
+- Green: PrintApiTest 12/12 and WorkPackPrintRendererTest 6/6; React 41/41, lint, Prettier and build clean.
+- Re-check of BPA-11 (found by the full `./mvnw -B verify`: 136 tests, 1 failure): `BPA11_workPackIsScheduledWithLookAheadDates` asserted that the process waits at
+  Generate Workpack print, true only until this story. It now asserts that the print is generated and the process waits for the assignment file
+  (IntermediateCatchEvent_AssignmentFileReceived). ScheduleApiTest is 17/17 again.
+- Local stack: the running bpa-app was built before this code, so the portal list showed "The list of prints could not be loaded" (the list path was a 404) until it
+  was rebuilt; the pending print jobs of the three Work Packs already scheduled (WP-000011, 13 and 15) were then taken by the new worker and their prints stored. The
+  print of WP-000013 was fetched through the API as time-method-analyst: 200, `application/pdf`, `inline; filename="WP-000013.pdf"`, 19,617 bytes, `%PDF-1.6`; page 1 was
+  rendered to an image and read (header, Work Pack details, man hours with the total, the material, cutting sheet CS-3310, the footer in Asia/Riyadh).
+- Not checked in a browser: the iframe in the portal.
