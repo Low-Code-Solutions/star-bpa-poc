@@ -160,3 +160,36 @@ A stub `RecordSignOffWorker` with no `@JobWorker` keeps the test class compiling
 ## Human-gap log
 - Local Maven build uses the `subst S:` work-round and JAVA_HOME per command; `npm.cmd` in PowerShell; Docker Desktop must be
   running.
+
+## Build notes (5 Nov 2026, as built)
+- Built as planned, with these details:
+  - `TaskValidity` returns the first failing message; `TaskService.complete` runs it after the allow-list check and before assign and
+    complete, so a refused completion leaves the task open. `completedTaskKey` is a String (the engine key); the worker accepts a
+    string or a number.
+  - `ReleaseSignOffRepository.record` is one transaction: `INSERT ... ON CONFLICT (task_key) DO NOTHING`, checked first; on a new row,
+    the audit rows (release_signoff: workpack_id, task_key, decision, decline_reason when declined, signed_off_by, signed_off_at;
+    workpack.status Draft to Released; hour_journal_header.locked false to true), all by `completedBy`. Only a Draft is released; any
+    other state is a fault (the job fails and ends as an incident, S7).
+  - The Sign off release screen always starts with no decision and no reason, although the read list carries signOffDecision and
+    declineReason: after a decline and a new confirmation the old decline must not arrive pre-filled. It shows the Work Pack in a
+    read-only panel (activity, drawing, department, date, phases, materials).
+  - The Declined text is "Declined by Project Engineer: " plus the trimmed reason; the worker takes it from the job variables, so a
+    re-run returns the same output.
+- Red run (a84bec2): SignOffApiTest 6 of 8 failed (BPA9_releaseIsSignedOff, BPA9_declineReturnsToAnalyst and BPA9_rerunRecordsSignOffOnce
+  timed out with no release_signoff row; BPA9_declineNeedsReason completed with no 400; the two non-scenario tests failed), TaskValidityTest 3
+  of 4; BPA9_workPackWaitsForSignOff and BPA9_otherRolesCannotSignOff passed already (BPA-8, BPA-26). React: the 6 SignOffRelease tests
+  failed (the stub rendered nothing); BPA9_declineReasonShowsOnConfirmScreen passed already (D51, BPA-23).
+- Green (cb61baa): SignOffApiTest 8/8 alone; TaskApiTest and TaskValidityTest green; `npm test` 27/27, lint, Prettier and build clean.
+  Two test fixes, said in the PR: the sign-off screen test helper waits for the loaded Workpack number (a race in the test), and
+  completedTaskKeyIsSetByTheServer waits for the sign-off value of the variable (the search first returned the Confirm task key). No
+  expectation was weakened.
+- Re-checks done: BPA7_headerIsLockedOnceReleased (8/8 in its class) and BPA23_noCorrectionAfterRelease (9/9) use the real sign-off; the
+  stand-in SQL and the token move are gone, the unused moveTokenTo helpers are removed, and every assertion kept.
+- Local stack (rebuilt bpa-app, through the API): decline without a reason gives 400 "Reason is required"; no decision gives 400 "Decision
+  is required"; the Analyst gets 403; a decline returns Confirm showing "Declined by Project Engineer: Wrong drawing revision"; confirming
+  again opens a new sign-off task; approving gives Released, Header locked, two release_signoff rows (Declined, then Approved, both
+  project-engineer) and the instance waits at UserTask_ScheduleWorkPack. Not checked in a browser.
+- The task list says "Task completed; the Work Pack is saved" after a sign-off completion, as no task returns to the Project Engineer (BPA-26
+  wording, left as it is).
+- Full `./mvnw -B verify` showed 2 failures in SignOffApiTest in a combined run, both traced above: the second test fix, and the combined-run
+  Confirm flake seen in BPA-8 (a Confirm task that never appeared; the class passes alone).
