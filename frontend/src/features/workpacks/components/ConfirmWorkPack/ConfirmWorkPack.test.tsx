@@ -176,4 +176,21 @@ describe('ConfirmWorkPack', () => {
       within(screen.getByRole('region', { name: 'Return reason' })).getByText('Materials are not reserved for this Workpack'),
     ).toBeInTheDocument();
   });
+
+  // BPA-8: the release check's reason comes back on this same screen, with no new screen. D51 was built with BPA-23, so this
+  // test is expected to pass already (the plan says so; the failing-first tests for BPA-8 are the backend ones).
+  it('BPA8_materialNotReservedBlocksConfirmation', async () => {
+    await renderScreen({ confirmMessage: 'Drawing is not approved (IFC or As-Built required)' });
+
+    expect(
+      within(screen.getByRole('region', { name: 'Return reason' })).getByText('Drawing is not approved (IFC or As-Built required)'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Complete task' })).toBeEnabled();
+  });
+
+  it('shows no return reason when the task has none (a first visit, or after Ready)', async () => {
+    await renderScreen();
+
+    expect(screen.queryByRole('region', { name: 'Return reason' })).not.toBeInTheDocument();
+  });
 });
