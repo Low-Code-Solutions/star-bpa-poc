@@ -293,3 +293,22 @@ Newest last. One entry per review; the full report goes in the PR description.
   CamundaSteps wording: fixed. Story last updated and plate hex: fixed. Q1 date item: dropped.
 - After the fixes: `./mvnw -B verify` 68 (ConfirmWorkPackApiTest 9); `npm test` 18/18; lint, format, build clean.
 - Not verified by the reviewer: test and build runs, CI, the browser render, the local-stack run, the flaky BPA-6 run.
+
+### BPA-8 at 7c33be6, 5 Nov 2026 (qa-reviewer)
+- Code: 0 High, 3 Medium, several Low. Reviewer read BPA-8 in Jira, the plan, spec.md and the diff; it ran no tests (Docker needed).
+  Author's runs: red 10 timeouts + 1 stub throw (1e1b0a3), green 11/11 and `./mvnw -B verify` 79; React 20/20; local stack Ready and both
+  Not ready paths through the API (return to Confirm 2.6 to 3.3 s).
+- Checks passed: all 11 test names equal the Jira DoD list, one test each, the outline's rows in one test; the worker and repository match
+  the SOR Notes (materialsReserved, drawingApproved); read-only, so idempotent; DMN, seed and migrations unchanged (PO decision 5 Nov);
+  the worker excluded in ProcessTestApplication; scope is BPA-8 only; scenario 7 only passes if reservations are keyed by drawing,
+  scenario 10 only if "any" or "oldest" revision is not used.
+- Medium (3):
+  - React test named as the backend scenario but asserting the drawing reason: fixed (BPA8_returnedReleaseReasonShowsOnConfirmScreen); plan updated.
+  - The Superseded filter was untested (all 11 tests passed without it): fixed (newest revision C Superseded in the As-Built test; only-Superseded
+    case in the no-revision test); a mutant without the filter fails the As-Built test.
+  - registered_at ties were nondeterministic: fixed (higher revision letter wins, ASSUMPTION in the plan and Javadoc).
+- Low: vacuous true for a Work Pack with no material lines (D20 says none; noted in the plan). confirmMessage cleared when Ready and "Confirm no
+  longer open" were unasserted: added (scenario 8 and 1). Plan "one React test": corrected to two. Story last updated: refreshed (status
+  moved to In Progress only). D65 cite: D24 added. Restore of the seed is not asserted: kept (throwaway DB; no later test depends on it).
+- After the fixes: ReleaseCheckApiTest 11/11; `npm test` 20/20; format clean.
+- Not verified by the reviewer: test runs, CI, the local-stack run, the combined-run Confirm flake (BPA-23 note).
