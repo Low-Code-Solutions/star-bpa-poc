@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@tests/test-utils';
+import { cleanup, render, screen, waitFor, within } from '@tests/test-utils';
 import userEvent from '@testing-library/user-event';
 import { apiClient } from '@/services/apiClient';
 import { SignOffRelease } from './SignOffRelease';
@@ -98,7 +98,7 @@ describe('SignOffRelease', () => {
 
     expect(completions()).toHaveLength(1);
     expect(completions()[0].body).toEqual({ variables: { signOffDecision: 'Approved' } });
-    expect(onDone).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
   });
 
   it('BPA9_declineReturnsToAnalyst', async () => {
@@ -112,7 +112,7 @@ describe('SignOffRelease', () => {
     expect(completions()[0].body).toEqual({
       variables: { signOffDecision: 'Declined', declineReason: 'Wrong drawing revision' },
     });
-    expect(onDone).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
   });
 
   it('BPA9_declineNeedsReason', async () => {

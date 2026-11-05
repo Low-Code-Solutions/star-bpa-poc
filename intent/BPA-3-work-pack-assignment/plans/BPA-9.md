@@ -1,7 +1,7 @@
 # Plan: BPA-9 Project Engineer can sign off a Work Pack release
 Jira: BPA-9 (Story, epic BPA-3)
-Story last updated: 2026-11-05T12:24:53.058+0400
-Status: Approved (Ahsan, Build Lead, 2026-11-05)
+Story last updated: 2026-11-05T12:47:40.126+0400
+Status: Closed (2026-11-05)
 Approver: Ahsan (Build Lead)
 Branch: BPA-9-release-signoff, from main fdb64ac
 
@@ -193,3 +193,13 @@ A stub `RecordSignOffWorker` with no `@JobWorker` keeps the test class compiling
   wording, left as it is).
 - Full `./mvnw -B verify` showed 2 failures in SignOffApiTest in a combined run, both traced above: the second test fix, and the combined-run
   Confirm flake seen in BPA-8 (a Confirm task that never appeared; the class passes alone).
+- Story last updated refreshed after review: the changelog since the plan shows only the status move (Ready to In Progress, 12:24) and an assignee
+  change (Zain Irshad, then Ahsan.Ali, 12:47). Description, Acceptance Criteria, SOR Notes and comments are as read on 5 Nov.
+- Files that changed beyond the "Files that change" list: `frontend/src/features/workpacks/signOffMessages.ts` (the screen's two field checks),
+  `frontend/src/features/workpacks/index.ts` (barrel export), `frontend/src/styles/global.css` (a `textarea` rule, `.sign-table` and `.choices`;
+  the `textarea` rule is global, and no other textarea exists in the portal today), the two ASSUMPTION 400 examples in `api/openapi.yaml`,
+  and `backend/src/test/java/com/lcs/star/bpa/CamundaSteps.java` (two sign-off helpers; the unused `moveTokenTo` is removed).
+- Review fixes (qa-reviewer, 5 Nov): worker-level tests added (missing `completedBy` or `completedTaskKey` fails the job and writes nothing; a
+  declined re-run returns the same `confirmMessage`; a non-Draft Work Pack rolls the whole sign-off back); the audit `signed_off_at` and the column
+  use the same microsecond instant; an approval that finds the Header already locked logs a warning; the React tests wait for `onDone`; the helper
+  imports are tidied.

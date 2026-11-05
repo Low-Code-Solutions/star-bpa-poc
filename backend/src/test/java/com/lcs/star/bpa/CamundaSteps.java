@@ -5,7 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lcs.star.bpa.CamundaRest.Reply;
+import com.lcs.star.bpa.api.TestBrowser;
+import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -61,9 +64,9 @@ final class CamundaSteps {
      * The Project Engineer completes Sign off release through the task API (BPA-9); the reason is sent only when given.
      * Returns the response, so a test can also check a refusal.
      */
-    static java.net.http.HttpResponse<String> completeSignOff(com.lcs.star.bpa.api.TestBrowser projectEngineer, String taskKey,
+    static HttpResponse<String> completeSignOff(TestBrowser projectEngineer, String taskKey,
             String decision, String reason) {
-        Map<String, Object> variables = new java.util.LinkedHashMap<>();
+        Map<String, Object> variables = new LinkedHashMap<>();
         if (decision != null) {
             variables.put("signOffDecision", decision);
         }

@@ -10,6 +10,7 @@ import static com.lcs.star.bpa.CamundaSteps.poll;
 import static com.lcs.star.bpa.CamundaSteps.toJson;
 import static com.lcs.star.bpa.CamundaSteps.variable;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,6 +31,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -250,6 +252,72 @@ class SignOffApiTest {
         assertThat(openTasks(wp.instance(), "UserTask_SignOffRelease")).hasSize(1);
     }
 
+    /**
+     * The sign-off is the Project Engineer's (D63): a job without completedBy or completedTaskKey fails, so it retries and ends as an
+     * incident (S7). It never falls back to the service user, and it writes nothing. (Added after review.)
+     */
+    @Test
+    void workerFailsWithoutWhoOrWhichTask() {
+        Waiting wp = atSignOff();
+        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+
+        assertThatThrownBy(() -> worker.handle(client, job(51L, wp.instance(),
+                Map.of("completedTaskKey", wp.signOffTask(), "signOffDecision", "Approved"))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("completedBy");
+        assertThatThrownBy(() -> worker.handle(client, job(52L, wp.instance(),
+                Map.of("completedBy", "project-engineer", "signOffDecision", "Approved"))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("completedTaskKey");
+
+        Mockito.verify(client, Mockito.never()).newCompleteCommand(Mockito.anyLong());
+        assertThat(signOffRows(wp)).isZero();
+        assertThat(status(wp)).isEqualTo("Draft");
+        assertThat(headerLocked(wp)).isFalse();
+    }
+
+    /** A retried decline gives the same output (the confirmMessage) and records once; the output comes from the job, not the write. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void declinedRerunReturnsTheSameMessageAndRecordsOnce() {
+        Waiting wp = atSignOff();
+        assertThat(completeSignOff(loggedInAs("project-engineer"), wp.signOffTask(), "Declined", "Wrong drawing revision").statusCode())
+                .isEqualTo(204);
+        awaitSignOffRow(wp);
+        int auditRows = signOffAuditRows(wp);
+        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+        Map<String, Object> variables = Map.of("completedTaskKey", wp.signOffTask(), "completedBy", "project-engineer",
+                "signOffDecision", "Declined", "declineReason", "  Wrong drawing revision ");
+
+        worker.handle(client, job(61L, wp.instance(), variables));
+        worker.handle(client, job(62L, wp.instance(), variables));
+
+        for (long key : new long[] {61L, 62L}) {
+            ArgumentCaptor<Map<String, Object>> output = ArgumentCaptor.forClass(Map.class);
+            Mockito.verify(client.newCompleteCommand(key)).variables(output.capture());
+            assertThat(output.getValue()).containsEntry("confirmMessage", DECLINED_PREFIX + "Wrong drawing revision");
+        }
+        assertThat(signOffRows(wp)).as("one decision for the task").isEqualTo(1);
+        assertThat(status(wp)).isEqualTo("Draft");
+        assertThat(signOffAuditRows(wp)).as("no audit row for a re-run").isEqualTo(auditRows);
+    }
+
+    /** Release and lock are one transaction: a Work Pack that is not Draft cannot be released, and the whole sign-off rolls back. */
+    @Test
+    void approvalOfAWorkPackThatIsNotDraftChangesNothing() {
+        Waiting wp = atSignOff();
+        jdbc.update("UPDATE bpa.workpack SET status = 'Released' WHERE id = ?", wp.id()); // a state no path produces before sign-off
+        int auditRows = signOffAuditRows(wp);
+        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+
+        assertThatThrownBy(() -> worker.handle(client, job(71L, wp.instance(), Map.of("completedTaskKey", "900000000000071",
+                "completedBy", "project-engineer", "signOffDecision", "Approved"))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("not Draft");
+
+        Mockito.verify(client, Mockito.never()).newCompleteCommand(Mockito.anyLong());
+        assertThat(signOffRows(wp)).as("the insert is rolled back with the failed release").isZero();
+        assertThat(headerLocked(wp)).isFalse();
+        assertThat(signOffAuditRows(wp)).isEqualTo(auditRows);
+    }
+
     /** completedTaskKey is set from the engine's task on every completion (like completedBy, D63); a client cannot send it. */
     @Test
     void completedTaskKeyIsSetByTheServer() {
@@ -309,6 +377,10 @@ class SignOffApiTest {
     private Map<String, Object> awaitSignOffRow(Waiting wp) {
         return poll(() -> jdbc.queryForList("SELECT * FROM bpa.release_signoff WHERE workpack_id = ? ORDER BY created_at", wp.id()),
                 rows -> !rows.isEmpty(), "release_signoff row for " + wp.number()).get(0);
+    }
+
+    private int signOffRows(Waiting wp) {
+        return jdbc.queryForObject("SELECT count(*) FROM bpa.release_signoff WHERE workpack_id = ?", Integer.class, wp.id());
     }
 
     private String status(Waiting wp) {

@@ -3,8 +3,11 @@ package com.lcs.star.bpa.persistence;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +21,8 @@ public class ReleaseSignOffRepository {
 
     /** What a run did, for the log. */
     public enum Outcome { APPROVED, DECLINED, ALREADY_RECORDED }
+
+    private static final Logger LOG = LoggerFactory.getLogger(ReleaseSignOffRepository.class);
 
     private final JdbcTemplate jdbc;
     private final Clock clock;
@@ -35,7 +40,8 @@ public class ReleaseSignOffRepository {
      */
     @Transactional
     public Outcome record(UUID workpackId, long taskKey, boolean approved, String reason, String username) {
-        Instant now = clock.instant();
+        // Microseconds, as the column holds them, so the audit text and signed_off_at are the same instant (data model §6.1).
+        Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
         Timestamp at = Timestamp.from(now);
         String decision = approved ? "Approved" : "Declined";
         String declineReason = approved ? null : reason.trim();
@@ -67,7 +73,9 @@ public class ReleaseSignOffRepository {
             throw new IllegalStateException("Work Pack " + workpackId + " is not Draft, so it cannot be released");
         }
         audit("workpack", workpackId, "status", "Draft", "Released", username, now);
-        headers.lock(workpackId, username);
+        if (!headers.lock(workpackId, username)) {
+            LOG.warn("Work Pack {} was approved but its Header was already locked", workpackId);
+        }
         return Outcome.APPROVED;
     }
 
