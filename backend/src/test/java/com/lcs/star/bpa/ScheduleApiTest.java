@@ -279,7 +279,10 @@ class ScheduleApiTest {
         assertThat(submit(planner, wp, "2026-11-03", "2026-11-06").saved()).isTrue();
         int auditRows = scheduleAuditRows(wp);
 
-        // "Then no UserTask_ScheduleWorkPack task exists for WP": the process has moved on and nothing offers the task again
+        // "Then no UserTask_ScheduleWorkPack task exists for WP": the process has moved on and nothing offers the task again.
+        // The task that was just completed may still be listed as open for a moment (the task search is eventually consistent,
+        // BPA-25; it failed in CI that way, with the planner as assignee), so wait until it is gone, then check that none comes back.
+        poll(() -> openTasks(wp.instance(), SCHEDULE), List::isEmpty, "the completed Schedule Work Pack task of " + wp.number() + " leaving the open list");
         assertStaysEmpty(() -> openTasks(wp.instance(), SCHEDULE), "Schedule Work Pack task for " + wp.number());
         // "And its planned dates are unchanged", even if the job for this Work Pack runs again with other dates (D27, D65)
         JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);

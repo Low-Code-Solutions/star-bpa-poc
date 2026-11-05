@@ -207,3 +207,6 @@ A stub worker and a stub endpoint keep the classes compiling for the red run, as
   `frontend/src/features/workpacks/hooks/useLookAhead.ts`, `frontend/src/features/workpacks/services/workpackService.ts` (getLookAhead),
   `frontend/src/types/api.ts` (the LookAhead type), `frontend/src/features/tasks/taskScreens.ts` and `frontend/src/utils/constants.ts` (the registry entry),
   and `backend/src/main/java/com/lcs/star/bpa/domain/ScheduleValidator.java` constants made public for the worker. `CamundaSteps` was not changed.
+- CI fix (5 Nov, after the first CI run of PR #30): `BPA11_scheduledWorkPackCannotBeRescheduled` failed in CI because its "no Schedule Work Pack task" check ran while the
+  just-completed task was still listed as open (the task search is eventually consistent, BPA-25; the listed task had the planner as assignee). The test now waits for the
+  completed task to leave the open list, then checks that none comes back. The check itself is unchanged; it passed locally in every earlier run, and `ScheduleApiTest` is 17/17 again.
