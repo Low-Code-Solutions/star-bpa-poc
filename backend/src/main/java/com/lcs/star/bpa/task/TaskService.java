@@ -30,6 +30,9 @@ public class TaskService {
     /** Process variable set on every completion: the Camunda username of the user who completed the task (D63). */
     public static final String COMPLETED_BY = "completedBy";
 
+    /** Process variable set on every completion: the key of the user task that was completed (BPA-9, the sign-off's re-run key). */
+    public static final String COMPLETED_TASK_KEY = "completedTaskKey";
+
     static final String NOT_FOUND = "Task not found";
     static final String FORBIDDEN = "You are not allowed to work on this task";
     static final String ALREADY_COMPLETED = "Task is already completed";
@@ -103,10 +106,18 @@ public class TaskService {
             submitted.keySet().stream().sorted().filter(name -> !writable.contains(name)).findFirst().ifPresent(name -> {
                 throw problem(HttpStatus.BAD_REQUEST, "Variable " + name + " is not allowed for this task");
             });
+            // BPA-9: the rules that affect validity are re-checked here before the task is assigned or completed, so a refused
+            // completion leaves the task open (09 S14; the React screen checks the same rules).
+            TaskValidity.check(task.elementId(), submitted).ifPresent(message -> {
+                throw problem(HttpStatus.BAD_REQUEST, message);
+            });
             // D63 (BPA-6 plan, Ahsan 4 Nov): the save workers record who completed the task. Set here from the session, never
             // from the request: no allow-list holds "completedBy", so a client that sends it gets the 400 above.
+            // BPA-9 (Ahsan, 5 Nov): likewise the key of the task being completed, which a job worker needs as its re-run key
+            // (D65): a job carries only its own key. Never from the request either.
             Map<String, Object> completion = new LinkedHashMap<>(submitted);
             completion.put(COMPLETED_BY, username);
+            completion.put(COMPLETED_TASK_KEY, task.key());
             try {
                 camunda.assign(task.key(), username);
                 camunda.complete(task.key(), completion);

@@ -262,7 +262,10 @@ class SignOffApiTest {
         assertThat(json(forged.body()).path("detail").asText()).isEqualTo("Variable completedTaskKey is not allowed for this task");
 
         assertThat(completeSignOff(engineer, wp.signOffTask(), "Approved", null).statusCode()).isEqualTo(204);
-        String value = poll(() -> variable(wp.instance(), "completedTaskKey"), v -> v != null, "completedTaskKey of " + wp.instance());
+        // Confirm Workpack's completion set the variable first (to its own task key), so wait for the sign-off's value: the
+        // variable search is eventually consistent (BPA-25) and may still show the earlier one.
+        String value = poll(() -> variable(wp.instance(), "completedTaskKey"),
+                v -> v != null && v.replace("\"", "").equals(wp.signOffTask()), "completedTaskKey of the sign-off in " + wp.instance());
         assertThat(value.replace("\"", "")).isEqualTo(wp.signOffTask());
     }
 

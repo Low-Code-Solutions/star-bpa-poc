@@ -52,25 +52,6 @@ final class CamundaSteps {
                 .toList();
     }
 
-    /** Test stand-in: terminate whatever is active and activate one element, retrying while the search lags (BPA-7). */
-    static void moveTokenTo(long instance, String toElementId) {
-        long until = System.nanoTime() + Duration.ofSeconds(60).toNanos();
-        Reply last = null;
-        while (System.nanoTime() < until) {
-            List<JsonNode> active = activeElements(instance);
-            if (!active.isEmpty()) {
-                last = IntegrationApp.admin.post("/v2/process-instances/" + instance + "/modification", Map.of(
-                        "activateInstructions", List.of(Map.of("elementId", toElementId)),
-                        "terminateInstructions", active.stream().map(e -> Map.of("elementInstanceKey", e.path("elementInstanceKey").asText())).toList()));
-                if (last.status() == 204) {
-                    return;
-                }
-            }
-            pause();
-        }
-        throw new AssertionError("could not move " + instance + " to " + toElementId + "; last: " + (last == null ? "nothing active" : last.body()));
-    }
-
     /** The open Sign off release task of the instance, as the Project Engineer's task key (BPA-9). */
     static String awaitSignOffTask(long instance) {
         return awaitOpenTask(instance, "UserTask_SignOffRelease").path("userTaskKey").asText();

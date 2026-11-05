@@ -5,4 +5,5 @@ export const PHASES = ['Engineering', 'Cutting', 'Welding', 'Finishing'];
 export const USER_TASKS = {
   createWorkPack: 'UserTask_CreateWorkPack',
   confirmWorkPack: 'UserTask_ConfirmWorkPack',
+  signOffRelease: 'UserTask_SignOffRelease',
 } as const;

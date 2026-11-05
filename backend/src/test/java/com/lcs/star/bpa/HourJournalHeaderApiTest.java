@@ -193,22 +193,23 @@ class HourJournalHeaderApiTest {
         correctWeldingTo300(wp);
         awaitHeader(wp.number(), h -> h.path("estimatedManhours").decimalValue().compareTo(new BigDecimal("450")) == 0);
 
-        // Stand-in for BPA-9's sign-off (record-release-signoff sets Released and locks the Header, D8), which has no worker
-        // yet. The token is moved past Confirm from wherever it is: today it waits at ServiceTask_EvaluateReleaseInputs;
-        // once BPA-8 has a worker it moves on by itself, to Sign off release or (Not ready) back to Confirm Workpack.
-        // BPA-8: nothing to change here; the stand-in terminates whatever is active.
-        // BPA-9: replace these three lines with the real path. Confirm (BPA-8/23) → release check Ready, which needs reserved
-        // materials and an approved drawing for DWG-118 / MAT-PIPE-06 / MAT-FLG-02 (D1, D10) → the Project Engineer approves
-        // Sign off release through the task API. Keep every assertion below, including the locked re-run (BPA-7's own part).
-        jdbc.update("UPDATE bpa.workpack SET status = 'Released' WHERE id = ?", wp.id());
-        jdbc.update("UPDATE bpa.hour_journal_header SET locked = true WHERE workpack_id = ?", wp.id());
-        moveTokenTo(wp.instance(), "UserTask_ScheduleWorkPack");
+        // The real sign-off (BPA-9 re-check; until BPA-9 this was a stand-in that set Released and locked the Header in the
+        // database and moved the token to UserTask_ScheduleWorkPack). The correction above ran the release check, which is Ready
+        // (DWG-118 has an IFC revision and reservations for MAT-PIPE-06 and MAT-FLG-02; D1, D10), so the Project Engineer approves
+        // Sign off release through the task API, and record-release-signoff sets Released and locks the Header (D8).
+        // The assertions below are unchanged, including the locked re-run (BPA-7's own part).
+        String signOff = CamundaSteps.awaitSignOffTask(wp.instance());
+        HttpResponse<String> approved = CamundaSteps.completeSignOff(loggedInAs("project-engineer"), signOff, "Approved", null);
+        assertThat(approved.statusCode()).as("approve: " + approved.body()).isEqualTo(204);
+        poll(() -> headers(ppcTeam(), wp.number()).get(0).path("locked").asBoolean(false), locked -> locked,
+                "Header of " + wp.number() + " locked by the sign-off");
+        assertThat(jdbc.queryForObject("SELECT status FROM bpa.workpack WHERE id = ?", String.class, wp.id())).isEqualTo("Released");
 
         JsonNode header = headers(ppcTeam(), wp.number()).get(0);
         assertThat(header.path("locked").asBoolean(false)).isTrue();
         assertThat(header.path("estimatedManhours").decimalValue()).isEqualByComparingTo("450");
-        // Today this holds already (the corrections stand-in ended Confirm); it gains meaning with BPA-9's real sign-off.
-        // Polled for a few seconds, since the task search is eventually consistent (BPA-25).
+        // With the real sign-off this means something: the process itself ended Confirm Workpack and moved on, and no Confirm
+        // task comes back. Polled for a few seconds, since the task search is eventually consistent (BPA-25).
         assertStaysEmpty(() -> openTasks(wp.instance(), CONFIRM), "Confirm Workpack task for " + wp.number());
 
         // BPA-7's own part of D8: the upsert never changes a locked Header, even if the phases change later.
@@ -331,41 +332,6 @@ class HourJournalHeaderApiTest {
         Reply found = IntegrationApp.admin.post("/v2/user-tasks/search",
                 Map.of("filter", Map.of("processInstanceKey", Long.toString(instance), "elementId", elementId, "state", "CREATED")));
         return elements(found.body().path("items"));
-    }
-
-    /**
-     * Terminate whatever is active in the instance and activate one element (test stand-in). Retried, because the search may
-     * still list an element the engine has already left (eventual consistency, BPA-25): the engine then rejects it.
-     */
-    private static void moveTokenTo(long instance, String toElementId) {
-        long until = System.nanoTime() + Duration.ofSeconds(60).toNanos();
-        Reply last = null;
-        while (System.nanoTime() < until) {
-            List<JsonNode> active = activeElements(instance);
-            if (!active.isEmpty()) {
-                last = IntegrationApp.admin.post("/v2/process-instances/" + instance + "/modification", modification(active, toElementId));
-                if (last.status() == 204) {
-                    return;
-                }
-            }
-            pause();
-        }
-        throw new AssertionError("could not move " + instance + " to " + toElementId + "; last: " + (last == null ? "nothing active" : last.body()));
-    }
-
-    private static Map<String, Object> modification(List<JsonNode> terminate, String toElementId) {
-        return Map.of(
-                "activateInstructions", List.of(Map.of("elementId", toElementId)),
-                "terminateInstructions", terminate.stream().map(e -> Map.of("elementInstanceKey", e.path("elementInstanceKey").asText())).toList());
-    }
-
-    /** The instance's active flow elements (not the process itself). */
-    private static List<JsonNode> activeElements(long instance) {
-        return elements(IntegrationApp.admin.post("/v2/element-instances/search",
-                        Map.of("filter", Map.of("processInstanceKey", Long.toString(instance), "state", "ACTIVE"), "page", Map.of("limit", 50)))
-                .body().path("items")).stream()
-                .filter(e -> !"PROCESS".equals(e.path("type").asText()) && !PROCESS.equals(e.path("elementId").asText()))
-                .toList();
     }
 
     private static <T> void assertStaysEmpty(java.util.function.Supplier<List<T>> read, String what) {

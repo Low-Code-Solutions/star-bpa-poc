@@ -66,7 +66,8 @@ async function renderScreen() {
   const onDone = vi.fn();
   const user = userEvent.setup();
   render(<SignOffRelease api={apiClient()} taskKey={TASK} onDone={onDone} />);
-  await screen.findByLabelText('Workpack number');
+  // The task has loaded once its Workpack number is shown (prefilled from the task).
+  await screen.findByDisplayValue('WP-000457');
   return { ...backend, user, onDone };
 }
 
