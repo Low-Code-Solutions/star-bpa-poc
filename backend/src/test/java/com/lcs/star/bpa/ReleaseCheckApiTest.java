@@ -131,6 +131,7 @@ class ReleaseCheckApiTest {
         assertThat(releaseResult(wp.instance())).isEqualTo("Ready");
         assertThat(status(wp)).as(wp.number() + " stays Draft").isEqualTo("Draft");
         assertThat(signOffGroups(wp)).containsExactly("project-engineer");
+        assertStaysEmpty(() -> openTasks(wp.instance(), CONFIRM), "Confirm Workpack task for " + wp.number());
     }
 
     @Test
@@ -185,6 +186,16 @@ class ReleaseCheckApiTest {
 
         assertThat(outcome.ready()).isFalse();
         assertThat(outcome.message()).isEqualTo(NOT_APPROVED);
+
+        // Added after review: a drawing whose only revisions are Superseded has no approved revision either (no rows left to
+        // approve it), so it is also not approved.
+        arrange("DWG-141", List.of(rev("A", "Superseded", 60)), List.of("MAT-PIPE-06"));
+        Draft onlySuperseded = draft("DWG-141", List.of(line("MAT-PIPE-06")));
+
+        Outcome second = confirm(onlySuperseded);
+
+        assertThat(second.ready()).isFalse();
+        assertThat(second.message()).isEqualTo(NOT_APPROVED);
     }
 
     @Test
@@ -225,11 +236,15 @@ class ReleaseCheckApiTest {
         assertThat(second.ready()).isTrue();
         assertThat(releaseResult(wp.instance())).isEqualTo("Ready");
         assertThat(signOffGroups(wp)).containsExactly("project-engineer");
+        // Added after review: the earlier reason is cleared once the check is Ready (BPMN maps releaseReason, null when Ready).
+        poll(() -> variable(wp.instance(), "confirmMessage"), v -> v == null || "null".equals(v), "confirmMessage cleared for " + wp.number());
     }
 
     @Test
     void BPA8_asBuiltDrawingCountsAsApproved() {
-        arrange("DWG-130", List.of(rev("A", "Superseded", 60), rev("B", "As-Built", 30)), List.of("MAT-PIPE-06"));
+        // Revision C, the newest row, is Superseded (taken from the D365 event); the latest revision that is not Superseded is B,
+        // As-Built. A check that did not skip Superseded rows would look at C and block (added after review).
+        arrange("DWG-130", List.of(rev("A", "Superseded", 60), rev("B", "As-Built", 30), rev("C", "Superseded", 10)), List.of("MAT-PIPE-06"));
         Draft wp = draft("DWG-130", List.of(line("MAT-PIPE-06")));
 
         Outcome outcome = confirm(wp);

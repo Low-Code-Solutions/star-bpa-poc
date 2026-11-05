@@ -30,7 +30,7 @@ public class ReleaseInputsRepository {
 
     /**
      * True when the latest revision (by registered_at) that is not Superseded has status IFC or As-Built (D1, D10). False when
-     * the drawing has no such revision (ASSUMPTION in the story: no revision rows means not approved).
+     * the drawing has no such revision (ASSUMPTION in the story: no revision rows means not approved). Ties on registered_at go to the higher revision letter (ASSUMPTION).
      */
     public boolean drawingApproved(UUID workpackId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
@@ -39,6 +39,6 @@ public class ReleaseInputsRepository {
                     FROM bpa.workpack w
                     JOIN bpa.drawing_revision dr ON dr.drawing_ref = w.drawing_ref
                     WHERE w.id = ? AND dr.status <> 'Superseded'
-                    ORDER BY dr.registered_at DESC LIMIT 1), false)""", Boolean.class, workpackId));
+                    ORDER BY dr.registered_at DESC, dr.revision DESC LIMIT 1), false)""", Boolean.class, workpackId));
     }
 }

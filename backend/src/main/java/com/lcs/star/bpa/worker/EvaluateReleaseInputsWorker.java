@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * Job type {@code evaluate-release-inputs} (BPA-8) on {@code ServiceTask_EvaluateReleaseInputs}: reads the POC database and
  * sets {@code materialsReserved} and {@code drawingApproved}; Decision_WorkpackReleaseCheck decides (D24).
  *
- * <p>Built with the new-job-worker skill. It only reads, so it is idempotent by nature (D65, S7): the same data gives the same
+ * <p>Built with the new-job-worker skill. It only reads, so it is idempotent by nature (D24, D65, S7): the same data gives the same
  * result on a retry and nothing is written, audited or stamped. No input to validate, so no BPMN error. Retries and
  * incidents are Camunda's defaults (S7): a job whose instance has no Work Pack throws, and ends as an incident after three tries.
  */

@@ -1,7 +1,7 @@
 # Plan: BPA-8 Time & Method Analyst can confirm a Work Pack only when materials are reserved and the drawing is approved
 Jira: BPA-8 (Story, epic BPA-3)
-Story last updated: 2026-11-02T16:13:10.077+0400
-Status: Approved (Ahsan, Build Lead, 2026-11-05)
+Story last updated: 2026-11-05T11:11:14.959+0400
+Status: Closed (2026-11-05)
 Approver: Ahsan (Build Lead)
 Branch: BPA-8-release-check, from main 270c194
 
@@ -93,7 +93,7 @@ An `@AfterEach` restores every row the test touched, so the seed is as it was.
 | 10 | The check uses the drawing's latest revision | BPA8_checkUsesLatestRevision | DWG-118 B Superseded, C IFR (latest) → the drawing reason |
 | 11 | Evaluating the inputs twice gives the same result | BPA8_evaluatingInputsTwiceGivesSameResult | `handle` twice with a mocked `JobClient` → both complete with true/true; no row and no `updated_at` changed, no audit row |
 
-React: one screen test, `BPA8_materialNotReservedBlocksConfirmation` in the task-list flow. A Confirm task that comes back
+React: two screen tests, `BPA8_returnedReleaseReasonShowsOnConfirmScreen` (renamed after review) and one for no reason shown. A Confirm task that comes back
 with `confirmMessage` "Materials are not reserved for this Workpack" reopens and shows it after "Returned:". It is
 expected to **pass already**, because BPA-23 built D51; I'll say so in the PR rather than claim a red run. The 11 backend
 tests are the failing-first set: today the token waits at Evaluate, so no outcome appears.
@@ -108,8 +108,8 @@ tests are the failing-first set: today the token waits at Evaluate, so no outcom
 - New: `worker/EvaluateReleaseInputsWorker.java`, `persistence/ReleaseInputsRepository.java`.
 - Tests: new `ReleaseCheckApiTest.java`; `ProcessTestApplication.java` (exclude); possibly `CamundaSteps.java` (a
   variable-read helper is already there).
-- React: one test in `tests/integration/` or beside the Confirm screen. `app.config.ts` only if the timing check needs it.
-- `REVIEW.md`, this plan. No BPMN, DMN, migration, contract or seed change.
+- React: two tests beside the Confirm screen (ConfirmWorkPack.test.tsx). `app.config.ts` only if the timing check needs it.
+- `REVIEW.md`, this plan, `CamundaSteps` untouched. No BPMN, DMN, migration, contract or seed change.
 
 ## Order of work
 1. Commit this plan. You move statuses.
@@ -140,6 +140,7 @@ tests are the failing-first set: today the token waits at Evaluate, so no outcom
 - Local Maven build uses the `subst S:` work-round; `npm.cmd` in PowerShell.
 
 ## Build notes (5 Nov 2026, as built)
+- Story last updated refreshed after review: only the status moved (Ready to In Progress); the content is as read on 5 Nov.
 - Built as planned: `EvaluateReleaseInputsWorker` and `ReleaseInputsRepository`; no BPMN, DMN, migration, contract, seed or
   frontend code change. `ProcessTestApplication` excludes the worker.
 - Red run (1e1b0a3): `ReleaseCheckApiTest` 11 tests, 10 timed out waiting for the release check (the token waited at
@@ -147,10 +148,15 @@ tests are the failing-first set: today the token waits at Evaluate, so no outcom
   Combined run with the BPA-7 and BPA-23 classes: 27 of 28 first time (one Confirm task never appeared, the BPA-23 flake), then
   `verify` green; both classes pass unchanged, so no re-check change in their plans.
 - React: no failing-first run. The Confirm screen already showed `confirmMessage` (BPA-23, D51); two tests added
-  (BPA8_materialNotReservedBlocksConfirmation, the screen shows the drawing reason; and no reason when none). `npm test` 20/20.
+  (BPA8_returnedReleaseReasonShowsOnConfirmScreen shows the drawing reason; and no reason when none). `npm test` 20/20.
 - Local stack (rebuilt bpa-app): Ready (DWG-118 + MAT-PIPE-06) → UserTask_SignOffRelease for project-engineer; Not ready (DWG-118 +
   MAT-PLATE-12) → Confirm returns with "Materials are not reserved for this Workpack"; Not ready (DWG-119 + MAT-PLATE-12) → "Drawing
   is not approved (IFC or As-Built required)". The return took 2.6 to 3.3 s from Complete, inside the task list's 5 s watch
   (500 ms x 10), so `taskPolling` stays as it is. The margin is about 2 s: if the stack is slower, the list shows the task after a refresh.
   Checked through the API, not in a browser.
 - The seed/AC mismatch stays open for Khitaba (Q1); the tests arrange their own data.
+- Review fixes (qa-reviewer, 5 Nov): the React test renamed (it asserts the drawing reason); BPA8_asBuiltDrawingCountsAsApproved gains a
+  newest Superseded revision so the "latest revision that is not Superseded" rule is tested (a mutant without the filter fails it);
+  BPA8_drawingWithoutRevisionsIsNotApproved gains an only-Superseded case; scenario 1 asserts Confirm is no longer open; scenario 8
+  asserts confirmMessage is cleared once Ready; the repository breaks a registered_at tie by the higher revision letter (ASSUMPTION).
+  A Work Pack with no material lines would count as reserved (vacuous); D20 says none exists, and nothing enforces it here.
