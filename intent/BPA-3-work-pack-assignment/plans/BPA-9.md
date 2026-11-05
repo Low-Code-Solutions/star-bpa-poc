@@ -203,3 +203,10 @@ A stub `RecordSignOffWorker` with no `@JobWorker` keeps the test class compiling
   declined re-run returns the same `confirmMessage`; a non-Draft Work Pack rolls the whole sign-off back); the audit `signed_off_at` and the column
   use the same microsecond instant; an approval that finds the Header already locked logs a warning; the React tests wait for `onDone`; the helper
   imports are tidied.
+- Departure from the plan (Ahsan, 5 Nov, after CI): PR #29's `backend-tests` failed in `SignOffApiTest` (the first test of the class timed out waiting
+  for its Confirm task), as in 3 of 3 full runs, while the class passes 11/11 alone. Cause: the integration classes share one Camunda; a pending
+  activate-jobs request of the previous class's closed client can take the first job of the next class, which then stays locked for the client
+  default of 5 minutes (`camunda.client.worker.defaults.timeout`, PT5M). The Work Pack of the failed test was saved minutes later by a worker of a
+  later class. Fix: a new test-only `backend/src/test/resources/application.properties` sets that timeout to PT10S; production configuration is
+  unchanged. This is outside the story's own scope (a small departure from one item per branch); it also targets the same flake seen in BPA-8 and
+  BPA-23 tests. Result: local full `./mvnw -B verify` 94 tests, 0 failures, SignOffApiTest 11/11 in the full run (it failed in every earlier full run); CI result is on the PR.

@@ -335,3 +335,5 @@ Newest last. One entry per review; the full report goes in the PR description.
   The ASSUMPTION texts and the Approved-with-reason rule need the BPA-9 Jira comment before merge: drafted for Ahsan (not posted).
 - Not verified by the reviewer: test runs, CI, the red states, the local-stack run, the browser, `TaskScreenShell` alert and focus behaviour
   (shared code, BPA-23).
+- After the review (BPA-9, Ahsan's decision 5 Nov, not reviewed by qa-reviewer): a test-only `application.properties` sets the Camunda job lock to PT10S,
+  because the first test of SignOffApiTest failed in every full run (local and CI) from a job locked to a closed client for the default 5 minutes.
