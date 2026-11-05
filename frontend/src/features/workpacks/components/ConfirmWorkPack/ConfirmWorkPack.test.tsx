@@ -183,7 +183,9 @@ describe('ConfirmWorkPack', () => {
     await renderScreen({ confirmMessage: 'Drawing is not approved (IFC or As-Built required)' });
 
     expect(
-      within(screen.getByRole('region', { name: 'Return reason' })).getByText('Drawing is not approved (IFC or As-Built required)'),
+      within(screen.getByRole('region', { name: 'Return reason' })).getByText(
+        'Drawing is not approved (IFC or As-Built required)',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Complete task' })).toBeEnabled();
   });
