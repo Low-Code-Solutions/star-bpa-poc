@@ -21,6 +21,8 @@
     <java.version>21</java.version>
     <!-- One patch release for every Camunda component, equal to the pinned server (.env.example, ADR 0001). -->
     <camunda.version>8.10.1</camunda.version>
+    <!-- S1: the Workpack print. OpenHTMLtoPDF (maintained fork, latest release as at 5 Nov 2026) brings PDFBox 3.0.8; the tests extract text with it. -->
+    <openhtmltopdf.version>1.1.108</openhtmltopdf.version>
   </properties>
 
   <dependencies>
@@ -65,6 +67,16 @@
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
+    </dependency>
+    <!-- The Workpack print (BPA-10, S1): Thymeleaf fills an XHTML template, OpenHTMLtoPDF converts it, with an embedded font. -->
+    <dependency>
+      <groupId>org.thymeleaf</groupId>
+      <artifactId>thymeleaf</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.github.openhtmltopdf</groupId>
+      <artifactId>openhtmltopdf-pdfbox</artifactId>
+      <version>${openhtmltopdf.version}</version>
     </dependency>
     <!-- Camunda Spring Boot Starter, Spring Boot 3 variant (the plain starter is built on Boot 4). -->
     <dependency>

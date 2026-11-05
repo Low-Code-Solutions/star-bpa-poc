@@ -25,6 +25,18 @@ public final class TestBrowser {
         return send(HttpRequest.newBuilder(URI.create(base + path)).GET());
     }
 
+    /** The body as bytes, for a binary response such as the Workpack print PDF (BPA-10). */
+    public HttpResponse<byte[]> getBytes(String path) {
+        try {
+            return http.send(HttpRequest.newBuilder(URI.create(base + path)).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
+    }
+
     /** A state-changing call that sends the CSRF token back, as React does. */
     public HttpResponse<String> post(String path, String json) {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(base + path))
