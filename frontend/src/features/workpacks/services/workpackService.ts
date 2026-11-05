@@ -22,8 +22,13 @@ export async function getLookAhead(api: Api, workpackNumber: string): Promise<Lo
 
 /** GET /api/v1/workpack-prints (BPA-10): the Work Packs that have a print, newest first; null when the call failed. */
 export async function listWorkPackPrints(api: Api): Promise<WorkPackPrintSummary[] | null> {
-  const { data } = await api.GET('/api/v1/workpack-prints');
-  return data ?? null;
+  try {
+    const { data } = await api.GET('/api/v1/workpack-prints');
+    return data ?? null;
+  } catch {
+    // A network failure is a failed call too: the screen says so instead of showing nothing.
+    return null;
+  }
 }
 
 /** The outcome of fetching a print: the PDF as a blob, or the status and the contract's problem `detail`. */
@@ -34,14 +39,21 @@ export type PrintResult = { ok: true; blob: Blob } | { ok: false; status: number
  * "Workpack print not available" (not scheduled yet) or "Work Pack not found".
  */
 export async function getWorkPackPrint(api: Api, workpackNumber: string): Promise<PrintResult> {
-  const { data, error, response } = await api.GET('/api/v1/workpacks/{workpackNumber}/print', {
-    params: { path: { workpackNumber } },
-    parseAs: 'blob',
-  });
-  if (response.ok && data) {
-    return { ok: true, blob: data };
+  try {
+    const { data, error, response } = await api.GET('/api/v1/workpacks/{workpackNumber}/print', {
+      params: { path: { workpackNumber } },
+      parseAs: 'blob',
+    });
+    if (response.ok && data) {
+      return { ok: true, blob: data };
+    }
+    const detail =
+      typeof error === 'object' && error !== null && 'detail' in error
+        ? String((error as { detail: unknown }).detail)
+        : undefined;
+    return { ok: false, status: response.status, detail };
+  } catch {
+    // The request itself failed (network): status 0, so the screen shows its general message.
+    return { ok: false, status: 0 };
   }
-  const detail =
-    typeof error === 'object' && error !== null && 'detail' in error ? String((error as { detail: unknown }).detail) : undefined;
-  return { ok: false, status: response.status, detail };
 }

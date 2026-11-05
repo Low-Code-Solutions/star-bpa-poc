@@ -8,11 +8,13 @@ import static com.lcs.star.bpa.CamundaSteps.json;
 import static com.lcs.star.bpa.CamundaSteps.poll;
 import static com.lcs.star.bpa.CamundaSteps.toJson;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lcs.star.bpa.api.TestBrowser;
+import com.lcs.star.bpa.persistence.WorkPackPrintRepository;
 import com.lcs.star.bpa.worker.GenerateWorkPackPrintWorker;
 import io.camunda.client.api.response.ActivatedJob;
 import io.camunda.client.api.worker.JobClient;
@@ -103,6 +105,9 @@ class PrintApiTest {
     @Autowired
     GenerateWorkPackPrintWorker worker;
 
+    @Autowired
+    WorkPackPrintRepository prints;
+
     /** The seed rows of each drawing this test touched, kept the first time it is arranged. */
     private final Map<String, Seed> touched = new LinkedHashMap<>();
 
@@ -137,10 +142,19 @@ class PrintApiTest {
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(response.headers().firstValue("Content-Type")).hasValue("application/pdf");
         String text = pdfText(response.body());
+        // Each value next to its label (a bare "contains" would pass with a wrong or missing row, because the date to complete and the
+        // planned end are both 06 Nov 2026): added after review.
         assertThat(text).contains(wp.number());
-        assertThat(text).contains("Cutting", "150", "Welding", "250", "Total", "400");
-        assertThat(text).contains("06 Nov 2026", "03 Nov 2026", "DWG-118");
-        assertThat(text).contains("MAT-PIPE-06", "MAT-FLG-02", "CS-3310");
+        assertThat(text).containsPattern("Drawing\\s+DWG-118");
+        assertThat(text).containsPattern("Date to complete\\s+06 Nov 2026");
+        assertThat(text).containsPattern("Planned start\\s+03 Nov 2026");
+        assertThat(text).containsPattern("Planned end\\s+06 Nov 2026");
+        assertThat(text).containsPattern("Cutting\\s+150\\b");
+        assertThat(text).containsPattern("Welding\\s+250\\b");
+        assertThat(text).containsPattern("Total\\s+400\\b");
+        assertThat(text).containsPattern("MAT-PIPE-06\\s+Cutting");
+        assertThat(text).containsPattern("MAT-FLG-02\\s+Welding");
+        assertThat(text).contains("CS-3310");
         Map<String, Object> row = jdbc.queryForMap("SELECT sha256, file, created_by FROM bpa.workpack_print WHERE workpack_id = ?", wp.id());
         assertThat(row.get("sha256")).as("the stored hash is the file's").isEqualTo(sha256((byte[]) row.get("file")));
         assertThat(sha256(response.body())).as("and the file served is the stored one").isEqualTo(row.get("sha256"));
@@ -191,7 +205,10 @@ class PrintApiTest {
         int auditRows = printAuditRows(wp);
         JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
 
-        // A retry after a lost completion (D29, D65, 09 S7), even a day later: nothing is generated again.
+        // A retry after a lost completion (D29, D65, 09 S7), even a day later: nothing is generated again. The existing print is looked
+        // for first, before anything else is read: even with the schedule gone (not a state the process produces; arranged so that a job
+        // that went on to read it would fail) the job completes (added after review).
+        jdbc.update("DELETE FROM bpa.workpack_schedule WHERE workpack_id = ?", wp.id());
         clock.set(TODAY.plus(Duration.ofDays(1)));
         worker.handle(client, job(101L, wp.instance(), Map.of("completedBy", "production-planner")));
         worker.handle(client, job(102L, wp.instance(), Map.of("completedBy", "production-planner")));
@@ -311,12 +328,63 @@ class PrintApiTest {
         Work wp = atSchedule("DWG-118", List.of(phase("Cutting", 150)), List.of(material("MAT-PIPE-06", "Cutting")));
         JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> worker.handle(client, job(111L, wp.instance(), Map.of("completedBy", "production-planner"))))
+        assertThatThrownBy(() -> worker.handle(client, job(111L, wp.instance(), Map.of("completedBy", "production-planner"))))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("not scheduled");
 
         Mockito.verify(client, Mockito.never()).newCompleteCommand(Mockito.anyLong());
         assertThat(printRows(wp)).isZero();
         assertThat(assignmentState(wp)).isNull();
+    }
+
+    /** A HEAD request is served by the GET handler, so the group rule must hold for it too (added after review). */
+    @Test
+    void aHeadRequestFollowsTheSameGroupRule() {
+        Work wp = scheduled("DWG-118", List.of(phase("Cutting", 150)), List.of(material("MAT-PIPE-06", "Cutting")));
+        awaitPrint(wp);
+        String path = "/api/v1/workpacks/" + wp.number() + "/print";
+
+        assertThat(loggedInAs("project-engineer").head(path).statusCode()).isEqualTo(403);
+        assertThat(loggedInAs("project-engineer").head("/api/v1/workpack-prints").statusCode()).isEqualTo(403);
+        assertThat(loggedInAs("time-method-analyst").head(path).statusCode()).isEqualTo(200);
+    }
+
+    /** Only a Released Work Pack is printed (D25): arranged by hand, since the process never schedules one that is not Released. */
+    @Test
+    void workerFailsForAWorkPackThatIsNotReleased() {
+        Work wp = atSchedule("DWG-118", List.of(phase("Cutting", 150)), List.of(material("MAT-PIPE-06", "Cutting")));
+        jdbc.update("""
+                INSERT INTO bpa.workpack_schedule (workpack_id, planned_start_date, planned_end_date, scheduled_by, created_by, updated_by)
+                VALUES (?, DATE '2026-11-03', DATE '2026-11-06', 'test', 'test', 'test')""", wp.id());
+        jdbc.update("UPDATE bpa.workpack SET status = 'Draft' WHERE id = ?", wp.id());
+        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+
+        assertThatThrownBy(() -> worker.handle(client, job(121L, wp.instance(), Map.of("completedBy", "production-planner"))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("not Released");
+
+        Mockito.verify(client, Mockito.never()).newCompleteCommand(Mockito.anyLong());
+        assertThat(printRows(wp)).isZero();
+        assertThat(assignmentState(wp)).isNull();
+    }
+
+    /**
+     * The print is stored once, and storing it opens the Work Pack for assignment files only while the state is still empty, so a Work
+     * Pack that has moved on (Assigning) is never reset (D50, D61; added after review). Through the repository, because the worker's own
+     * "already printed" check makes this path unreachable from a job.
+     */
+    @Test
+    void aStateThatHasMovedOnIsNotResetAndASecondStoreChangesNothing() {
+        Work wp = atSchedule("DWG-118", List.of(phase("Cutting", 150)), List.of(material("MAT-PIPE-06", "Cutting")));
+        jdbc.update("UPDATE bpa.workpack SET assignment_state = 'Assigning' WHERE id = ?", wp.id());
+
+        assertThat(prints.save(wp.id(), new byte[] {1, 2, 3}, "first", TODAY, "test")).isTrue();
+        assertThat(prints.save(wp.id(), new byte[] {4, 5, 6}, "second", TODAY, "test")).as("a second store writes nothing").isFalse();
+
+        assertThat(assignmentState(wp)).isEqualTo("Assigning");
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM bpa.audit_log WHERE table_name = 'workpack' AND column_name = 'assignment_state' AND record_id = ?""",
+                Integer.class, wp.id())).isZero();
+        assertThat(printRows(wp)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT sha256 FROM bpa.workpack_print WHERE workpack_id = ?", String.class, wp.id())).isEqualTo("first");
     }
 
     // --- arranging the Given, and putting the seed back ---------------------------------------------------------------------

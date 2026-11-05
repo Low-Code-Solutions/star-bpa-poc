@@ -107,6 +107,32 @@ describe('WorkPackPrints', () => {
     expect(screen.queryByTitle('Workpack print WP-000457')).not.toBeInTheDocument();
   });
 
+  it('shows a general message, and releases the blob URL, when the print fails (500, then a network error) (added after review)', async () => {
+    const { user } = await renderPanel(['time-method-analyst']);
+    await user.click(await screen.findByRole('button', { name: 'Print PDF WP-000457' }));
+    await screen.findByTitle('Workpack print WP-000457');
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+
+    // The same Work Pack, now failing with a 500: the iframe goes, the blob URL is released, and the message is general.
+    vi.stubGlobal('fetch', fakeBackend({ printStatus: 500 }).fetchMock);
+    await user.click(screen.getByRole('button', { name: 'Print PDF WP-000457' }));
+    expect(await screen.findByText('The print could not be loaded')).toBeInTheDocument();
+    expect(screen.queryByTitle('Workpack print WP-000457')).not.toBeInTheDocument();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:print-1');
+
+    // A request that throws (no network) is the same message, not an unhandled rejection.
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    await user.click(screen.getByRole('button', { name: 'Print PDF WP-000457' }));
+    expect(await screen.findByText('The print could not be loaded')).toBeInTheDocument();
+  });
+
+  it('says the list could not be loaded when that call fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    render(<WorkPackPrints api={apiClient()} groups={['production-planner']} />);
+
+    expect(await screen.findByText('The list of prints could not be loaded')).toBeInTheDocument();
+  });
+
   it('reads the list again on Refresh', async () => {
     const { user, calls } = await renderPanel(['production-team']);
     await screen.findByText('WP-000457');

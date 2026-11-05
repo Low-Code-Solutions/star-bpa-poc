@@ -57,7 +57,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/hour-journal-headers").hasAnyAuthority(PPC_TEAM, TIME_METHOD_ANALYST)
                         // BPA-10: the Workpack print and the list the portal shows are read by the Analyst, the Planner and the
                         // Production Team (groups ASSUMPTION in the story); the backend answers 403 for anyone else (09 S6).
-                        .requestMatchers(HttpMethod.GET, "/api/v1/workpacks/*/print", "/api/v1/workpack-prints")
+                        // Every method, not only GET: a HEAD request is served by the GET handler and must not skip the rule.
+                        .requestMatchers("/api/v1/workpacks/*/print", "/api/v1/workpack-prints")
                                 .hasAnyAuthority(TIME_METHOD_ANALYST, PRODUCTION_PLANNER, PRODUCTION_TEAM)
                         .anyRequest().authenticated())
                 // S26: token in the XSRF-TOKEN cookie (readable by React), sent back as X-XSRF-TOKEN on every state-changing call,

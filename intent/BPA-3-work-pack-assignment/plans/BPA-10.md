@@ -1,7 +1,7 @@
 # Plan: BPA-10 Time & Method Analyst can print a scheduled Work Pack
 Jira: BPA-10 (Story, epic BPA-3)
-Story last updated: 2026-11-02T16:13:10.954+0400
-Status: Approved (Ahsan, Build Lead, 2026-11-05)
+Story last updated: 2026-11-05T17:03:38.512+0400
+Status: Closed (2026-11-05)
 Approver: Ahsan (Build Lead)
 Branch: BPA-10-print-work-pack, from main ddd8df1
 
@@ -143,7 +143,7 @@ Stubs (worker, renderer, controller methods) keep the classes compiling for the 
   - new `print/WorkPackPrintRenderer.java`, `print/PrintData.java`, `worker/GenerateWorkPackPrintWorker.java`,
     `persistence/WorkPackPrintRepository.java`, `api/PrintController.java`;
   - `config/SecurityConfig.java`;
-  - resources `templates/print/workpack-print.html`, `fonts/DejaVuSans*.ttf` and the licence.
+  - resources `print/workpack-print.html` (not `templates/print/`, see the build notes), `fonts/DejaVuSans*.ttf` and the licence.
 - Tests: new `PrintApiTest`, `WorkPackPrintRendererTest`; `ProcessTestApplication` (exclude the worker).
 - Contract: `api/openapi.yaml` (the new list operation and schema).
 - Frontend:
@@ -212,3 +212,19 @@ Stubs (worker, renderer, controller methods) keep the classes compiling for the 
   print of WP-000013 was fetched through the API as time-method-analyst: 200, `application/pdf`, `inline; filename="WP-000013.pdf"`, 19,617 bytes, `%PDF-1.6`; page 1 was
   rendered to an image and read (header, Work Pack details, man hours with the total, the material, cutting sheet CS-3310, the footer in Asia/Riyadh).
 - Not checked in a browser: the iframe in the portal.
+- Story last updated refreshed after review: the changelog since the plan shows only the status move (Ready to In Progress) and an assignee change (Ahsan.Ali), both on 5 Nov;
+  the description, Acceptance Criteria, SOR Notes and comments are as read.
+- Files that changed beyond the "Files that change" list: `backend/src/test/java/com/lcs/star/bpa/api/TestBrowser.java` (`getBytes` and `head` helpers),
+  `backend/src/main/java/com/lcs/star/bpa/print/PrintData.java` (the print's data record), `backend/src/test/java/com/lcs/star/bpa/ScheduleApiTest.java` (the BPA-11 re-check),
+  `frontend/src/features/workpacks/hooks/useWorkPackPrints.ts`, `frontend/src/features/workpacks/components/WorkPackPrints/index.ts`, and `frontend/src/styles/global.css`
+  (the prints list and iframe, about 57 lines).
+- Review fixes (qa-reviewer, 5 Nov):
+  - The group rule now covers every HTTP method on the print paths, not only GET: a HEAD request is served by the GET handler and skipped the rule (so a project-engineer could learn
+    whether a print exists). A test checks HEAD gives 403 for project-engineer and 200 for time-method-analyst.
+  - Scenario 1 and the renderer unit test assert each value next to its label (the planned end now differs from the date to complete in the unit test), and the determinism test waits
+    1.1 s of wall clock between the two renders and also compares the document /ID and ModDate.
+  - Worker tests added: the "not Released" fault, a state that has moved on (Assigning) is not reset and a second store writes nothing (through the repository, since the worker's own
+    "already printed" check makes it unreachable from a job), and the re-run test deletes the schedule first so a job that read anything before the existing-print check would fail.
+  - The portal releases the blob URL when a later fetch fails, shows a general message for a 500 or a network error (no unhandled rejection), and says "The list of prints could not be
+    loaded" when the list call fails or throws; tests for each.
+- The Jira ASSUMPTION comment (for Khitaba) covers Q1 to Q3 of this plan and the story's SOR Notes/BPMN Reference not naming the list endpoint (a proposal, not an edit).

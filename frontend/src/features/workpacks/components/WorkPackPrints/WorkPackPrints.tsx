@@ -40,6 +40,11 @@ function PrintsSection({ api }: { api: Api }) {
     setProblem(null);
     const result = await getWorkPackPrint(api, workpackNumber);
     if (!result.ok) {
+      // The print on show goes away with its iframe, so its blob URL is released too.
+      if (current.current) {
+        URL.revokeObjectURL(current.current);
+        current.current = null;
+      }
       setShown(null);
       setProblem(result.status === 404 ? (result.detail ?? 'Workpack print not available') : 'The print could not be loaded');
       return;

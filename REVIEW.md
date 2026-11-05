@@ -355,3 +355,21 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Nits: a failed look-ahead call, a one-day-late end and a missing plan date had no test or text: tests added, "Not set" shown. The two panels have no headings and no live announcement for a failed
   look-ahead: left (acceptable; the date inputs have labels).
 - Not verified by the reviewer: test runs, CI, the browser, the red states, spec.md and data-model sections in full.
+
+### BPA-10 at 7f99ff5, 5 Nov 2026 (qa-reviewer)
+- Code: 0 High, 3 Medium, 5 Low. Reviewer read BPA-10 in Jira, the plan, S1/S3/S4, ADR 0004, data model 4.5 and 6.1 and the diff; it ran no tests (Docker needed). Author's runs: red PrintApiTest 12 of 12,
+  WorkPackPrintRendererTest 6 of 6, React 5 of 6 (4be7b68); green PrintApiTest 12/12 and the renderer 6/6; the full `./mvnw -B verify` (136 tests) found one failure, the BPA-11 test that
+  expected the process to wait at the print step (re-checked, ScheduleApiTest 17/17); React 41/41; on the local stack the print of WP-000013 fetched as time-method-analyst (200, application/pdf,
+  inline filename) and page 1 rendered to an image and read.
+- Checks passed: the 8 test names equal the Jira DoD list and each asserts its Gherkin (exact Content-Disposition, the 404 text, 403 for project-engineer, AwaitingFile, one print per Work Pack);
+  the worker and repository (existing print first, ON CONFLICT, one transaction, audit with `sha256:<hex>` per A3, state only when empty, faults for unscheduled); the renderer (dates and /ID from the
+  instant, embedded DejaVu Sans with its licence, English only, Thymeleaf XML mode with th:text only, no external resource, man hours as entered); the contract addition follows the spec.md rule and
+  leaks nothing; pom pins; the BPA-11 test edit is a real re-check.
+- Medium (3):
+  - A HEAD request bypassed the group rule (the matcher was GET only): fixed (all methods) with a test.
+  - The determinism test could pass with a wall-clock leak at second precision: fixed (1.1 s between renders, /ID and ModDate compared).
+  - Scenario 1 and the renderer test used a bare `contains` (the date to complete and planned end are both 06 Nov in the AC): fixed (each value next to its label; the unit test uses different dates).
+- Low: worker mutation gaps (the existing-print check, the state guard, the not-Released branch): tests added; blob URL not released after a failed fetch and an unhandled rejection on a network
+  error: fixed with tests; plan header and Files list: updated; unused import: removed. Left: two quick clicks on Print PDF may show the earlier response (minor); no loading text while the list
+  loads; the new PDF is not announced to screen readers and focus does not move to it.
+- Not verified by the reviewer: test runs, the layout, the browser (the iframe), whether CSP or frame headers affect a blob iframe, Maven Central latest for 1.1.108 (resolves locally).

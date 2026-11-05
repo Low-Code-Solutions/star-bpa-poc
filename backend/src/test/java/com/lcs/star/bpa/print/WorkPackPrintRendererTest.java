@@ -30,10 +30,19 @@ class WorkPackPrintRendererTest {
 
     private static PrintData data(BigDecimal cutting, List<String> cuttingSheets) {
         return new PrintData("WP-000457", "A-2201", "DWG-118", "Fabrication", LocalDate.parse("2026-11-06"),
-                LocalDate.parse("2026-11-03"), LocalDate.parse("2026-11-06"),
+                LocalDate.parse("2026-11-03"), LocalDate.parse("2026-11-09"), // planned end differs from the date to complete (review)
                 List.of(new PrintData.PhaseLine("Cutting", cutting), new PrintData.PhaseLine("Welding", new BigDecimal("250.00"))),
                 List.of(new PrintData.MaterialLine("MAT-PIPE-06", "Cutting"), new PrintData.MaterialLine("MAT-FLG-02", "Welding")),
                 cuttingSheets);
+    }
+
+    /** The document /ID as hex text (a COSArray has no value equality). */
+    private static String idText(PDDocument document) {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < document.getDocument().getDocumentID().size(); i++) {
+            text.append(java.util.HexFormat.of().formatHex(((org.apache.pdfbox.cos.COSString) document.getDocument().getDocumentID().get(i)).getBytes()));
+        }
+        return text.toString();
     }
 
     private static String text(byte[] pdf) throws IOException {
@@ -46,10 +55,20 @@ class WorkPackPrintRendererTest {
     void rendersTheFieldsOfTheStory() throws IOException {
         String text = text(renderer.render(data(new BigDecimal("150.00"), List.of("CS-3310")), AT));
 
-        assertThat(text).contains("WP-000457", "A-2201", "DWG-118", "Fabrication");
-        assertThat(text).contains("Cutting", "150", "Welding", "250", "400");
-        assertThat(text).contains("06 Nov 2026", "03 Nov 2026");
-        assertThat(text).contains("MAT-PIPE-06", "MAT-FLG-02", "CS-3310");
+        // Each value next to its label (the planned end differs from the date to complete, so a swapped or missing row fails).
+        assertThat(text).contains("WP-000457");
+        assertThat(text).containsPattern("Activity\\s+A-2201");
+        assertThat(text).containsPattern("Drawing\\s+DWG-118");
+        assertThat(text).containsPattern("Department\\s+Fabrication");
+        assertThat(text).containsPattern("Date to complete\\s+06 Nov 2026");
+        assertThat(text).containsPattern("Planned start\\s+03 Nov 2026");
+        assertThat(text).containsPattern("Planned end\\s+09 Nov 2026");
+        assertThat(text).containsPattern("Cutting\\s+150\\b");
+        assertThat(text).containsPattern("Welding\\s+250\\b");
+        assertThat(text).containsPattern("Total\\s+400\\b");
+        assertThat(text).containsPattern("MAT-PIPE-06\\s+Cutting");
+        assertThat(text).containsPattern("MAT-FLG-02\\s+Welding");
+        assertThat(text).contains("CS-3310");
         assertThat(text).doesNotContain("No cutting sheet available");
     }
 
@@ -70,11 +89,19 @@ class WorkPackPrintRendererTest {
     }
 
     @Test
-    void theSameDataAndInstantGiveTheSameBytes() {
+    void theSameDataAndInstantGiveTheSameBytes() throws Exception {
         byte[] first = renderer.render(data(new BigDecimal("150"), List.of("CS-3310")), AT);
+        // More than a second of wall clock between the renders, so a date or id that came from the wall clock (to the second) and not
+        // from the instant would differ (added after review).
+        Thread.sleep(1100);
         byte[] second = renderer.render(data(new BigDecimal("150"), List.of("CS-3310")), AT);
 
         assertThat(first).isNotEmpty().isEqualTo(second);
+        try (PDDocument a = Loader.loadPDF(first); PDDocument b = Loader.loadPDF(second)) {
+            assertThat(a.getDocument().getDocumentID()).as("the document /ID").isNotNull();
+            assertThat(idText(a)).isNotEmpty().isEqualTo(idText(b));
+            assertThat(a.getDocumentInformation().getModificationDate().toInstant()).isEqualTo(AT);
+        }
     }
 
     @Test

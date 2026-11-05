@@ -37,6 +37,19 @@ public final class TestBrowser {
         }
     }
 
+    /** HEAD, to check that a rule on a path holds for every method (BPA-10 review). */
+    public HttpResponse<Void> head(String path) {
+        try {
+            return http.send(HttpRequest.newBuilder(URI.create(base + path)).method("HEAD", HttpRequest.BodyPublishers.noBody()).build(),
+                    HttpResponse.BodyHandlers.discarding());
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
+    }
+
     /** A state-changing call that sends the CSRF token back, as React does. */
     public HttpResponse<String> post(String path, String json) {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(base + path))
