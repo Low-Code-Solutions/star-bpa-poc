@@ -498,6 +498,31 @@ paths:
                     status: 404
                     title: Not Found
                     detail: Work Pack not found
+  /api/v1/workpack-prints:
+    get:
+      tags: [prints]
+      operationId: listWorkPackPrints
+      summary: The Work Packs that have a Workpack print
+      description: |
+        The list behind the portal's "Workpack prints" section on the home page, newest print first (BPA-10; the portal has no task
+        screen for the print, so this is where a user finds it; PO decision on the portal, 5 Nov 2026). Each row has what the list
+        shows and the Work Pack number for GET /api/v1/workpacks/{workpackNumber}/print. Same groups as the print: `time-method-analyst`,
+        `production-planner` and `production-team`. No paging in the POC. This operation is new in BPA-10 (x-assumption: no source states it).
+      x-assumption: true
+      x-assumption-note: new operation added by BPA-10 for the portal's list of prints; groups as for the print
+      responses:
+        '200':
+          description: The Work Packs that have a print, newest first (empty when none has)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkPackPrintSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /api/v1/assignment-files:
     post:
       tags: [assignment-files]
@@ -1044,6 +1069,26 @@ components:
           type: string
           format: date
           description: Weld Map Drawing
+    WorkPackPrintSummary:
+      type: object
+      description: One row of the list of Workpack prints (BPA-10; workpack_print joined to workpack and workpack_schedule)
+      required: [workpackNumber, drawingRef, plannedStartDate, plannedEndDate, generatedAt]
+      properties:
+        workpackNumber:
+          $ref: '#/components/schemas/WorkpackNumber'
+        drawingRef:
+          type: string
+          example: DWG-118
+        plannedStartDate:
+          type: string
+          format: date
+        plannedEndDate:
+          type: string
+          format: date
+        generatedAt:
+          type: string
+          format: date-time
+          description: When the print was generated (workpack_print.generated_at)
     HourJournalHeader:
       type: object
       description: hour_journal_header (data model §5.5), joined to workpack
