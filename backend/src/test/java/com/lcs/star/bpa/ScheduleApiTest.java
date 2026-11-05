@@ -35,6 +35,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -382,6 +383,27 @@ class ScheduleApiTest {
 
         Mockito.verify(client, Mockito.never()).newCompleteCommand(Mockito.anyLong());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.workpack_schedule WHERE workpack_id = ?", Integer.class, draft.id())).isZero();
+    }
+
+    /**
+     * A date the task API cannot vouch for (any text may be sent): the save step refuses it like a missing one, with a BPMN error, so
+     * the task comes back (ASSUMPTION text). Added with the worker, not before it: it fails on the stub by construction.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void unreadableDatesAreRefusedByTheSaveStep() {
+        Scheduling wp = atSchedule("DWG-118");
+        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+
+        worker.handle(client, job(97L, wp.instance(), Map.of("completedBy", "production-planner",
+                "plannedStartDate", "next week", "plannedEndDate", "2026-11-06")));
+
+        ArgumentCaptor<Map<String, Object>> output = ArgumentCaptor.forClass(Map.class);
+        Mockito.verify(client.newThrowErrorCommand(97L).errorCode("SCHEDULE_INVALID").errorMessage("Planned start is not a valid date"))
+                .variables(output.capture());
+        assertThat(output.getValue()).containsEntry("validationMessages", List.of("Planned start is not a valid date"));
+        Mockito.verify(client, Mockito.never()).newCompleteCommand(Mockito.anyLong());
+        assertThat(scheduleRows(wp)).isZero();
     }
 
     // --- arranging the Given, and putting the seed back ---------------------------------------------------------------------
