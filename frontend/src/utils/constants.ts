@@ -6,4 +6,5 @@ export const USER_TASKS = {
   createWorkPack: 'UserTask_CreateWorkPack',
   confirmWorkPack: 'UserTask_ConfirmWorkPack',
   signOffRelease: 'UserTask_SignOffRelease',
+  scheduleWorkPack: 'UserTask_ScheduleWorkPack',
 } as const;

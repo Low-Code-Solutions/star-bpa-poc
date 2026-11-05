@@ -65,8 +65,12 @@ bpa:
         read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials, signOffDecision, declineReason]
       "[UserTask_ScheduleWorkPack]": # production-planner (G9), BPA-11
         write: [plannedStartDate, plannedEndDate]
-        read: [plannedStartDate, plannedEndDate]
+        # BPA-11: read also carries what the screen shows read-only (the Work Pack and its date to complete), as for the sign-off (BPA-9);
+        # the dates entered come back on a returned task. Write is unchanged: the data-model names, not the form spec names (BPA-46 Q2).
+        read: [activityRef, drawingRef, departmentRef, completionDate, plannedStartDate, plannedEndDate]
 
 # S9, ADR 0013: business dates (D20 "no past date", ...) are read in this zone; instants stay UTC.
 app:
   business-zone: Asia/Riyadh
+  # D9 (PO), data model §6.2: the lead time for planned dates, in days; configuration, not data, so a test can override it.
+  lead-time-days: 7

@@ -314,6 +314,11 @@ input[readonly] {
   color: var(--mill-scale);
 }
 
+/* BPA-11: a term and its value wrapped in a div (the Look-Ahead dates) stay two columns of the same grid. */
+.context-panel__pair {
+  display: contents;
+}
+
 .context-panel dd {
   margin: 0;
   font-weight: 500;

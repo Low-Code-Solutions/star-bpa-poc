@@ -337,3 +337,21 @@ Newest last. One entry per review; the full report goes in the PR description.
   (shared code, BPA-23).
 - After the review (BPA-9, Ahsan's decision 5 Nov, not reviewed by qa-reviewer): a test-only `application.properties` sets the Camunda job lock to PT10S,
   because the first test of SignOffApiTest failed in every full run (local and CI) from a job locked to a closed client for the default 5 minutes.
+
+### BPA-11 at 5597c1e, 5 Nov 2026 (qa-reviewer)
+- Code: 0 High, 3 Medium, 4 Nits. Reviewer read BPA-11 and its two comments in Jira, the plan and the diff; it ran no tests (Docker needed). Author's runs: red
+  14 of 15 ScheduleApiTest, 6 of 7 ScheduleValidatorTest and 6 of 6 React tests failed (41e8b1d); green ScheduleApiTest 16/16 and ScheduleValidatorTest 7/7 alone, full
+  `./mvnw -B verify` 117 tests, 0 failures, `npm test` 33/33, lint, format and build clean; local stack with the real Riyadh clock (look-ahead 200, 404 and 400; Analyst 403;
+  a start before today + 7 and an end before the start returned with the messages; a valid schedule saved by production-planner; the instance at Generate Workpack print).
+- Checks passed: the 9 scenario tests named as in the Jira DoD, each asserting its Gherkin; the validator order and the once-only lead-time text; the 27 and 28 Oct boundary
+  through the real process; today from the injected Clock and the business zone; the worker order (completedBy, existing schedule, Released, dates); ON CONFLICT on
+  workpack_id and audit rows only for a new row; the look-ahead API (200 with absent dates, 404, 400, 401, only the Work Pack, drawing and three dates exposed); the data-model
+  variable names; strict "late" comparison; the widened read list reachable only by production-planner; Jira `updated` equal to the plan's date (no drift).
+- Medium (3):
+  - The Riyadh-versus-UTC row promised in the plan Risks was missing (a mutant using the UTC day survived): fixed (a test with the clock at 22:00 UTC on 20 Oct).
+  - An unreadable date skipped the validator, so other rules were lost (start unreadable and end 27 Oct returned only the bad-start text): fixed (every rule runs on what can be read; tests for three
+    combinations).
+  - The unreadable-date texts and test were written with the worker, and Q2 and the Files list were incomplete: said in the plan and the PR, Q2 and the file list completed, the texts go to Khitaba.
+- Nits: a failed look-ahead call, a one-day-late end and a missing plan date had no test or text: tests added, "Not set" shown. The two panels have no headings and no live announcement for a failed
+  look-ahead: left (acceptable; the date inputs have labels).
+- Not verified by the reviewer: test runs, CI, the browser, the red states, spec.md and data-model sections in full.
