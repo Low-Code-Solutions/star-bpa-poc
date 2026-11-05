@@ -71,6 +71,27 @@ final class CamundaSteps {
         throw new AssertionError("could not move " + instance + " to " + toElementId + "; last: " + (last == null ? "nothing active" : last.body()));
     }
 
+    /** The open Sign off release task of the instance, as the Project Engineer's task key (BPA-9). */
+    static String awaitSignOffTask(long instance) {
+        return awaitOpenTask(instance, "UserTask_SignOffRelease").path("userTaskKey").asText();
+    }
+
+    /**
+     * The Project Engineer completes Sign off release through the task API (BPA-9); the reason is sent only when given.
+     * Returns the response, so a test can also check a refusal.
+     */
+    static java.net.http.HttpResponse<String> completeSignOff(com.lcs.star.bpa.api.TestBrowser projectEngineer, String taskKey,
+            String decision, String reason) {
+        Map<String, Object> variables = new java.util.LinkedHashMap<>();
+        if (decision != null) {
+            variables.put("signOffDecision", decision);
+        }
+        if (reason != null) {
+            variables.put("declineReason", reason);
+        }
+        return projectEngineer.post("/api/v1/tasks/" + taskKey + "/complete", toJson(Map.of("variables", variables)));
+    }
+
     /** A process variable's value as JSON text, as Camunda holds it (null when absent). */
     static String variable(long instance, String name) {
         List<JsonNode> found = elements(IntegrationApp.admin.post("/v2/variables/search",
