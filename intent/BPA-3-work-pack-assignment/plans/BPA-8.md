@@ -138,3 +138,19 @@ tests are the failing-first set: today the token waits at Evaluate, so no outcom
 
 ## Human-gap log
 - Local Maven build uses the `subst S:` work-round; `npm.cmd` in PowerShell.
+
+## Build notes (5 Nov 2026, as built)
+- Built as planned: `EvaluateReleaseInputsWorker` and `ReleaseInputsRepository`; no BPMN, DMN, migration, contract, seed or
+  frontend code change. `ProcessTestApplication` excludes the worker.
+- Red run (1e1b0a3): `ReleaseCheckApiTest` 11 tests, 10 timed out waiting for the release check (the token waited at
+  ServiceTask_EvaluateReleaseInputs), 1 threw from the stub worker. Green (c38e52c): 11/11; `./mvnw -B verify` 79 tests, 0 failures.
+  Combined run with the BPA-7 and BPA-23 classes: 27 of 28 first time (one Confirm task never appeared, the BPA-23 flake), then
+  `verify` green; both classes pass unchanged, so no re-check change in their plans.
+- React: no failing-first run. The Confirm screen already showed `confirmMessage` (BPA-23, D51); two tests added
+  (BPA8_materialNotReservedBlocksConfirmation, the screen shows the drawing reason; and no reason when none). `npm test` 20/20.
+- Local stack (rebuilt bpa-app): Ready (DWG-118 + MAT-PIPE-06) → UserTask_SignOffRelease for project-engineer; Not ready (DWG-118 +
+  MAT-PLATE-12) → Confirm returns with "Materials are not reserved for this Workpack"; Not ready (DWG-119 + MAT-PLATE-12) → "Drawing
+  is not approved (IFC or As-Built required)". The return took 2.6 to 3.3 s from Complete, inside the task list's 5 s watch
+  (500 ms x 10), so `taskPolling` stays as it is. The margin is about 2 s: if the stack is slower, the list shows the task after a refresh.
+  Checked through the API, not in a browser.
+- The seed/AC mismatch stays open for Khitaba (Q1); the tests arrange their own data.
