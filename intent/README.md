@@ -20,6 +20,7 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 
 | Plan | Summary | Status |
 |---|---|---|
+| [BPA-23](BPA-3-work-pack-assignment/plans/BPA-23.md) | Time & Method Analyst can correct a Draft Work Pack before confirming it | Closed (2026-11-05) |
 | [BPA-25](BPA-3-work-pack-assignment/plans/BPA-25.md) | ? | ? |
 | [BPA-26](BPA-3-work-pack-assignment/plans/BPA-26.md) | Portal user can get, view and complete their tasks through the backend task API | Closed (2026-11-04) |
 | [BPA-34](BPA-3-work-pack-assignment/plans/BPA-34.md) | Restructure repo to 09 L1 (layout only, no content) | Closed (2026-10-28) |

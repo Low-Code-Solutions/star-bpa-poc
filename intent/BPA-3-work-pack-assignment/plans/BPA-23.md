@@ -1,8 +1,8 @@
 # Plan: BPA-23 Time & Method Analyst can correct a Draft Work Pack before confirming it
 Jira: BPA-23 (Story, epic BPA-3)
 Story last updated: 2026-11-04T17:46:15.286+0400 (status In Progress and assignee only; content last changed 2 Nov)
-Status: Approved (Ahsan, Build Lead, 4 Nov 2026, in the Claude Code session; design brief confirmed with the plan)
-Approver: Ahsan (Build Lead)
+Status: Closed (2026-11-05)
+Approver: Ahsan (Build Lead), approved 4 Nov 2026 in the Claude Code session (design brief confirmed with the plan; design seen in the browser 5 Nov)
 Branch: BPA-23-correct-draft-work-pack, from main 604eb8c
 
 
@@ -279,3 +279,4 @@ Non-scenario tests:
   and are tested; noted for the PO in the Jira comment.
 - **After the fixes:** `./mvnw -B verify` 68 tests (ConfirmWorkPackApiTest 9); `npm test` 18/18; lint, format and build
   clean.
+- 5 Nov: Ahsan checked the design in the browser ("looks good"). Jira comment 10473 posted on BPA-23 (decisions, ASSUMPTIONs, the remove-line note for the PO).
