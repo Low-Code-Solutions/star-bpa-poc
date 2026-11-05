@@ -312,3 +312,28 @@ Newest last. One entry per review; the full report goes in the PR description.
   moved to In Progress only). D65 cite: D24 added. Restore of the seed is not asserted: kept (throwaway DB; no later test depends on it).
 - After the fixes: ReleaseCheckApiTest 11/11; `npm test` 20/20; format clean.
 - Not verified by the reviewer: test runs, CI, the local-stack run, the combined-run Confirm flake (BPA-23 note).
+
+### BPA-9 at c99921c, 5 Nov 2026 (qa-reviewer)
+- Code: 0 High, 3 Medium, 7 Low. Reviewer read BPA-9 in Jira, the plan, REVIEW.md and the diff; it ran no tests (Docker needed).
+  Author's runs: red 6 of 8 SignOffApiTest and 3 of 4 TaskValidityTest failed, 6 React tests failed (a84bec2); green SignOffApiTest 8/8 alone,
+  BPA-7 re-check 8/8 and BPA-23 re-check 9/9; `npm test` 27/27, lint, format, build clean; local stack decline, send back, confirm again and
+  approve through the API (Released, Header locked, two release_signoff rows, instance at Schedule Work Pack).
+- Checks passed: the 6 scenario tests named as in the Jira DoD, each asserting its Gherkin; the backend re-check runs after 404, 403, 409 and
+  the allow-list 400 and before assign and complete; `completedTaskKey` is set from the task, on no allow-list, and ignored by the other
+  workers; ON CONFLICT (task_key) first; `signed_off_by` from `completedBy`; release and lock in one transaction; the decline text comes from the
+  job and Ready clears it; the widened read list is reachable only by project-engineer; ADR 0004, openapi text and examples match the code;
+  no BPMN, DMN or migration change; the BPA-7 and BPA-23 re-checks keep every assertion.
+- Medium (3):
+  - Plan header `Story last updated` older than Jira `updated`: fixed (changelog shows only the status move and an assignee change; recorded).
+  - Files in the diff not in the plan (signOffMessages.ts, workpacks/index.ts, global.css incl. a global textarea rule, openapi examples): fixed
+    (listed in the plan).
+  - Worker tests too weak (no missing completedBy or completedTaskKey, no declined re-run output, no non-Draft rollback): fixed (three tests
+    added; each checked to need the code it tests).
+- Low: audit `signed_off_at` could carry nanoseconds that the column drops: fixed (both use microseconds). An approval that finds the Header already
+  locked passed silently: now logs a warning. React tests asserted `onDone` without waiting: fixed (`waitFor`). Helper imports in CamundaSteps: fixed.
+  Reason state kept across Approve then Decline (harmless; nothing sent when Approved): left. Empty tables show no empty-state text: left.
+  The ASSUMPTION texts and the Approved-with-reason rule need the BPA-9 Jira comment before merge: drafted for Ahsan (not posted).
+- Not verified by the reviewer: test runs, CI, the red states, the local-stack run, the browser, `TaskScreenShell` alert and focus behaviour
+  (shared code, BPA-23).
+- After the review (BPA-9, Ahsan's decision 5 Nov, not reviewed by qa-reviewer): a test-only `application.properties` sets the Camunda job lock to PT10S,
+  because the first test of SignOffApiTest failed in every full run (local and CI) from a job locked to a closed client for the default 5 minutes.

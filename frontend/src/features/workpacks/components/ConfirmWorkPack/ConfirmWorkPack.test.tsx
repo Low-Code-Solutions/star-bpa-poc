@@ -190,6 +190,18 @@ describe('ConfirmWorkPack', () => {
     expect(screen.getByRole('button', { name: 'Complete task' })).toBeEnabled();
   });
 
+  // BPA-9: a decline by the Project Engineer comes back as the same `confirmMessage`, shown the same way as BPA-8's reason (D51).
+  // D51 was built with BPA-23, so this test is expected to pass already; the failing-first tests for BPA-9 are the others.
+  it('BPA9_declineReasonShowsOnConfirmScreen', async () => {
+    await renderScreen({ confirmMessage: 'Declined by Project Engineer: Wrong drawing revision' });
+
+    expect(
+      within(screen.getByRole('region', { name: 'Return reason' })).getByText(
+        'Declined by Project Engineer: Wrong drawing revision',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('shows no return reason when the task has none (a first visit, or after Ready)', async () => {
     await renderScreen();
 

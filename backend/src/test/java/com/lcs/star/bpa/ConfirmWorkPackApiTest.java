@@ -5,7 +5,6 @@ import static com.lcs.star.bpa.CamundaSteps.awaitOpenTask;
 import static com.lcs.star.bpa.CamundaSteps.completed;
 import static com.lcs.star.bpa.CamundaSteps.elements;
 import static com.lcs.star.bpa.CamundaSteps.json;
-import static com.lcs.star.bpa.CamundaSteps.moveTokenTo;
 import static com.lcs.star.bpa.CamundaSteps.openTasks;
 import static com.lcs.star.bpa.CamundaSteps.poll;
 import static com.lcs.star.bpa.CamundaSteps.toJson;
@@ -203,19 +202,22 @@ class ConfirmWorkPackApiTest {
         poll(() -> headers(wp.number()), h -> h.size() == 1
                 && h.get(0).path("estimatedManhours").decimalValue().compareTo(new BigDecimal("450")) == 0, "header 450");
 
-        // Stand-in for BPA-9's sign-off (Released and Header locked, D8). The token is moved past Confirm from wherever it is.
-        // BPA-9: replace these three lines with the real path (release check Ready, which needs reserved materials and an
-        // approved drawing, D1, D10; then the Project Engineer approves Sign off release). Keep the assertions below.
-        // BPA-8: nothing to change; the move terminates whatever is active.
-        jdbc.update("UPDATE bpa.workpack SET status = 'Released' WHERE id = ?", wp.id());
-        jdbc.update("UPDATE bpa.hour_journal_header SET locked = true WHERE workpack_id = ?", wp.id());
-        moveTokenTo(wp.instance(), "UserTask_ScheduleWorkPack");
+        // The real sign-off (BPA-9 re-check; until BPA-9 this was a stand-in that set Released and locked the Header in the
+        // database and moved the token past Confirm). The correction ran the release check, which is Ready (DWG-118 has an IFC
+        // revision and a reservation for MAT-PIPE-06; D1, D10), so the Project Engineer approves Sign off release through the
+        // task API and record-release-signoff sets Released and locks the Header (D8). The assertions below are unchanged.
+        String signOff = CamundaSteps.awaitSignOffTask(wp.instance());
+        HttpResponse<String> approved = CamundaSteps.completeSignOff(loggedInAs("project-engineer"), signOff, "Approved", null);
+        assertThat(approved.statusCode()).as("approve: " + approved.body()).isEqualTo(204);
+        poll(() -> headers(wp.number()).get(0).path("locked").asBoolean(false), locked -> locked,
+                "Header of " + wp.number() + " locked by the sign-off");
+        assertThat(jdbc.queryForObject("SELECT status FROM bpa.workpack WHERE id = ?", String.class, wp.id())).isEqualTo("Released");
 
         assertStaysEmpty(() -> openTasks(wp.instance(), CONFIRM), "Confirm Workpack task for " + wp.number());
         assertThat(headers(wp.number()).get(0).path("locked").asBoolean(false)).as("man hours locked").isTrue();
 
         // BPA-23's own part (Ahsan, 4 Nov): a corrections job for a Work Pack that is no longer Draft is an incident (retries 0)
-        // and saves nothing. The lines above only stand in for BPA-9; this is the code BPA-23 adds for D8.
+        // and saves nothing. The sign-off above is now real (BPA-9); this is the code BPA-23 adds for D8.
         JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
         saveWorkPack.handle(client, job(31L, wp.instance(), SAVE_CORRECTIONS, withManhours(wp.variables(), "Welding", 999)));
         Mockito.verify(client.newFailCommand(31L)).retries(0);

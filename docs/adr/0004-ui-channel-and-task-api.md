@@ -58,6 +58,11 @@ and a server-side validation workaround (07 G2). The Work Pack print also has to
   no allow-list, so a request that sends it is refused with 400 'Variable completedBy is not allowed for this task'. Save
   workers use it for `created_by`, `updated_by` and the audit log; if it is missing they record the service user. Camunda's
   own audit log still shows the service identity as the actor (BPA-26 Q1, open with the PO).
+- Amended 5 Nov 2026 (BPA-9; D65; decided by Ahsan, Build Lead): the task API also adds `completedTaskKey`, the key of the task
+  being completed, on every completion, set from the engine and never from the request, and on no allow-list (a request that sends
+  it gets the same 400). A worker that records a decision uses it as its re-run key (release_signoff.task_key, D65): a job carries
+  only its own key. The task API also re-checks the rules that affect validity before it completes a task (BPA-9: Sign off release
+  needs a decision, and a decline needs a reason), so a refused completion leaves the task open (400).
 
 ## Sources
 

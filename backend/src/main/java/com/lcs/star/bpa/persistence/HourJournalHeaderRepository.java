@@ -72,6 +72,27 @@ public class HourJournalHeaderRepository {
         return Outcome.UPDATED;
     }
 
+    /**
+     * Locks the Work Pack's header at sign-off (D8, BPA-9): its man hours are never changed again. Joins the caller's
+     * transaction. A header must exist by now (it is created when the Work Pack is saved); a missing one is a fault, so the
+     * sign-off job fails and ends as an incident (S7). Returns false when it was already locked, and changes nothing then.
+     */
+    @Transactional
+    public boolean lock(UUID workpackId, String username) {
+        Map<String, Object> current = jdbc.queryForList(
+                "SELECT id, locked FROM bpa.hour_journal_header WHERE workpack_id = ? FOR UPDATE", workpackId).stream().findFirst()
+                .orElseThrow(() -> new IllegalStateException("No Project Hour Journal Header to lock for Work Pack " + workpackId));
+        if (Boolean.TRUE.equals(current.get("locked"))) {
+            return false;
+        }
+        Instant now = clock.instant();
+        UUID id = (UUID) current.get("id");
+        jdbc.update("UPDATE bpa.hour_journal_header SET locked = true, updated_at = ?, updated_by = ? WHERE id = ?",
+                Timestamp.from(now), username, id);
+        audit(id, "locked", "false", "true", username, now);
+        return true;
+    }
+
     /** The header of the Work Pack with this number, if the Work Pack exists: empty list when it has none yet. */
     public Optional<List<HourJournalHeader>> findByWorkpackNumber(String workpackNumber) {
         List<UUID> workpack = jdbc.queryForList("SELECT id FROM bpa.workpack WHERE workpack_number = ?", UUID.class, workpackNumber);

@@ -61,7 +61,8 @@ bpa:
         read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
       "[UserTask_SignOffRelease]": # project-engineer (G9), BPA-9
         write: [signOffDecision, declineReason]
-        read: [signOffDecision, declineReason]
+        # BPA-9 (Ahsan, 5 Nov): read also carries what the Project Engineer signs, shown read-only (Form_SignOffRelease); write stays as it is
+        read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials, signOffDecision, declineReason]
       "[UserTask_ScheduleWorkPack]": # production-planner (G9), BPA-11
         write: [plannedStartDate, plannedEndDate]
         read: [plannedStartDate, plannedEndDate]

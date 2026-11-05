@@ -248,6 +248,18 @@ paths:
                     status: 400
                     title: Bad Request
                     detail: Reason is required
+                decisionRequired:
+                  summary: BPA-9 ASSUMPTION text (the story states only "Reason is required"); no decision on Sign off release
+                  value:
+                    status: 400
+                    title: Bad Request
+                    detail: Decision is required
+                decisionUnknown:
+                  summary: BPA-9 ASSUMPTION text; a decision that is neither Approved nor Declined
+                  value:
+                    status: 400
+                    title: Bad Request
+                    detail: Decision must be Approved or Declined
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -932,6 +944,8 @@ components:
             declineReason; UserTask_ScheduleWorkPack takes plannedStartDate and plannedEndDate.
             The backend adds `completedBy`, the session user's Camunda username, to every completion, so the save workers
             record who did the work (D63; BPA-6). It is on no allow-list: a request that sends it is refused with 400.
+            Likewise it adds `completedTaskKey`, the key of the task being completed, the re-run key of a worker that records a
+            decision (D65; BPA-9, release_signoff.task_key). It is on no allow-list either.
           example:
             signOffDecision: Approved
     Activity:

@@ -405,3 +405,73 @@ input[readonly] {
 .notice__label {
   font-weight: 700;
 }
+
+/* --- Sign off release (BPA-9): the Work Pack to sign, and a plain two-way decision ----------------------------------------- */
+
+textarea {
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--mill-scale);
+  border-radius: var(--radius);
+  background: var(--sheet);
+  resize: vertical;
+}
+
+.sign-table {
+  width: 100%;
+  margin-top: var(--space-3);
+  border-collapse: collapse;
+  font-size: var(--step--1);
+}
+
+.sign-table caption {
+  text-align: left;
+  font-weight: 600;
+  padding-bottom: var(--space-1);
+}
+
+.sign-table th,
+.sign-table td {
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--rule);
+}
+
+.sign-table th {
+  color: var(--mill-scale);
+  font-weight: 500;
+}
+
+/* The decision: the two choices side by side on a plate edge, like the line groups; radios keep their natural size. */
+.choices {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 0;
+  border-left: 4px solid var(--steel-ink);
+  background: var(--plate);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+}
+
+.choices legend {
+  padding: 0;
+  font-weight: 600;
+}
+
+.choices label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  font-weight: 500;
+}
+
+.choices input[type='radio'] {
+  width: 1.25rem;
+  min-height: 0;
+  height: 1.25rem;
+  accent-color: var(--steel-ink);
+}
