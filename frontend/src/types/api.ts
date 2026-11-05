@@ -7,6 +7,7 @@ export type Me = Schemas['Me'];
 export type TaskSummary = Schemas['TaskSummary'];
 export type Task = Schemas['Task'];
 export type LookAhead = Schemas['LookAhead'];
+export type WorkPackPrintSummary = Schemas['WorkPackPrintSummary'];
 export type Activity = Schemas['Activity'];
 export type Drawing = Schemas['Drawing'];
 export type Material = Schemas['Material'];

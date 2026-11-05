@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<!--
+  The Workpack print (BPA-10, 09 S1, S3): English only, filled by Thymeleaf (XML mode, so the output stays well-formed XHTML) and
+  converted by OpenHTMLtoPDF with the embedded DejaVu Sans. Every value arrives as ready text from WorkPackPrintRenderer.
+  Job card and return material voucher are out of scope (no layout in any source; the voucher stays in FMS, FRD-7 §7.3.3).
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <title th:text="${v.workpackNumber()}">Workpack</title>
+  <style>
+    @page { size: A4; margin: 16mm 15mm 18mm 15mm; }
+    body { font-family: 'DejaVu Sans', sans-serif; font-size: 10pt; color: #1e2933; }
+    h1 { font-size: 20pt; margin: 0 0 2mm 0; }
+    h2 { font-size: 11pt; margin: 7mm 0 2mm 0; border-bottom: 0.4mm solid #1e2933; padding-bottom: 1mm; }
+    .brand { font-size: 9pt; letter-spacing: 0.3mm; color: #5b6670; margin: 0 0 1mm 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 1.4mm 2mm; border-bottom: 0.2mm solid #c9cfd3; }
+    th { color: #5b6670; font-weight: bold; width: 38%; }
+    table.lines th { width: auto; }
+    td.num, th.num { text-align: right; }
+    tr.total td { font-weight: bold; border-top: 0.4mm solid #1e2933; }
+    .notice { font-style: italic; }
+    .footer { margin-top: 9mm; font-size: 8pt; color: #5b6670; }
+  </style>
+</head>
+<body>
+  <p class="brand">STAR · WORKPACK PRINT</p>
+  <h1 th:text="${v.workpackNumber()}">WP-000000</h1>
+
+  <h2>Work Pack</h2>
+  <table>
+    <tr><th>Activity</th><td th:text="${v.activityRef()}">A-0000</td></tr>
+    <tr><th>Drawing</th><td th:text="${v.drawingRef()}">DWG-000</td></tr>
+    <tr><th>Department</th><td th:text="${v.departmentRef()}">Department</td></tr>
+    <tr><th>Date to complete</th><td th:text="${v.completionDate()}">01 Jan 2026</td></tr>
+    <tr><th>Planned start</th><td th:text="${v.plannedStart()}">01 Jan 2026</td></tr>
+    <tr><th>Planned end</th><td th:text="${v.plannedEnd()}">01 Jan 2026</td></tr>
+  </table>
+
+  <h2>Man hours</h2>
+  <table class="lines">
+    <tr><th>Phase</th><th class="num">Man hours</th></tr>
+    <tr th:each="p : ${v.phases()}"><td th:text="${p.label()}">Phase</td><td class="num" th:text="${p.value()}">0</td></tr>
+    <tr class="total"><td>Total</td><td class="num" th:text="${v.totalManhours()}">0</td></tr>
+  </table>
+
+  <h2>Materials (material coupon)</h2>
+  <table class="lines">
+    <tr><th>Material</th><th>Phase</th></tr>
+    <tr th:each="m : ${v.materials()}"><td th:text="${m.label()}">MAT</td><td th:text="${m.value()}">Phase</td></tr>
+  </table>
+
+  <h2>Cutting sheets</h2>
+  <table class="lines" th:if="${!v.cuttingSheets().isEmpty()}">
+    <tr th:each="c : ${v.cuttingSheets()}"><td th:text="${c}">CS-0000</td></tr>
+  </table>
+  <p class="notice" th:if="${v.cuttingSheets().isEmpty()}">No cutting sheet available</p>
+
+  <p class="footer" th:text="${v.generated()}">Generated</p>
+</body>
+</html>

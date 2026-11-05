@@ -314,6 +314,63 @@ input[readonly] {
   color: var(--mill-scale);
 }
 
+/* --- Workpack prints (BPA-10): a register of printed Work Packs, and the PDF in the browser viewer below it ------------------------ */
+
+.prints {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+
+.prints h2 {
+  margin: var(--space-4) 0 0;
+  font-size: var(--step-1);
+  font-weight: 600;
+}
+
+.prints > .button {
+  justify-self: start;
+}
+
+.prints p {
+  margin: 0;
+}
+
+.prints__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--sheet);
+  border-top: 2px solid var(--steel-ink);
+}
+
+.prints__row {
+  display: grid;
+  grid-template-columns: 8rem 6rem 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--rule);
+}
+
+.prints__number {
+  font-weight: 700;
+}
+
+.prints__frame {
+  width: 100%;
+  height: 70vh;
+  border: 1px solid var(--mill-scale);
+  background: var(--sheet);
+}
+
+@media (max-width: 40rem) {
+  .prints__row {
+    grid-template-columns: 1fr auto;
+  }
+}
+
 /* BPA-11: a term and its value wrapped in a div (the Look-Ahead dates) stay two columns of the same grid. */
 .context-panel__pair {
   display: contents;
