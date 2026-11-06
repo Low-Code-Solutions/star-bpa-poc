@@ -27,10 +27,25 @@ export function AssignmentFileUpload({ api, groups }: { api: Api; groups: string
   return <UploadSection api={api} />;
 }
 
+/** What to tell the user when an upload is refused: the contract's own text for a 400, a plain reason for 403 and 413, else a general one. */
+function refusal(status: number, detail?: string): string {
+  if (status === 400 && detail) {
+    return detail;
+  }
+  if (status === 403) {
+    return 'You are not allowed to upload an assignment file';
+  }
+  if (status === 413) {
+    return 'The file is too large (at most 5 MB)';
+  }
+  return 'The file could not be uploaded';
+}
+
 function UploadSection({ api }: { api: Api }) {
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<AssignmentFileResult | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function upload() {
     if (!file) {
@@ -38,11 +53,16 @@ function UploadSection({ api }: { api: Api }) {
       return;
     }
     setProblem(null);
-    const uploaded = await uploadAssignmentFile(api, file);
-    if (uploaded.ok) {
-      setResult(uploaded.result);
-    } else {
-      setProblem(uploaded.status === 400 && uploaded.detail ? uploaded.detail : 'The file could not be uploaded');
+    setBusy(true);
+    try {
+      const uploaded = await uploadAssignmentFile(api, file);
+      if (uploaded.ok) {
+        setResult(uploaded.result);
+      } else {
+        setProblem(refusal(uploaded.status, uploaded.detail));
+      }
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -92,7 +112,7 @@ function UploadSection({ api }: { api: Api }) {
         <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       </Field>
       <div className="assignment-file__actions">
-        <Button className="button--primary" onClick={() => void upload()}>
+        <Button className="button--primary" disabled={busy} onClick={() => void upload()}>
           Upload
         </Button>
       </div>

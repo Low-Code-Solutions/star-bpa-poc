@@ -90,4 +90,22 @@ class AssignmentFileReaderTest {
         assertThat(AssignmentFileReader.read(new byte[0]).fileOutcome()).isEqualTo("File cannot be read");
         assertThat(AssignmentFileReader.read("not a workbook".getBytes()).fileOutcome()).isEqualTo("File cannot be read");
     }
+
+    @Test
+    void moreThanFiveThousandRowsIsRefusedAndExactlyFiveThousandIsRead() {
+        // One upload is one transaction and one response, so the rows are capped (ASSUMPTION; added after review).
+        AssignmentFileBuilder atTheLimit = AssignmentFileBuilder.assignment();
+        for (int i = 0; i < 5000; i++) {
+            atTheLimit.row("WP-000457", "E1021", 1);
+        }
+        Result read = AssignmentFileReader.read(atTheLimit.build());
+        assertThat(read.fileOutcome()).isNull();
+        assertThat(read.rows()).hasSize(5000);
+
+        AssignmentFileBuilder over = AssignmentFileBuilder.assignment();
+        for (int i = 0; i < 5001; i++) {
+            over.row("WP-000457", "E1021", 1);
+        }
+        assertThat(AssignmentFileReader.read(over.build())).isEqualTo(new Result("File has too many rows", List.of()));
+    }
 }

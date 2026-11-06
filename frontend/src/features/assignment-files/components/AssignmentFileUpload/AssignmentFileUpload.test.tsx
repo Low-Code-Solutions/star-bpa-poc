@@ -193,4 +193,15 @@ describe('AssignmentFileUpload', () => {
     await chooseAndUpload(broken.user);
     expect(await screen.findByText('The file could not be uploaded')).toBeInTheDocument();
   });
+
+  it('says why an upload was refused for a missing permission or a file that is too large', async () => {
+    const forbidden = await renderSection(['production-team'], { upload: { status: 403, body: { status: 403 } } });
+    await chooseAndUpload(forbidden.user);
+    expect(await screen.findByText('You are not allowed to upload an assignment file')).toBeInTheDocument();
+    cleanup();
+
+    const large = await renderSection(['production-team'], { upload: { status: 413, body: { status: 413 } } });
+    await chooseAndUpload(large.user);
+    expect(await screen.findByText('The file is too large (at most 5 MB)')).toBeInTheDocument();
+  });
 });

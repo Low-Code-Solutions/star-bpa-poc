@@ -52,8 +52,10 @@ public class AssignmentFileResultCsvConverter extends AbstractHttpMessageConvert
     }
 
     static String downloadName(String fileName) {
-        String base = fileName == null ? "assignment" : fileName.replaceAll("(?i)\\.xlsx$", "").replace("\"", "").replaceAll("[\\r\\n]", "");
-        return base + "-result.csv";
+        // The browser may send a path: keep only the name, and drop quotes, backslashes, semicolons and control characters (review).
+        String name = fileName == null ? "assignment" : fileName.replaceAll(".*[\\\\/]", "");
+        String base = name.replaceAll("(?i)\\.xlsx$", "").replaceAll("[\\p{Cntrl}\"\\\\;]", "");
+        return (base.isBlank() ? "assignment" : base) + "-result.csv";
     }
 
     static String csv(AssignmentFileResult result) {

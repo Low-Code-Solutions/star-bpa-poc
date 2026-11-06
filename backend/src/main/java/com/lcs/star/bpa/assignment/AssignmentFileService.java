@@ -152,6 +152,11 @@ public class AssignmentFileService {
         } catch (EngineUnavailableException e) {
             LOG.warn("{} for {} (file {}) could not be sent: {}", MESSAGE, workpackNumber, fileId, e.getMessage());
             return false;
+        } catch (RuntimeException e) {
+            // Any other failure of the send (a refusal, a bad answer) is "not delivered" too: the claim is undone and the loop goes on
+            // with the next Work Pack, so a failed send never leaves a claim that blocks a resend for ever (data model 5.12; found in review).
+            LOG.error("{} for {} (file {}) failed: {}", MESSAGE, workpackNumber, fileId, e.toString(), e);
+            return false;
         }
     }
 

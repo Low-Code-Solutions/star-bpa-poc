@@ -373,3 +373,16 @@ Newest last. One entry per review; the full report goes in the PR description.
   error: fixed with tests; plan header and Files list: updated; unused import: removed. Left: two quick clicks on Print PDF may show the earlier response (minor); no loading text while the list
   loads; the new PDF is not announced to screen readers and focus does not move to it.
 - Not verified by the reviewer: test runs, the layout, the browser (the iframe), whether CSP or frame headers affect a blob iframe, Maven Central latest for 1.1.108 (resolves locally).
+
+### BPA-12 at 40f8a2f (plan notes ea8b845), 6 Nov 2026 (qa-reviewer)
+- Code: 0 High, 5 Medium, 9 Low. Author's runs: red AssignmentFileApiTest 21 of 21, reader 7 of 8, template 4 of 4, React 7 of 8 (7ea3734); green API 21/21, full `./mvnw -B verify` 172 tests, React 51/51;
+  local stack through the API with a real `.xlsx` (routed, same file again, unknown Work Pack, 403, CSV, template, the BPA-22 incident).
+- Medium (5):
+  - A non-engine exception from the correlate call left the claim and returned a 500: fixed (any failure undoes the claim; the next Work Pack is still sent), with a unit test.
+  - Mutation gaps (D73 before state, a claim lost to a concurrent upload, the compensation paths): `AssignmentFileServiceTest` added.
+  - No row cap, zip limit or log for unreadable files: 5,000-row cap ("File has too many rows", ASSUMPTION), POI entry-size cap, debug log, tests.
+  - ASSUMPTIONs not yet commented and Remarks maximum 250 not enforced: ASSUMPTION comment text for Khitaba prepared; the Remarks rule is BPA-22's.
+  - A read timeout after Camunda correlated could show a false "Not processed": noted in the plan, no change.
+- Low: attachment name sanitised (fixed, test); `Accept: */*` untested (test added); Upload not disabled while in flight and generic upload errors (fixed, tests); left: CSV formula injection (PO call),
+  trailing-slash path, file input not cleared after upload, the Work Pack outcome shown inside the Outcome cell; plan file list and `updated` drift (plan updated).
+- Not verified by the reviewer: test runs, CI, the browser.

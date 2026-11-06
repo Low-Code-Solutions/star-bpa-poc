@@ -1205,7 +1205,7 @@ components:
           type: string
           description: |
             File-level line; absent when the rows carry the outcomes (D70, D73). Texts (BPA-12): "File has no rows",
-            "File cannot be read", "File layout not recognised", "File already processed".
+            "File cannot be read", "File layout not recognised", "File has too many rows" (more than 5000 rows; ASSUMPTION), "File already processed".
         rows:
           type: array
           items:

@@ -6,6 +6,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.apache.poi.openxml4j.util.ZipSecureFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
@@ -27,11 +30,21 @@ public final class AssignmentFileReader {
     static final String CANNOT_BE_READ = "File cannot be read";
     static final String LAYOUT_NOT_RECOGNISED = "File layout not recognised";
     static final String NO_ROWS = "File has no rows";
+    static final String TOO_MANY_ROWS = "File has too many rows";
+    /** The most data rows one upload may carry (ASSUMPTION): one transaction and one response hold them all. */
+    static final int MAX_ROWS = 5000;
 
     private static final String WORKPACK = "workpack number";
     private static final String BADGE = "badge no";
     private static final String HOURS = "estimated hours";
     private static final String REMARKS = "remarks";
+
+    private static final Logger LOG = LoggerFactory.getLogger(AssignmentFileReader.class);
+
+    static {
+        // POI's zip-bomb guard allows an entry of up to 4 GB; an assignment file is small, so a sheet that unpacks to more than 50 MB is refused.
+        ZipSecureFile.setMaxEntrySize(50L * 1024 * 1024);
+    }
 
     private AssignmentFileReader() {
     }
@@ -55,6 +68,7 @@ public final class AssignmentFileReader {
             return rows(workbook.getSheetAt(0));
         } catch (Exception e) {
             // Not a workbook, an old .xls, empty or damaged: POI raises several kinds of exception; all are "cannot be read".
+            LOG.debug("The assignment file could not be read", e);
             return new Result(CANNOT_BE_READ, List.of());
         }
     }
@@ -86,6 +100,9 @@ public final class AssignmentFileReader {
             String remarks = text(formatter, row, columns.get(REMARKS));
             if (workpack == null && badge == null && hours == null && remarks == null) {
                 continue; // a blank row (a row with only an Employee name is blank too: that column is ignored)
+            }
+            if (rows.size() == MAX_ROWS) {
+                return new Result(TOO_MANY_ROWS, List.of());
             }
             rows.add(new Row(r + 1, workpack, badge, hours, remarks));
         }

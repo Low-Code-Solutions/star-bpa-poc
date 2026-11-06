@@ -1,7 +1,7 @@
 # Plan: BPA-12 Production Team can submit a Worker assignment file for a scheduled Work Pack
 Jira: BPA-12 (Story, epic BPA-3)
-Story last updated: 2026-11-02T16:13:11.156+0400
-Status: Approved (Ahsan, Build Lead, 2026-11-06)
+Story last updated: 2026-11-06T10:26:28.351+0400 (status and assignee only; the content last changed 29 Oct, sprint 2 Nov)
+Status: Closed (2026-11-06); approved by Ahsan, Build Lead, 2026-11-06
 Approver: Ahsan (Build Lead)
 Branch: BPA-12-assignment-file-upload, from main 4fe2409
 
@@ -259,3 +259,22 @@ test that passes before the build is said in the PR.
   "validate-worker-assignment is built by BPA-22"; one `published_message` row. Not checked in a browser.
 - jsdom's `FormData` is not Node's, so a React test cannot read the content type of the upload request; it checks the file is appended under the part name `file` instead.
 - Size: about 12 to 13 points by my estimate against the 8 on the story; kept whole by Ahsan's decision of 6 Nov (see the Readiness check).
+
+## Review fixes (6 Nov 2026, after the qa-reviewer pass; see REVIEW.md)
+- **Service:** a failed send of any kind (not only an engine fault) now undoes that Work Pack's claim, sets its Pending rows to "Not processed: Work Pack not ready; resend the file" and goes on
+  with the next Work Pack; the user no longer gets a 500. Tests added in `AssignmentFileServiceTest` (6, mocked repository and Camunda): D73 checked before the state, a claim lost to a concurrent
+  identical upload, every claim lost ("File already processed"), a failed send, an unreachable Camunda, a file problem.
+- **Reader:** at most 5,000 data rows, otherwise the file-level line "File has too many rows" (**ASSUMPTION**, Q1; the contract text for `outcome` lists it); POI's entry size is capped at 50 MB; the
+  reason a file cannot be read is logged at debug. Tests for 5,000 and 5,001 rows.
+- **CSV:** the attachment name drops any path, quotes, backslashes, semicolons and control characters (`AssignmentFileResultCsvConverterTest`, 4).
+- **Portal:** Upload is disabled while a call is running; a refused upload says "You are not allowed to upload an assignment file" (403) or "The file is too large (at most 5 MB)" (413).
+- **Test:** `Accept: */*` and no Accept both give JSON on the result.
+- **Files that changed beyond the list:** `frontend/src/features/assignment-files/index.ts`, `components/AssignmentFileUpload/index.ts`, `frontend/src/utils/download.ts` (`saveBlob`),
+  `AssignmentFileServiceTest`, `AssignmentFileResultCsvConverterTest`.
+- **Open, for the PR and Khitaba:**
+  - Q1 also covers the 5,000-row cap. The Remarks maximum of 250 is not enforced here; BPA-22 validates it.
+  - A CSV value that starts with `=`, `+`, `-` or `@` is written as it is (no spreadsheet-formula protection); changing it alters the downloaded data, so it is the Product Owner's call.
+  - If Camunda correlates the message but the HTTP read then times out, the rows read "Not processed" although the instance moved on; a resend is then refused by the D73 guard only if the claim
+    survived, which it does not. Rare; noted for the demo, no read timeout added.
+  - Estimate: about 12 to 13 points against 8, kept whole by Ahsan.
+- Final runs after the review fixes: full `./mvnw -B verify` 185 tests, 0 failures; React 52/52, lint, Prettier and build clean.

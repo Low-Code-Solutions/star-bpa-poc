@@ -335,6 +335,21 @@ class AssignmentFileApiTest {
     }
 
     @Test
+    void resultIsJsonWhenTheAcceptHeaderIsAnyTypeOrMissing() {
+        // Not a scenario: a client that sends Accept: */* (curl, a script) or no Accept at all gets JSON, not the CSV (review).
+        Upload upload = upload("production-team", "assign-empty.xlsx", AssignmentFileBuilder.assignment().build());
+        TestBrowser team = loggedInAs("production-team");
+
+        for (HttpResponse<String> any : List.of(
+                team.getWithAccept("/api/v1/assignment-files/" + upload.id() + "/result", "*/*"),
+                team.get("/api/v1/assignment-files/" + upload.id() + "/result"))) {
+            assertThat(any.statusCode()).as(any.body()).isEqualTo(200);
+            assertThat(any.headers().firstValue("Content-Type")).hasValueSatisfying(t -> assertThat(t).startsWith("application/json"));
+            assertThat(json(any.body()).path("outcome").asText()).isEqualTo("File has no rows");
+        }
+    }
+
+    @Test
     void BPA12_otherRolesCannotUpload() {
         int before = fileRows();
 
