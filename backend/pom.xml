@@ -23,6 +23,8 @@
     <camunda.version>8.10.1</camunda.version>
     <!-- S1: the Workpack print. OpenHTMLtoPDF (maintained fork, latest release as at 5 Nov 2026) brings PDFBox 3.0.8; the tests extract text with it. -->
     <openhtmltopdf.version>1.1.108</openhtmltopdf.version>
+    <!-- S18: the Worker assignment file (.xlsx), read in the upload and written by the template and the test AssignmentFileBuilder. Latest release as at 6 Nov 2026. -->
+    <poi.version>6.0.0</poi.version>
   </properties>
 
   <dependencies>
@@ -77,6 +79,12 @@
       <groupId>io.github.openhtmltopdf</groupId>
       <artifactId>openhtmltopdf-pdfbox</artifactId>
       <version>${openhtmltopdf.version}</version>
+    </dependency>
+    <!-- The Worker assignment file (BPA-12, S18): Apache POI reads the uploaded .xlsx and builds the template and the test files. -->
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-ooxml</artifactId>
+      <version>${poi.version}</version>
     </dependency>
     <!-- Camunda Spring Boot Starter, Spring Boot 3 variant (the plain starter is built on Boot 4). -->
     <dependency>
