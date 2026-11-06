@@ -23,6 +23,7 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-10](BPA-3-work-pack-assignment/plans/BPA-10.md) | Time & Method Analyst can print a scheduled Work Pack | Closed (2026-11-05) |
 | [BPA-11](BPA-3-work-pack-assignment/plans/BPA-11.md) | Production Planner can schedule a Released Work Pack | Closed (2026-11-05) |
 | [BPA-12](BPA-3-work-pack-assignment/plans/BPA-12.md) | Production Team can submit a Worker assignment file for a scheduled Work Pack | Closed (2026-11-06); approved by Ahsan, Build Lead, 2026-11-06 |
+| [BPA-22](BPA-3-work-pack-assignment/plans/BPA-22.md) | Production Team can have each assignment row validated | Closed (2026-11-06); approved by Ahsan, Build Lead, 2026-11-06 |
 | [BPA-23](BPA-3-work-pack-assignment/plans/BPA-23.md) | Time & Method Analyst can correct a Draft Work Pack before confirming it | Closed (2026-11-05) |
 | [BPA-25](BPA-3-work-pack-assignment/plans/BPA-25.md) | ? | ? |
 | [BPA-26](BPA-3-work-pack-assignment/plans/BPA-26.md) | Portal user can get, view and complete their tasks through the backend task API | Closed (2026-11-04) |

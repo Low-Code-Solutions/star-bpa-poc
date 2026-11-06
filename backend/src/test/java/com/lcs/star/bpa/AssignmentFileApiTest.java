@@ -1,29 +1,22 @@
 package com.lcs.star.bpa;
 
-import static com.lcs.star.bpa.CamundaSteps.activeElements;
-import static com.lcs.star.bpa.CamundaSteps.awaitOpenTask;
-import static com.lcs.star.bpa.CamundaSteps.awaitSignOffTask;
-import static com.lcs.star.bpa.CamundaSteps.completeSignOff;
 import static com.lcs.star.bpa.CamundaSteps.elements;
 import static com.lcs.star.bpa.CamundaSteps.json;
 import static com.lcs.star.bpa.CamundaSteps.poll;
-import static com.lcs.star.bpa.CamundaSteps.toJson;
 import static com.lcs.star.bpa.CamundaSteps.variable;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lcs.star.bpa.AssignmentFlow.Upload;
+import com.lcs.star.bpa.AssignmentFlow.Work;
 import com.lcs.star.bpa.api.TestBrowser;
 import java.net.http.HttpResponse;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +50,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * Background: today is 30 Oct 2026 (Asia/Riyadh); Workers E1021 and E1099 are in the Worker master (seed); E9999 is not.
  *
  * <p>The AC's Work Pack numbers (WP-000457, ...) are illustrative: each test creates its own Work Packs and uses the numbers they get.
- * Row validation is BPA-22: a routed instance stops at ServiceTask_ValidateWorkerAssignment with an incident "built by BPA-22".
+ * Row validation is BPA-22 (WorkerAssignmentApiTest): a routed instance with valid rows passes ServiceTask_ValidateWorkerAssignment and stops at
+ * ServiceTask_CreateHourJournalLines (BPA-14) with an incident "built by BPA-14". The upload answers right after the send, so a routed row reads
+ * "Pending" or, when the worker was quicker, "Assigned".
  */
 @Tag("integration")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -71,7 +66,9 @@ class AssignmentFileApiTest {
     static final String CONFIRM = "UserTask_ConfirmWorkPack";
     static final String SCHEDULE = "UserTask_ScheduleWorkPack";
     static final String CATCH = "IntermediateCatchEvent_AssignmentFileReceived";
-    static final String VALIDATE = "ServiceTask_ValidateWorkerAssignment";
+    static final String CREATE_LINES = "ServiceTask_CreateHourJournalLines";
+    /** BPA-22 answers a routed row within seconds, so the upload's own answer reads Pending or, when the worker was quicker, Assigned. */
+    static final java.util.Set<String> ROUTED = java.util.Set.of("Pending", "Assigned");
     static final String NOT_PROCESSED = "Not processed: Work Pack not ready; resend the file";
     static final String ALREADY = "Already processed in an earlier upload";
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -120,12 +117,12 @@ class AssignmentFileApiTest {
 
         assertThat(upload.status()).isEqualTo(201);
         assertThat(upload.body().has("outcome")).as("no file-level line: the rows carry the outcomes").isFalse();
-        // "Then the on-screen result shows both rows as Pending until BPA-22 validates them", with the Worker names (D59)
-        assertThat(rows(upload)).extracting(r -> r.path("outcome").asText()).containsExactly("Pending", "Pending");
+        // "Then the on-screen result shows both rows as Pending until BPA-22 validates them" (or Assigned, when it was quicker), with the Worker names (D59)
+        assertThat(rows(upload)).extracting(r -> r.path("outcome").asText()).hasSize(2).allMatch(ROUTED::contains);
         assertThat(rows(upload)).extracting(r -> r.path("workerName").asText()).containsExactly("Worker E1021", "Worker E1099");
         assertThat(claims(sha256(file), wp.number())).as("published_message claim for the Work Pack").isEqualTo(1);
         // "Then message AssignmentFileReceived is published with correlation key WP / And the instance continues to ServiceTask_ValidateWorkerAssignment"
-        poll(() -> activeIds(wp), ids -> ids.contains(VALIDATE), "the instance of " + wp.number() + " at " + VALIDATE);
+        poll(() -> activeIds(wp), ids -> ids.contains(CREATE_LINES), "the instance of " + wp.number() + " at " + CREATE_LINES);
         assertThat(poll(() -> variable(wp.instance(), "assignmentFileId"), v -> v != null, "assignmentFileId of " + wp.number()).replace("\"", ""))
                 .as("the message carries the upload's id").isEqualTo(upload.id());
     }
@@ -203,10 +200,10 @@ class AssignmentFileApiTest {
 
         Upload upload = upload("production-team", "assign-two.xlsx", file);
 
-        assertThat(outcomes(upload)).containsExactly("Pending", "Work Pack is not Released");
+        assertThat(outcomes(upload)).satisfiesExactly(o -> assertThat(o).isIn(ROUTED), o -> assertThat(o).isEqualTo("Work Pack is not Released"));
         assertThat(claims(sha256(file), waiting.number())).as("published for the first Work Pack only").isEqualTo(1);
         assertThat(claims(sha256(file), notReleased.number())).isZero();
-        poll(() -> activeIds(waiting), ids -> ids.contains(VALIDATE), "the instance of " + waiting.number() + " at " + VALIDATE);
+        poll(() -> activeIds(waiting), ids -> ids.contains(CREATE_LINES), "the instance of " + waiting.number() + " at " + CREATE_LINES);
     }
 
     @Test
@@ -245,8 +242,8 @@ class AssignmentFileApiTest {
     void BPA12_sameFileAgainIsIgnored() {
         Work wp = awaiting();
         byte[] file = AssignmentFileBuilder.assignment().row(wp.number(), "E1021", 40).row(wp.number(), "E1099", 60).build();
-        assertThat(outcomes(upload("production-team", "assign-01.xlsx", file))).containsExactly("Pending", "Pending");
-        poll(() -> activeIds(wp), ids -> ids.contains(VALIDATE), "the instance of " + wp.number() + " at " + VALIDATE);
+        assertThat(outcomes(upload("production-team", "assign-01.xlsx", file))).hasSize(2).allMatch(ROUTED::contains);
+        poll(() -> activeIds(wp), ids -> ids.contains(CREATE_LINES), "the instance of " + wp.number() + " at " + CREATE_LINES);
         int filesBefore = fileRows();
 
         // identical content (same SHA-256) under a different name
@@ -257,7 +254,7 @@ class AssignmentFileApiTest {
         assertThat(fileRows()).as("recorded as its own assignment_file row").isEqualTo(filesBefore + 1);
         assertThat(jdbc.queryForObject("SELECT outcome FROM bpa.assignment_file WHERE id = ?::uuid", String.class, again.id())).isEqualTo("File already processed");
         assertThat(claims(sha256(file), wp.number())).as("no message is published again").isEqualTo(1);
-        assertThat(activeIds(wp)).as("and nothing changes in the process").contains(VALIDATE);
+        assertThat(activeIds(wp)).as("and nothing changes in the process").contains(CREATE_LINES);
     }
 
     @Test
@@ -274,10 +271,10 @@ class AssignmentFileApiTest {
         // When I upload assign-02.xlsx again with identical content
         Upload resend = upload("production-team", "assign-02.xlsx", file);
 
-        assertThat(outcomes(resend)).containsExactly("Pending");
+        assertThat(outcomes(resend)).hasSize(1).allMatch(ROUTED::contains);
         assertThat(resend.body().has("outcome")).as("the result does not show \"File already processed\"").isFalse();
         assertThat(claims(sha256(file), wp.number())).isEqualTo(1);
-        poll(() -> activeIds(wp), ids -> ids.contains(VALIDATE), "the instance of " + wp.number() + " at " + VALIDATE);
+        poll(() -> activeIds(wp), ids -> ids.contains(CREATE_LINES), "the instance of " + wp.number() + " at " + CREATE_LINES);
     }
 
     @Test
@@ -287,19 +284,19 @@ class AssignmentFileApiTest {
         Work b = released();
         jdbc.update("UPDATE bpa.workpack SET assignment_state = 'AwaitingFile' WHERE id = ?", b.id()); // by hand
         byte[] file = AssignmentFileBuilder.assignment().row(a.number(), "E1021", 40).row(b.number(), "E1099", 10).build();
-        assertThat(outcomes(upload("production-team", "assign-03.xlsx", file))).containsExactly("Pending", NOT_PROCESSED);
-        poll(() -> activeIds(a), ids -> ids.contains(VALIDATE), "the instance of " + a.number() + " at " + VALIDATE);
+        assertThat(outcomes(upload("production-team", "assign-03.xlsx", file))).satisfiesExactly(o -> assertThat(o).isIn(ROUTED), o -> assertThat(o).isEqualTo(NOT_PROCESSED));
+        poll(() -> activeIds(a), ids -> ids.contains(CREATE_LINES), "the instance of " + a.number() + " at " + CREATE_LINES);
         // And B now waits at the catch event
         schedule(b);
 
         // When I upload assign-03.xlsx again with identical content
         Upload resend = upload("production-team", "assign-03.xlsx", file);
 
-        assertThat(outcomes(resend)).as("only B is published; A is a duplicate (D73)").containsExactly(ALREADY, "Pending");
+        assertThat(outcomes(resend)).as("only B is published; A is a duplicate (D73)").satisfiesExactly(o -> assertThat(o).isEqualTo(ALREADY), o -> assertThat(o).isIn(ROUTED));
         assertThat(resend.body().has("outcome")).as("the result holds no file-level line").isFalse();
         assertThat(claims(sha256(file), a.number())).isEqualTo(1);
         assertThat(claims(sha256(file), b.number())).isEqualTo(1);
-        poll(() -> activeIds(b), ids -> ids.contains(VALIDATE), "the instance of " + b.number() + " at " + VALIDATE);
+        poll(() -> activeIds(b), ids -> ids.contains(CREATE_LINES), "the instance of " + b.number() + " at " + CREATE_LINES);
     }
 
     @Test
@@ -322,22 +319,24 @@ class AssignmentFileApiTest {
                 upload.id());
         assertThat(stored).hasSize(2);
         assertThat(stored.get(0)).containsEntry("row_number", 2).containsEntry("workpack_number", wp.number())
-                .containsEntry("badge_no", "E1021").containsEntry("estimated_hours_raw", "40").containsEntry("outcome", "Pending");
+                .containsEntry("badge_no", "E1021").containsEntry("estimated_hours_raw", "40");
+        assertThat((String) stored.get(0).get("outcome")).as("Pending, or Assigned when BPA-22 was quicker than this read").isIn(ROUTED);
         assertThat(stored.get(1)).containsEntry("row_number", 3).containsEntry("badge_no", "E1099").containsEntry("estimated_hours_raw", "60");
-        // GET /api/v1/assignment-files/{id}/result returns the same rows for download
+        // GET /api/v1/assignment-files/{id}/result returns the same rows for download, once BPA-22 has answered them (they read Assigned)
+        CamundaSteps.poll(() -> flow.result(upload).path("rows").findValuesAsText("outcome"), o -> !o.contains("Pending"), "the rows of the upload answered");
         TestBrowser team = loggedInAs("production-team");
         HttpResponse<String> result = team.get("/api/v1/assignment-files/" + upload.id() + "/result");
         assertThat(result.statusCode()).as(result.body()).isEqualTo(200);
         assertThat(rows(new Upload(200, json(result.body())))).extracting(r -> r.path("workpackNumber").asText() + "/" + r.path("badgeNo").asText()
-                + "/" + r.path("outcome").asText()).containsExactly(wp.number() + "/E1021/Pending", wp.number() + "/E1099/Pending");
+                + "/" + r.path("outcome").asText()).containsExactly(wp.number() + "/E1021/Assigned", wp.number() + "/E1099/Assigned");
         HttpResponse<String> csv = team.getWithAccept("/api/v1/assignment-files/" + upload.id() + "/result", "text/csv");
         assertThat(csv.statusCode()).as(csv.body()).isEqualTo(200);
         assertThat(csv.headers().firstValue("Content-Type")).hasValueSatisfying(t -> assertThat(t).startsWith("text/csv"));
         assertThat(csv.headers().firstValue("Content-Disposition")).hasValue("attachment; filename=\"assign-01-result.csv\"");
         assertThat(csv.body().trim().split("\\R")).containsExactly(
                 "rowNumber,workpackNumber,badgeNo,workerName,outcome,wpOutcome",
-                "2," + wp.number() + ",E1021,Worker E1021,Pending,",
-                "3," + wp.number() + ",E1099,Worker E1099,Pending,");
+                "2," + wp.number() + ",E1021,Worker E1021,Assigned,",
+                "3," + wp.number() + ",E1099,Worker E1099,Assigned,");
     }
 
     @Test
@@ -388,18 +387,18 @@ class AssignmentFileApiTest {
         assertThat(rows(upload).get(1).path("badgeNo").asText()).isEqualTo("E9999");
     }
 
-    /** BPA-22 builds the row validation: until then a routed instance stops at its step with an incident saying so (as BPA-6 did). */
+    /** BPA-14 builds the next step: until then an instance with Assigned Workers stops there with an incident saying so (as BPA-6 did for BPA-23). */
     @Test
-    void aRoutedInstanceStopsWithTheBpa22Incident() {
+    void aRoutedInstanceStopsWithTheBpa14Incident() {
         Work wp = awaiting();
         assertThat(outcomes(upload("production-team", "assign-incident.xlsx", AssignmentFileBuilder.assignment().row(wp.number(), "E1021", 40).build())))
-                .containsExactly("Pending");
+                .hasSize(1).allMatch(ROUTED::contains);
 
         List<JsonNode> incidents = poll(() -> elements(IntegrationApp.admin.post("/v2/incidents/search",
                         Map.of("filter", Map.of("processInstanceKey", Long.toString(wp.instance())))).body().path("items")),
                 list -> !list.isEmpty(), "an incident on the instance of " + wp.number());
 
-        assertThat(incidents.get(0).path("errorMessage").asText()).contains("built by BPA-22");
+        assertThat(incidents.get(0).path("errorMessage").asText()).contains("built by BPA-14");
     }
 
     @Test
@@ -434,118 +433,69 @@ class AssignmentFileApiTest {
         assertThat(loggedInAs("production-planner").getBytes("/api/v1/assignment-files/template").statusCode()).isEqualTo(403);
     }
 
-    // --- Work Packs in the state a scenario needs ---------------------------------------------------------------------------
+    // --- Work Packs and uploads: the shared set-up is in AssignmentFlow (BPA-22 uses it too) -----------------------------------
 
-    record Work(long instance, UUID id, String number, String confirmTask, String scheduleTask) {
+    private AssignmentFlow flow;
+
+    @BeforeEach
+    void flow() {
+        flow = new AssignmentFlow(port, jdbc);
     }
 
     private Work draft() {
-        TestBrowser analyst = loggedInAs("time-method-analyst");
-        HttpResponse<String> started = analyst.post("/api/v1/workpacks", "");
-        assertThat(started.statusCode()).as("POST /api/v1/workpacks: " + started.body()).isEqualTo(201);
-        long instance = Long.parseLong(json(started.body()).path("processInstanceKey").asText());
-        String create = awaitOpenTask(instance, CREATE).path("userTaskKey").asText();
-        Map<String, Object> variables = new LinkedHashMap<>();
-        variables.put("activityRef", "A-2201");
-        variables.put("drawingRef", "DWG-118");
-        variables.put("phases", List.of(Map.of("phase", "Cutting", "manhours", 150)));
-        variables.put("materials", List.of(Map.of("materialRef", "MAT-PIPE-06", "phase", "Cutting")));
-        variables.put("departmentRef", "Fabrication");
-        variables.put("completionDate", "2026-11-30");
-        HttpResponse<String> done = analyst.post("/api/v1/tasks/" + create + "/complete", toJson(Map.of("variables", variables)));
-        assertThat(done.statusCode()).as("complete Create: " + done.body()).isEqualTo(204);
-        String confirm = awaitOpenTask(instance, CONFIRM).path("userTaskKey").asText();
-        UUID id = (UUID) jdbc.queryForMap("SELECT id FROM bpa.workpack WHERE process_instance_key = ?", instance).get("id");
-        String number = jdbc.queryForObject("SELECT workpack_number FROM bpa.workpack WHERE id = ?", String.class, id);
-        return new Work(instance, id, number, confirm, null);
+        return flow.draft();
     }
 
-    /** Confirmed unchanged, the release check Ready, approved: Released, waiting to be scheduled. */
     private Work released() {
-        Work draft = draft();
-        TestBrowser analyst = loggedInAs("time-method-analyst");
-        HttpResponse<String> open = analyst.get("/api/v1/tasks/" + draft.confirmTask());
-        Map<String, Object> variables = JSON.convertValue(json(open.body()).path("variables"), new TypeReference<Map<String, Object>>() {
-        });
-        HttpResponse<String> confirmed = analyst.post("/api/v1/tasks/" + draft.confirmTask() + "/complete", toJson(Map.of("variables", variables)));
-        assertThat(confirmed.statusCode()).as("complete Confirm: " + confirmed.body()).isEqualTo(204);
-        HttpResponse<String> approved = completeSignOff(loggedInAs("project-engineer"), awaitSignOffTask(draft.instance()), "Approved", null);
-        assertThat(approved.statusCode()).as("approve: " + approved.body()).isEqualTo(204);
-        String scheduleTask = awaitOpenTask(draft.instance(), SCHEDULE).path("userTaskKey").asText();
-        return new Work(draft.instance(), draft.id(), draft.number(), draft.confirmTask(), scheduleTask);
+        return flow.released();
     }
 
-    /** The Planner schedules it (10 to 12 Nov, valid on 30 Oct: the earliest is 6 Nov); the print is generated and the instance waits for the file. */
     private void schedule(Work wp) {
-        HttpResponse<String> done = loggedInAs("production-planner").post("/api/v1/tasks/" + wp.scheduleTask() + "/complete",
-                toJson(Map.of("variables", Map.of("plannedStartDate", "2026-11-10", "plannedEndDate", "2026-11-12"))));
-        assertThat(done.statusCode()).as("complete Schedule: " + done.body()).isEqualTo(204);
-        poll(() -> activeIds(wp), ids -> ids.contains(CATCH), "the instance of " + wp.number() + " waiting for the assignment file");
+        flow.schedule(wp);
     }
 
-    /** Scheduled and printed: assignment_state AwaitingFile, the instance waiting at the catch event. */
     private Work awaiting() {
-        Work wp = released();
-        schedule(wp);
-        assertThat(state(wp)).isEqualTo("AwaitingFile");
-        return wp;
-    }
-
-    // --- uploads and what they leave behind ----------------------------------------------------------------------------------
-
-    record Upload(int status, JsonNode body) {
-        String id() {
-            return body.path("id").asText();
-        }
+        return flow.awaiting();
     }
 
     private Upload upload(String user, String fileName, byte[] file) {
-        HttpResponse<String> response = loggedInAs(user).postFile("/api/v1/assignment-files", fileName, file);
-        return new Upload(response.statusCode(), response.body() == null || response.body().isBlank() ? JSON.createObjectNode() : json(response.body()));
+        return flow.upload(user, fileName, file);
     }
 
     private static List<JsonNode> rows(Upload upload) {
-        return elements(upload.body().path("rows"));
+        return AssignmentFlow.rows(upload);
     }
 
     private static List<String> outcomes(Upload upload) {
-        assertThat(upload.status()).as("upload: " + upload.body()).isEqualTo(201);
-        return rows(upload).stream().map(r -> r.path("outcome").asText()).toList();
+        return AssignmentFlow.outcomes(upload);
     }
 
     private List<String> rowOutcomeInDatabase(Upload upload) {
-        return jdbc.queryForList("SELECT outcome FROM bpa.assignment_file_row WHERE assignment_file_id = ?::uuid ORDER BY row_number", String.class, upload.id());
+        return flow.rowOutcomeInDatabase(upload);
     }
 
     private int claims(String sha256, String workpackNumber) {
-        return jdbc.queryForObject("SELECT count(*) FROM bpa.published_message WHERE sha256 = ? AND workpack_number = ?", Integer.class, sha256, workpackNumber);
+        return flow.claims(sha256, workpackNumber);
     }
 
     private int fileRows() {
-        return jdbc.queryForObject("SELECT count(*) FROM bpa.assignment_file", Integer.class);
+        return flow.fileRows();
     }
 
     private String state(Work wp) {
-        return jdbc.queryForObject("SELECT assignment_state FROM bpa.workpack WHERE id = ?", String.class, wp.id());
+        return flow.state(wp);
     }
 
     private static List<String> activeIds(Work wp) {
-        return activeElements(wp.instance()).stream().map(e -> e.path("elementId").asText()).toList();
+        return AssignmentFlow.activeIds(wp);
     }
 
     private static String sha256(byte[] bytes) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
+        return AssignmentFlow.sha256(bytes);
     }
 
     private TestBrowser loggedInAs(String username) {
-        TestBrowser browser = new TestBrowser(port);
-        HttpResponse<String> login = browser.login(username, PersonaSyncTest.DEMO_PASSWORD);
-        assertThat(login.statusCode()).as("login " + username + ": " + login.body()).isEqualTo(200);
-        return browser;
+        return flow.loggedInAs(username);
     }
 
     /** "Given today is 30 Oct 2026 (Asia/Riyadh)" (S9; ADR 0013). */

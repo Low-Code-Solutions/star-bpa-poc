@@ -33,13 +33,13 @@ of a Work Pack that has been printed (assignment state AwaitingFile).
 
 | File | What it shows |
 | --- | --- |
-| `assign-demo-good.xlsx` | two rows routed to the waiting Work Pack; uploading it again shows "File already processed" |
+| `assign-demo-good.xlsx` | two rows routed to the waiting Work Pack and both read "Assigned" (BPA-22); uploading it again shows "File already processed" |
 | `assign-demo-unknown-workpack.xlsx` | the row reads "Work Pack not found" |
 | `assign-demo-wrong-layout.xlsx` | "File layout not recognised" |
 | `assign-demo-empty.xlsx` | "File has no rows" |
-| `assign-demo-duplicate-worker.xlsx` | the same Worker twice for a Work Pack (BPA-22 answers it) |
-| `assign-demo-hours-out-of-range.xlsx` | hours of 0 and 100000 (BPA-22 answers them) |
-| `assign-demo-unknown-employee.xlsx` | a Badge No that is not in the Worker master data (BPA-22 answers it) |
+| `assign-demo-duplicate-worker.xlsx` | the same Worker twice for a Work Pack: both rows read "Worker listed twice for this Work Pack" |
+| `assign-demo-hours-out-of-range.xlsx` | hours of 0 and 100000: "Estimated hours must be greater than 0" and "Estimated hours cannot exceed 99,999.99" |
+| `assign-demo-unknown-employee.xlsx` | a Badge No that is not in the Worker master data: "Worker not in worker master data" |
 
-The last three are routed like the good file and read "Pending" until the row validation (BPA-22) is built. Write them again with
+The last three are routed like the good file; BPA-22 answers every row, and when all rows are rejected the Work Pack goes back to waiting for a corrected file (D5). Write them again with
 `... com.lcs.star.bpa.AssignmentFileBuilder demo templates/demo`.
