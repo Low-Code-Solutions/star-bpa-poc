@@ -60,6 +60,9 @@ public class SecurityConfig {
                         // Every method, not only GET: a HEAD request is served by the GET handler and must not skip the rule.
                         .requestMatchers("/api/v1/workpacks/*/print", "/api/v1/workpack-prints")
                                 .hasAnyAuthority(TIME_METHOD_ANALYST, PRODUCTION_PLANNER, PRODUCTION_TEAM)
+                        // BPA-12: the Worker assignment upload, its result and the template are the Production Team's (D58, 09 S6; group
+                        // ASSUMPTION in the story), every method, so HEAD cannot skip the rule (the BPA-10 lesson).
+                        .requestMatchers("/api/v1/assignment-files", "/api/v1/assignment-files/**").hasAuthority(PRODUCTION_TEAM)
                         .anyRequest().authenticated())
                 // S26: token in the XSRF-TOKEN cookie (readable by React), sent back as X-XSRF-TOKEN on every state-changing call,
                 // the login included. The plain handler lets React send the cookie value unchanged.

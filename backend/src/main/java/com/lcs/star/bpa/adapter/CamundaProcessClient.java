@@ -44,6 +44,34 @@ public class CamundaProcessClient {
         }
     }
 
+    /**
+     * Correlates a message to the one instance waiting for it, synchronously: {@code POST /v2/messages/correlation} (BPA-12, C3). True
+     * when an instance received it; false when none was waiting for this correlation key (Camunda answers 404). Used by the assignment
+     * upload for AssignmentFileReceived, where "nothing correlated" must be known at once (D62).
+     */
+    public boolean correlate(String messageName, String correlationKey, Map<String, Object> variables) {
+        try {
+            return rest.post().uri("/v2/messages/correlation")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("name", messageName, "correlationKey", correlationKey, "variables", variables))
+                    .exchange((request, response) -> {
+                        if (response.getStatusCode().is5xxServerError()) {
+                            throw new EngineUnavailableException("Camunda message correlation returned " + response.getStatusCode().value());
+                        }
+                        if (response.getStatusCode().value() == 404) {
+                            return false;
+                        }
+                        if (!response.getStatusCode().is2xxSuccessful()) {
+                            throw new IllegalStateException("Camunda message correlation returned " + response.getStatusCode().value()
+                                    + ": " + new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8));
+                        }
+                        return true;
+                    });
+        } catch (ResourceAccessException e) {
+            throw new EngineUnavailableException("Camunda cannot be reached: " + e.getMessage());
+        }
+    }
+
     private record Started(String processInstanceKey) {
     }
 }

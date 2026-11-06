@@ -138,6 +138,11 @@
       <resource>
         <directory>../templates</directory>
         <targetPath>templates</targetPath>
+        <!-- The demo files and the README are for the showcase and the repo, not for the jar (BPA-12, S18). -->
+        <excludes>
+          <exclude>demo/**</exclude>
+          <exclude>README.md</exclude>
+        </excludes>
       </resource>
     </resources>
     <plugins>

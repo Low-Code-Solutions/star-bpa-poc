@@ -1,6 +1,11 @@
 spring:
   application:
     name: bpa
+  servlet:
+    multipart:
+      # BPA-12 (ASSUMPTION): an assignment file is small, so a larger upload is refused before it is read.
+      max-file-size: 5MB
+      max-request-size: 6MB
   datasource:
     url: ${BPA_DB_URL:jdbc:postgresql://localhost:5432/bpa}
     username: ${BPA_DB_USER:bpa}

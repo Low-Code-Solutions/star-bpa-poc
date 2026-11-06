@@ -371,6 +371,39 @@ input[readonly] {
   }
 }
 
+/* --- Assignment file (BPA-12): the template, the file input, the upload, and the result table --------------------------------------- */
+
+.assignment-file {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+
+.assignment-file h2 {
+  margin: var(--space-4) 0 0;
+  font-size: var(--step-1);
+  font-weight: 600;
+}
+
+.assignment-file p {
+  margin: 0;
+}
+
+.assignment-file__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.assignment-file__result {
+  display: grid;
+  gap: var(--space-3);
+  background: var(--sheet);
+  padding: var(--space-4);
+}
+
 /* BPA-11: a term and its value wrapped in a div (the Look-Ahead dates) stay two columns of the same grid. */
 .context-panel__pair {
   display: contents;

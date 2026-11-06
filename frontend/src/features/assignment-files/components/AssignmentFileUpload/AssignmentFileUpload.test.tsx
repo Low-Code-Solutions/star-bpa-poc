@@ -85,7 +85,7 @@ describe('AssignmentFileUpload', () => {
   it('BPA12_otherRolesCannotUpload', async () => {
     const { calls } = await renderSection(['production-planner']);
 
-    expect(screen.queryByRole('region', { name: 'Assignment file' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /Assignment file/ })).not.toBeInTheDocument();
     expect(calls()).toHaveLength(0);
   });
 
@@ -101,6 +101,9 @@ describe('AssignmentFileUpload', () => {
   it('BPA12_fileForScheduledWorkPackIsRouted', async () => {
     // The upload's result on screen: every row with its Worker name and its outcome, "Pending" until BPA-22 validates the rows.
     const { user, calls } = await renderSection(['production-team']);
+    // The file goes as multipart form data. jsdom's FormData is not Node's, so the stubbed Request cannot report the content type:
+    // what the screen builds is checked instead (the file under the part name "file", as the contract has it).
+    const append = vi.spyOn(FormData.prototype, 'append');
 
     await chooseAndUpload(user);
 
@@ -109,8 +112,8 @@ describe('AssignmentFileUpload', () => {
     expect(within(table).getByText('Worker E1021')).toBeInTheDocument();
     expect(within(table).getByText('Worker E1099')).toBeInTheDocument();
     expect(within(table).getAllByText('Pending')).toHaveLength(2);
-    const post = calls().find((c) => c.method === 'POST' && c.path === '/api/v1/assignment-files');
-    expect(post?.contentType).toMatch(/^multipart\/form-data/);
+    expect(calls().some((c) => c.method === 'POST' && c.path === '/api/v1/assignment-files')).toBe(true);
+    expect(append).toHaveBeenCalledWith('file', expect.objectContaining({ name: 'assign-01.xlsx' }));
   });
 
   it('BPA12_fileHasNoRows', async () => {

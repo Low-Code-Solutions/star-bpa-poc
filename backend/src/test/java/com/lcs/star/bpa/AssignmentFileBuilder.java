@@ -153,8 +153,38 @@ public final class AssignmentFileBuilder {
         }
     }
 
-    /** Writes the template: {@code java … AssignmentFileBuilder <target file>}. Run from the build, not by a test. */
+    /**
+     * The demo files (09 L20) for the showcase and manual testing, in templates/demo/: one good file and six broken ones. Tests never
+     * use them (S18); they use their own files from this builder. They name WP-000001, so before showing them, replace it with the number
+     * of a Work Pack that has been printed (the first Work Pack of a fresh database is WP-000001).
+     */
+    public static java.util.Map<String, byte[]> demoFiles() {
+        java.util.Map<String, byte[]> files = new java.util.LinkedHashMap<>();
+        files.put("assign-demo-good.xlsx", assignment().row("WP-000001", "E1021", 40).row("WP-000001", "E1099", 60).build());
+        files.put("assign-demo-unknown-workpack.xlsx", assignment().row("WP-999999", "E1021", 40).build());
+        files.put("assign-demo-wrong-layout.xlsx", assignment().headers("Employee", "Hours").cells("E1021", 40).build());
+        files.put("assign-demo-empty.xlsx", assignment().build());
+        files.put("assign-demo-duplicate-worker.xlsx", assignment().row("WP-000001", "E1021", 40).row("WP-000001", "E1021", 20).build());
+        files.put("assign-demo-hours-out-of-range.xlsx", assignment().row("WP-000001", "E1021", 0).row("WP-000001", "E1099", 100000).build());
+        files.put("assign-demo-unknown-employee.xlsx", assignment().row("WP-000001", "E9999", 40).build());
+        return files;
+    }
+
+    /**
+     * Writes the official template, or the demo files:
+     * {@code java ... AssignmentFileBuilder <template file>} or {@code java ... AssignmentFileBuilder demo <folder>}. Run from the build,
+     * not by a test; AssignmentTemplateTest keeps the committed template honest.
+     */
     public static void main(String[] args) throws IOException {
+        if (args.length == 2 && "demo".equals(args[0])) {
+            Path folder = Path.of(args[1]);
+            Files.createDirectories(folder);
+            for (var file : demoFiles().entrySet()) {
+                Files.write(folder.resolve(file.getKey()), file.getValue());
+                System.out.println("wrote " + folder.resolve(file.getKey()).toAbsolutePath());
+            }
+            return;
+        }
         Path target = Path.of(args[0]);
         try (OutputStream out = Files.newOutputStream(target)) {
             out.write(template());

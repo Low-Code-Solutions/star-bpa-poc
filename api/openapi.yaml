@@ -573,6 +573,37 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/v1/assignment-files/template:
+    get:
+      tags: [assignment-files]
+      operationId: downloadAssignmentTemplate
+      summary: The official Worker assignment template
+      description: |
+        The template the Production Team fills in and uploads, for the portal's "Download template" (BPA-12; 09 S18, ADR 0009):
+        sheet "Assignment" with the columns Workpack number, Badge No, Estimated hours, Employee name (ignored) and Remarks, and a
+        README sheet that marks the layout as an ASSUMPTION (D33 rule 1). Group `production-team` only, as the upload. This
+        operation is new in BPA-12 (x-assumption: no source names the download endpoint; S18 says the template is downloadable
+        from the portal).
+      x-assumption: true
+      x-assumption-note: new operation added by BPA-12 for the portal's "Download template"; group production-team
+      responses:
+        '200':
+          description: The template (.xlsx)
+          headers:
+            Content-Disposition:
+              description: attachment; filename="worker-assignment-template.xlsx"
+              schema:
+                type: string
+                example: attachment; filename="worker-assignment-template.xlsx"
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /api/v1/assignment-files/{assignmentFileId}/result:
     parameters:
       - name: assignmentFileId
