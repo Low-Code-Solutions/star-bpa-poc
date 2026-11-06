@@ -93,4 +93,32 @@ class AssignmentRowValidatorTest {
         assertThat(AssignmentRowValidator.validate(List.of(row(2, "E9999", "40", null), row(3, "E1021", "40", "night shift")), KNOWN))
                 .extracting(Verdict::outcome).containsExactly("Worker not in worker master data", "Assigned");
     }
+
+    /** Only plain decimals are numbers (ASSUMPTION, plan Q5; review): no exponent, no digits other than 0-9, no blank-looking text. */
+    @Test
+    void onlyPlainDecimalsAreNumbers() {
+        assertThat(outcome("E1021", "1E3", null)).isEqualTo("Estimated hours must be a number");
+        assertThat(outcome("E1021", "1E-7", null)).isEqualTo("Estimated hours must be a number");
+        assertThat(outcome("E1021", "\u0664\u0660", null)).as("Arabic-Indic digits").isEqualTo("Estimated hours must be a number");
+        assertThat(outcome("E1021", "\uFF14\uFF10", null)).as("full-width digits").isEqualTo("Estimated hours must be a number");
+        assertThat(outcome("E1021", "\u00A0", null)).as("a no-break space is not blank text").isEqualTo("Estimated hours must be a number");
+        assertThat(outcome("E1021", "1.2.3", null)).isEqualTo("Estimated hours must be a number");
+        assertThat(outcome("E1021", "+5", null)).as("a sign is allowed").isEqualTo("Assigned");
+        assertThat(outcome("E1021", " 40 ", null)).as("padding is trimmed").isEqualTo("Assigned");
+        assertThat(outcome("E1021", ".5", null)).isEqualTo("Assigned");
+    }
+
+    @Test
+    void whenARowHasSeveralFaultsTheFirstRuleInOrderWins() {
+        assertThat(outcome("E1021", "abc", "x".repeat(251))).as("hours before remarks").isEqualTo("Estimated hours must be a number");
+        assertThat(outcome("E9999", "abc", null)).as("Worker master before hours").isEqualTo("Worker not in worker master data");
+        assertThat(outcome("", "abc", "x".repeat(251))).as("Badge No before everything").isEqualTo("Badge No is required");
+    }
+
+    @Test
+    void aPaddedBadgeNoIsTheSameWorkerForTheDuplicateCheckAndTheMasterLookup() {
+        assertThat(AssignmentRowValidator.validate(List.of(row(2, " E1021", "40", null), row(3, "E1021", "20", null)), KNOWN))
+                .extracting(Verdict::outcome).containsExactly("Worker listed twice for this Work Pack", "Worker listed twice for this Work Pack");
+        assertThat(outcome(" E1021 ", "40", null)).isEqualTo("Assigned");
+    }
 }

@@ -133,6 +133,8 @@ class WorkerAssignmentApiTest {
         assertThat(settled(upload)).containsExactly("Worker not in worker master data");
         assertThat(assignments(wp)).as("no Worker is assigned").isEmpty();
         backAtCatch(wp, 1);
+        assertThat(flow.state(wp)).as("the state is unchanged").isEqualTo("AwaitingFile");
+        assertThat(stateChanges(wp)).as("and nothing is audited (D64)").isEmpty();
         // the corrected file is routed to the waiting instance and assigns
         Upload corrected = flow.upload("production-team", "assign-corrected.xlsx", AssignmentFileBuilder.assignment().row(wp.number(), "E1021", 40).build());
         assertThat(settled(corrected)).containsExactly("Assigned");
@@ -273,11 +275,17 @@ class WorkerAssignmentApiTest {
     void BPA22_allRejectedSetsAwaitingFile() {
         Work wp = flow.awaiting();
 
-        Upload upload = flow.upload("production-team", "assign-all-rejected.xlsx", AssignmentFileBuilder.assignment().row(wp.number(), "E9999", 40).build());
+        byte[] rejectedFile = AssignmentFileBuilder.assignment().row(wp.number(), "E9999", 40).build();
+        Upload upload = flow.upload("production-team", "assign-all-rejected.xlsx", rejectedFile);
 
         assertThat(settled(upload)).containsExactly("Worker not in worker master data");
         assertThat(flow.state(wp)).isEqualTo("AwaitingFile");
         backAtCatch(wp, 1);
+        assertThat(stateChanges(wp)).as("nothing changed, so nothing is audited (D64)").isEmpty();
+        // the same file again is the duplicate of D73 (plan Q3): it was published, so it is not routed; the user changes the file and resends
+        Upload same = flow.upload("production-team", "assign-all-rejected-again.xlsx", rejectedFile);
+        assertThat(same.body().path("outcome").asText()).isEqualTo("File already processed");
+        assertThat(flow.state(wp)).isEqualTo("AwaitingFile");
         byte[] corrected = AssignmentFileBuilder.assignment().row(wp.number(), "E1021", 40).build();
         Upload resend = flow.upload("production-team", "assign-corrected.xlsx", corrected);
         assertThat(resend.status()).isEqualTo(201);
@@ -376,6 +384,12 @@ class WorkerAssignmentApiTest {
                         Map.of("filter", Map.of("processInstanceKey", Long.toString(wp.instance())))).body().path("items")),
                 list -> !list.isEmpty(), "an incident on the instance of " + wp.number());
         assertThat(incidents.get(0).path("errorMessage").asText()).contains("built by BPA-14");
+    }
+
+    /** The Work Pack's assignment_state changes made by BPA-22 (the first audit row, null to AwaitingFile, is the print's). */
+    private List<String> stateChanges(Work wp) {
+        return jdbc.queryForList("SELECT old_value || '->' || new_value FROM bpa.audit_log WHERE table_name = 'workpack' AND record_id = ? AND column_name = 'assignment_state' AND old_value IS NOT NULL",
+                String.class, wp.id());
     }
 
     private int auditRows() {

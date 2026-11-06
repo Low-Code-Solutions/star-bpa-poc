@@ -386,3 +386,19 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Low: attachment name sanitised (fixed, test); `Accept: */*` untested (test added); Upload not disabled while in flight and generic upload errors (fixed, tests); left: CSV formula injection (PO call),
   trailing-slash path, file input not cleared after upload, the Work Pack outcome shown inside the Outcome cell; plan file list and `updated` drift (plan updated).
 - Not verified by the reviewer: test runs, CI, the browser.
+
+### BPA-22 at 69c0d1d, 6 Nov 2026 (qa-reviewer)
+- Code: 0 High, 4 Medium, 6 Low. Reviewer read BPA-22 in Jira, the plan, the AC (13 scenarios) and every main and test source in the diff; it ran no tests (Docker needed). Author's runs: red (6131a83) 16 new process tests, 7 re-checked
+  BPA-12 tests and 7 validator tests failed for the expected reason (rows stayed "Pending", instance at the placeholder); green 38 process tests, validator 7/7, full `./mvnw -B verify` 207 tests; local stack through the API with real `.xlsx`
+  files (mixed file Assigned plus unknown Worker, state Assigning, BPA-14 incident; an all-rejected file back at the catch event, then a corrected file assigned).
+- Checks passed: the 13 test names equal the Jira DoD list and each asserts its Gherkin (texts, the outline rows, gateway No count, instance back at the catch event, the single audit row); created_by from the uploader (D63), audit
+  rows with old value null, the injected Clock; ON CONFLICT key equals the schema UNIQUE; schema CHECKs match the validator; the BPA-14 placeholder follows the skill; the BPA-12 test changes are not weakened beyond "Pending or Assigned";
+  the lock is taken before the Pending read.
+- Medium (4):
+  - A false return from `assign()` was ignored and the row read "Assigned": fixed (the job fails and rolls back, no invented rule), with a test.
+  - Plan Q3 (a resent all-rejected file reads "File already processed") was not tested: fixed (scenario 13).
+  - Hours parsing and rule-order mutations survived (`1E3`, `+5`, Unicode digits, a no-break space, hours versus remarks): hours are plain decimals only (ASSUMPTION Q5), tests for each.
+  - Plan file list and Q-list drift: updated.
+- Low: retried job with no Pending row only logged nothing (log added); a retried all-rejected file untested (test added); no concurrency test for FOR UPDATE (noted in the plan); scenarios 3 and 13 did not assert state or audit
+  unchanged (added). Left: `settled()` polls up to 60 s and the class takes about 6 minutes of Work Pack set-up (the plan's risk); instances left at the BPA-14 incident accumulate in the shared Camunda (harmless).
+- Not verified by the reviewer: test runs, CI, the local-stack run, the browser.

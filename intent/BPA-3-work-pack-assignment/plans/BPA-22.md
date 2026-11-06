@@ -1,7 +1,7 @@
 # Plan: BPA-22 Production Team can have each assignment row validated
 Jira: BPA-22 (Story, epic BPA-3)
 Story last updated: 2026-11-06T12:58:36.056+0400 (status only; the content last changed 28 Oct 13:29, before the PO's approval at 13:31)
-Status: Approved (Ahsan, Build Lead, 2026-11-06)
+Status: Closed (2026-11-06); approved by Ahsan, Build Lead, 2026-11-06
 Approver: Ahsan (Build Lead)
 Branch: BPA-22-validate-assignment-rows, from main d4fdc13
 
@@ -225,3 +225,19 @@ before any worker code.
   incident "built by BPA-14". A second Work Pack with a file of one unknown Badge No: row rejected, no assignment, state AwaitingFile, the instance waiting at the catch event again; the corrected
   file (E1021) was routed and assigned. Not checked in a browser (no portal change).
 - Size: 5 points as estimated.
+
+## Review fixes (6 Nov 2026, after the qa-reviewer pass; see REVIEW.md)
+- **A Worker already assigned (M1):** `assign()` returning false (the Worker already holds the Work Pack from another file) used to be ignored, so the row read "Assigned" with the old hours kept. No path
+  creates this state yet (BPA-13's replacement resets Assigned, not AwaitingFile), so it now fails the job and rolls the transaction back, with a message naming the Worker (D32: once per Work Pack),
+  instead of inventing a row text. If a story needs a row text for it, that is a business rule to ask (not invented here). Test: `WorkerAssignmentServiceTest`.
+- **Plain decimals only (M3, ASSUMPTION Q5):** hours must be an optional sign, ASCII digits and at most one point. `1E3`, `1E-7`, Arabic-Indic or full-width digits and a no-break space read "Estimated hours
+  must be a number" (before, `new BigDecimal` accepted them). A cell is read as displayed (BPA-12), so a cell formatted `0.00` that holds 0.001 is read as `0.00` and says "must be greater than 0": noted for the PR.
+- **Pinned by tests that passed on first run (said in the PR):** the rule order (hours before remarks, Worker master before hours, Badge No before everything), a padded Badge No counted with its twin, the retried
+  job for a file that was all rejected, the state refusal text, and a retried job writing nothing (`AssignmentRowValidatorTest`, `WorkerAssignmentServiceTest`).
+- **Q3 is now tested (M2):** the same all-rejected bytes again read "File already processed" and leave the Work Pack AwaitingFile and the instance waiting (`BPA22_allRejectedSetsAwaitingFile`); scenarios 3 and
+  13 also assert the state is unchanged and no audit row is written.
+- **Retried job log (L1):** a job that finds no Pending row logs the count it answers.
+- **Not changed:** the lock (`FOR UPDATE`) has no concurrency test (BPA-12's claim and the state guard keep a second file out; a second file validated while Assigning is an incident, not a rejection, by
+  design). The seven BPA-12 assertions that now allow "Pending" or "Assigned" are said above; `AssignmentFileServiceTest` still pins that intake writes "Pending".
+- **Q5 (for Khitaba):** hours are plain decimals only (no exponent, ASCII digits).
+- Final run after the review fixes: full `./mvnw -B verify` 215 tests, 0 failures. No portal change, so no frontend run beyond CI.

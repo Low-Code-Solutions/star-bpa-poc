@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * The row checks of {@code validate-worker-assignment} (BPA-22; D14, D32, D59, C11): the rows of one uploaded file that belong to one Work
@@ -15,7 +16,7 @@ import java.util.Set;
  * <li>the same Badge No on more than one row of the Work Pack: every such row "Worker listed twice for this Work Pack" (D32); counted
  * whatever else is wrong with the row</li>
  * <li>Badge No not in the Worker master data: "Worker not in worker master data" (exact match on the trimmed text, no case folding; Q2)</li>
- * <li>Estimated hours: required, a number, greater than 0, at most 2 decimal places (trailing zeros do not count), at most 99,999.99 (D14)</li>
+ * <li>Estimated hours: required, a plain decimal number (no exponent, ASCII digits only; Q5), greater than 0, at most 2 decimal places (trailing zeros do not count), at most 99,999.99 (D14)</li>
  * <li>Remarks longer than 250 characters, counted as characters and not UTF-16 units, as PostgreSQL's char_length does (D59)</li>
  * </ol>
  * Otherwise "Assigned". The file's Employee name is never read (D59), and agency Workers are like any other (C11).
@@ -26,6 +27,9 @@ public final class AssignmentRowValidator {
 
     static final BigDecimal MAX_HOURS = new BigDecimal("99999.99");
     static final int MAX_REMARKS = 250;
+
+    /** Plain decimals only (ASSUMPTION, plan Q5): an optional sign, ASCII digits and at most one point. No exponent, no other digits, no separators. */
+    private static final Pattern PLAIN_DECIMAL = Pattern.compile("[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)");
 
     /** One row of an uploaded file that belongs to one Work Pack, as read (raw text; null for an empty cell). */
     public record Row(int rowNumber, String badgeNo, String estimatedHours, String remarks) {
@@ -66,12 +70,11 @@ public final class AssignmentRowValidator {
         if (isBlank(row.estimatedHours())) {
             return rejected("Estimated hours is required");
         }
-        BigDecimal hours;
-        try {
-            hours = new BigDecimal(row.estimatedHours().strip());
-        } catch (NumberFormatException e) {
+        String text = row.estimatedHours().strip();
+        if (!PLAIN_DECIMAL.matcher(text).matches()) {
             return rejected("Estimated hours must be a number");
         }
+        BigDecimal hours = new BigDecimal(text);
         if (hours.signum() <= 0) {
             return rejected("Estimated hours must be greater than 0");
         }

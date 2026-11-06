@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -31,6 +33,8 @@ public class WorkerAssignmentService {
     static final String PENDING = "Pending";
     static final String AWAITING_FILE = "AwaitingFile";
     static final String SERVICE_USER = "bpa-service";
+
+    private static final Logger LOG = LoggerFactory.getLogger(WorkerAssignmentService.class);
 
     /** The Work Pack is not waiting for a file, so its Pending rows must not be validated (D61): the job fails with this text, no retries. */
     public static class NotAwaitingFileException extends RuntimeException {
@@ -55,7 +59,9 @@ public class WorkerAssignmentService {
             String state = repository.lockState(workpackId).orElseThrow(() -> new IllegalStateException("No Work Pack " + workpackNumber));
             List<FileRow> pending = repository.rows(fileId, workpackNumber).stream().filter(r -> PENDING.equals(r.outcome())).toList();
             if (pending.isEmpty()) {
-                return repository.assignedFrom(workpackId, fileId); // a retried job: already answered (D65)
+                int already = repository.assignedFrom(workpackId, fileId); // a retried job: already answered (D65)
+                LOG.info("{}: file {} has no Pending row for this Work Pack (a retried job); answering {}", workpackNumber, fileId, already);
+                return already;
             }
             if (!AWAITING_FILE.equals(state)) {
                 throw new NotAwaitingFileException(workpackNumber + " is " + (state.isEmpty() ? "without an assignment state" : state)
@@ -73,8 +79,12 @@ public class WorkerAssignmentService {
                 FileRow row = pending.get(i);
                 Verdict verdict = verdicts.get(i);
                 if (verdict.accepted()) {
-                    // false would mean the Worker already holds this Work Pack (a re-run): the row still reads Assigned
-                    repository.assign(workpackId, workers.get(row.badgeNo().strip()), verdict.hours(), row.remarks(), fileId, username, at);
+                    // A Worker who already holds this Work Pack cannot be assigned from another file (D32: once per Work Pack). A re-run is
+                    // caught above (no Pending row), so this is a state no path creates yet: fail the job and roll back rather than read "Assigned".
+                    if (!repository.assign(workpackId, workers.get(row.badgeNo().strip()), verdict.hours(), row.remarks(), fileId, username, at)) {
+                        throw new IllegalStateException(workpackNumber + ": Worker " + row.badgeNo().strip()
+                                + " is already assigned to this Work Pack, so file " + fileId + " cannot assign it again (D32)");
+                    }
                     accepted++;
                 }
                 repository.setOutcome(row.id(), verdict.outcome(), username, at);
