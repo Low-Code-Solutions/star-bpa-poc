@@ -1,5 +1,6 @@
 package com.lcs.star.bpatest;
 
+import com.lcs.star.bpa.worker.CreateHourJournalLinesWorker;
 import com.lcs.star.bpa.worker.EvaluateReleaseInputsWorker;
 import com.lcs.star.bpa.worker.GenerateWorkPackPrintWorker;
 import com.lcs.star.bpa.worker.HourJournalHeaderWorker;
@@ -18,12 +19,12 @@ import org.springframework.context.annotation.FilterType;
 /**
  * Camunda Process Test application: only the job workers and the models, no database. It sits in a package of its own, as the
  * Camunda Process Test documentation asks, and lists the worker packages it needs. Workers that need the database are left out
- * (BPA-6: SaveWorkPackWorker; BPA-7: HourJournalHeaderWorker; BPA-8: EvaluateReleaseInputsWorker; BPA-9: RecordSignOffWorker; BPA-11: SaveWorkPackScheduleWorker; BPA-10: GenerateWorkPackPrintWorker; BPA-12: ValidateWorkerAssignmentWorker); the tests that use this app complete those jobs themselves.
+ * (BPA-6: SaveWorkPackWorker; BPA-7: HourJournalHeaderWorker; BPA-8: EvaluateReleaseInputsWorker; BPA-9: RecordSignOffWorker; BPA-11: SaveWorkPackScheduleWorker; BPA-10: GenerateWorkPackPrintWorker; BPA-12, BPA-22: ValidateWorkerAssignmentWorker; BPA-22: CreateHourJournalLinesWorker, the BPA-14 placeholder); the tests that use this app complete those jobs themselves.
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {DataSourceAutoConfiguration.class, FlywayAutoConfiguration.class})
 @ComponentScan(basePackages = "com.lcs.star.bpa.worker",
-        excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {SaveWorkPackWorker.class, HourJournalHeaderWorker.class, EvaluateReleaseInputsWorker.class, RecordSignOffWorker.class, SaveWorkPackScheduleWorker.class, GenerateWorkPackPrintWorker.class, ValidateWorkerAssignmentWorker.class}))
+        excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {SaveWorkPackWorker.class, HourJournalHeaderWorker.class, EvaluateReleaseInputsWorker.class, RecordSignOffWorker.class, SaveWorkPackScheduleWorker.class, GenerateWorkPackPrintWorker.class, ValidateWorkerAssignmentWorker.class, CreateHourJournalLinesWorker.class}))
 @Deployment(resources = {"classpath*:bpmn/*.bpmn", "classpath*:dmn/*.dmn"})
 public class ProcessTestApplication {
 }

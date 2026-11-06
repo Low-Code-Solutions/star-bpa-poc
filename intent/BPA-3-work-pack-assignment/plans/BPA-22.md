@@ -203,3 +203,25 @@ before any worker code.
 
 ## Human-gap log
 - Local Maven build: `subst S:` work-round and JAVA_HOME per command; `npm.cmd`; Docker Desktop must be running.
+
+## Build notes (6 Nov 2026, as built)
+- Built as planned, with these details:
+  - **Validator:** `domain/AssignmentRowValidator` is pure and follows the planned order; hours are parsed with `BigDecimal` (a text it cannot parse is "must be a number"), and accepted hours are
+    stored at two decimals. Remarks are counted with `codePointCount`.
+  - **Service and repository:** `assignment/WorkerAssignmentService` owns the one transaction (Work Pack row locked `FOR UPDATE`); `persistence/WorkerAssignmentRepository` holds the statements.
+    The uniqueness key `unique(workpack_id, worker_id)` is used with `ON CONFLICT DO NOTHING`. Audit rows: four or five per new assignment (`remarks` only when present) and one for the state change.
+  - **Worker:** `ValidateWorkerAssignmentWorker` finds the Work Pack by process instance, reads `assignmentFileId`, completes with `assignedWorkerCount`; a Work Pack that is not AwaitingFile, or a
+    message without a valid file id, fails the job with no retries and a message (an incident, nothing saved).
+  - **BPA-14 placeholder:** `CreateHourJournalLinesWorker` fails with "create-hour-journal-lines is built by BPA-14", excluded in `ProcessTestApplication`.
+  - **Tests:** the shared set-up moved from `AssignmentFileApiTest` to `AssignmentFlow`; `WorkerAssignmentApiTest` has the 13 scenario tests plus three more (audit rows, a retried job, the
+    state guard); `AssignmentRowValidatorTest` has 7. The BPA-12 tests were re-checked: seven expected the instance at ServiceTask_ValidateWorkerAssignment or "Pending" rows and now expect the BPA-14 step
+    and "Pending or Assigned" in the upload's own answer (a quick worker can answer before the upload reads the rows); `aRoutedInstanceStopsWithTheBpa22Incident` became
+    `aRoutedInstanceStopsWithTheBpa14Incident`; `BPA12_uploadIsRecorded` now waits for "Assigned" in the result and the CSV. No assertion was weakened beyond that.
+- Red run (6131a83): the 16 new process tests and the 7 re-checked BPA-12 tests failed because the rows stayed "Pending" and the instance stopped at the placeholder
+  (e.g. "timed out waiting for the rows ... answered; last: [Pending, Pending]"); the 7 validator tests failed because the stub answered "Pending". No test passed against a stub that should not.
+- Green: the 38 process tests, the validator 7/7, and the full `./mvnw -B verify` 207 tests with 0 failures.
+- Local stack (rebuilt bpa-app, real clock 6 Nov Asia/Riyadh, through the API with real `.xlsx` files): a Work Pack at AwaitingFile; a file with E1021 (40) and E9999: rows "Assigned" and
+  "Worker not in worker master data", one `worker_assignment` (E1021 = 40.00 by production-team), state Assigning with one audit row, the instance at ServiceTask_CreateHourJournalLines with the
+  incident "built by BPA-14". A second Work Pack with a file of one unknown Badge No: row rejected, no assignment, state AwaitingFile, the instance waiting at the catch event again; the corrected
+  file (E1021) was routed and assigned. Not checked in a browser (no portal change).
+- Size: 5 points as estimated.
