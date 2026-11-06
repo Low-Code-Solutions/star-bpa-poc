@@ -1,0 +1,1 @@
+export { AssignmentFileUpload } from './AssignmentFileUpload';

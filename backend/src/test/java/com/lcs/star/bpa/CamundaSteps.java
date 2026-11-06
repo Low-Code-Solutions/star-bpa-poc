@@ -28,6 +28,17 @@ final class CamundaSteps {
     private CamundaSteps() {
     }
 
+    /**
+     * Cancels every instance still waiting at {@code elementId}, whichever test class left it (all classes share one Camunda, each with its own
+     * database, so Work Pack numbers repeat and a message correlated by Work Pack number could reach an old instance; BPA-12 CI run).
+     */
+    static void cancelInstancesWaitingAt(String elementId) {
+        for (JsonNode element : elements(IntegrationApp.admin.post("/v2/element-instances/search",
+                Map.of("filter", Map.of("elementId", elementId, "state", "ACTIVE"), "page", Map.of("limit", 1000))).body().path("items"))) {
+            IntegrationApp.admin.post("/v2/process-instances/" + element.path("processInstanceKey").asText() + "/cancellation", Map.of());
+        }
+    }
+
     /** Open (CREATED) user tasks of one element in one instance. */
     static List<JsonNode> openTasks(long instance, String elementId) {
         Reply found = IntegrationApp.admin.post("/v2/user-tasks/search",

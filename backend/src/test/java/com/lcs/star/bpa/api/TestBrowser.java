@@ -25,6 +25,43 @@ public final class TestBrowser {
         return send(HttpRequest.newBuilder(URI.create(base + path)).GET());
     }
 
+    /** GET with an Accept header, for a body the portal asks for by type (the result as text/csv, BPA-12). */
+    public HttpResponse<String> getWithAccept(String path, String accept) {
+        return send(HttpRequest.newBuilder(URI.create(base + path)).header("Accept", accept).GET());
+    }
+
+    /**
+     * A multipart/form-data POST with one file part named {@code file}, as the portal's upload sends it (BPA-12); the CSRF token goes back
+     * as in {@link #post}. A null {@code content} sends the request with no file part at all.
+     */
+    public HttpResponse<String> postFile(String path, String fileName, byte[] content) {
+        String boundary = "----bpa" + java.util.UUID.randomUUID();
+        java.io.ByteArrayOutputStream body = new java.io.ByteArrayOutputStream();
+        try {
+            if (content != null) {
+                body.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"" + fileName
+                        + "\"\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n")
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                body.write(content);
+                body.write("\r\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            } else {
+                body.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\nno file\r\n")
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            body.write(("--" + boundary + "--\r\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(base + path))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()));
+        String token = cookie("XSRF-TOKEN");
+        if (token != null) {
+            request.header("X-XSRF-TOKEN", token);
+        }
+        return send(request);
+    }
+
     /** The body as bytes, for a binary response such as the Workpack print PDF (BPA-10). */
     public HttpResponse<byte[]> getBytes(String path) {
         try {
