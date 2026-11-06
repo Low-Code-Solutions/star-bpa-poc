@@ -278,3 +278,7 @@ test that passes before the build is said in the PR.
     survived, which it does not. Rare; noted for the demo, no read timeout added.
   - Estimate: about 12 to 13 points against 8, kept whole by Ahsan.
 - Final runs after the review fixes: full `./mvnw -B verify` 185 tests, 0 failures; React 52/52, lint, Prettier and build clean.
+- **CI fix (6 Nov, first `backend-tests` run failed, 6 of 22 AssignmentFileApiTest):** all test classes share one Camunda but each has its own database, so Work Pack numbers repeat. On CI,
+  PrintApiTest ran first and left instances waiting at `IntermediateCatchEvent_AssignmentFileReceived` under the same numbers, so the message reached the old instances (rows "Pending" instead of
+  "Not processed"; new instances stuck at the catch). A test-isolation problem, not a code defect: `CamundaSteps.cancelInstancesWaitingAt` cancels instances left at the catch event, called once in
+  `@BeforeAll` of AssignmentFileApiTest. Checked locally with PrintApiTest run before AssignmentFileApiTest: 15/15 and 22/22.

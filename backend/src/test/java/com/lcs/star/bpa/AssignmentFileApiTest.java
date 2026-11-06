@@ -98,6 +98,12 @@ class AssignmentFileApiTest {
     @Autowired
     TestClock clock;
 
+    @org.junit.jupiter.api.BeforeAll
+    static void noInstanceLeftWaitingByAnotherClass() {
+        IntegrationApp.background();
+        CamundaSteps.cancelInstancesWaitingAt(CATCH);
+    }
+
     @BeforeEach
     void today() {
         clock.set(TODAY);
