@@ -231,3 +231,31 @@ test that passes before the build is said in the PR.
 ## Human-gap log
 - Local Maven build uses the `subst S:` work-round and JAVA_HOME per command; `npm.cmd` in PowerShell; Docker Desktop must be
   running.
+
+## Build notes (6 Nov 2026, as built)
+- Built as planned, with these details:
+  - **Reader:** `AssignmentFileReader` uses POI 6.0.0 (`XSSFWorkbook` only, so an old `.xls`, a renamed `.csv`, an empty or damaged file are all "File cannot be read"); headers matched
+    trimmed and case-insensitive in any order; values read as displayed (`DataFormatter`, locale English); a row with no Workpack number, Badge No, Estimated hours or Remarks is skipped;
+    the row number is the spreadsheet row.
+  - **Service:** `AssignmentFileService` decides per Work Pack group in the plan order, with `TransactionTemplate`: the file, its rows and the claims are one transaction; the send
+    (`CamundaProcessClient.correlate`, `POST /v2/messages/correlation`, variable `assignmentFileId`) comes after the commit. A 404 (nothing waiting) or an unreachable Camunda
+    undoes the claim and sets the still-Pending rows of that Work Pack to "Not processed: Work Pack not ready; resend the file". Camunda answered 404 for a Work Pack whose instance
+    is not waiting (checked by `BPA12_messageNotDeliverableRowsNotProcessed`).
+  - **API:** `AssignmentFileController` implements the generated `AssignmentFilesApi`; the CSV is written by `AssignmentFileResultCsvConverter` (Accept `text/csv`, RFC 4180, CRLF, the
+    attachment name from the upload's file name); a request with no file part gets 400 "File is required". The new `GET /api/v1/assignment-files/template` serves the template from the
+    classpath. SecurityConfig covers `/api/v1/assignment-files` and everything under it for production-team, every method.
+  - **Placeholder:** `ValidateWorkerAssignmentWorker` fails the job with no retries: "validate-worker-assignment is built by BPA-22".
+  - **Template and demo files:** `AssignmentFileBuilder` (test sources) writes `templates/worker-assignment-template.xlsx` and the seven demo files in `templates/demo/` (run its `main`);
+    `AssignmentTemplateTest` compares the committed template with what the builder writes. The pom copies `templates/` onto the classpath but leaves out `demo/**` and `README.md`.
+  - **Portal:** a "Assignment file" section under My tasks for production-team only (`features/assignment-files/`): Download template, a file input, Upload, the result table or the
+    one file-level line, Refresh result and Download result (CSV). The section's accessible name is "Assignment file upload" (the file input is "Assignment file").
+- Red run (7ea3734): AssignmentFileApiTest 21 of 21 failed (every upload got Spring's own 404), AssignmentFileReaderTest 7 of 8, AssignmentTemplateTest 4 of 4, React 7 of 8. Two tests
+  passed against the stubs and are said in the PR: the reader test for a file that is not an xlsx (the stub answers "File cannot be read") and the React test that the section is not shown to
+  other roles (the stub renders nothing).
+- Green: AssignmentFileApiTest 21/21 on the first run, the 12 unit tests, full `./mvnw -B verify` 172 tests with 0 failures; React 51/51, lint, Prettier and build clean.
+- Local stack (rebuilt bpa-app, through the API with a real `.xlsx`, real clock 6 Nov Asia/Riyadh): a Work Pack taken to AwaitingFile (WP-000016); upload as production-team: 201, two rows
+  "Pending" with the Worker names; the same bytes under another name: "File already processed"; a row for WP-999999: "Work Pack not found"; the same upload as production-planner: 403; the result as
+  CSV (header, two rows, `attachment; filename="assign-01-result.csv"`); the template: 200, `.xlsx`, 4,348 bytes; the instance at ServiceTask_ValidateWorkerAssignment with the incident
+  "validate-worker-assignment is built by BPA-22"; one `published_message` row. Not checked in a browser.
+- jsdom's `FormData` is not Node's, so a React test cannot read the content type of the upload request; it checks the file is appended under the part name `file` instead.
+- Size: about 12 to 13 points by my estimate against the 8 on the story; kept whole by Ahsan's decision of 6 Nov (see the Readiness check).
