@@ -150,3 +150,25 @@ All 6 scenario tests are expected to fail first for the expected reason. If one 
 
 ## Human-gap log
 - Local Maven build: `subst S:` work-round and JAVA_HOME per command; Docker Desktop must be running.
+
+## Build notes (9 Nov 2026, as built)
+- Built as planned, with these details:
+  - **Repository:** `persistence/HourJournalLineRepository` creates the Lines with one `INSERT ... SELECT ... ON CONFLICT (header_id, worker_id) DO NOTHING RETURNING ...` over the Work Pack's `worker_assignment` rows joined to
+    `worker` and to the Header, in one `@Transactional` method; it writes six audit rows (`header_id`, `worker_id`, `role`, `designation`, `estimated_hours`, `status`) for each Line the insert returns, so a re-run
+    returns nothing and audits nothing. The user is the assignment's `created_by`, the uploader of the file (D63). The read method returns the Lines by Badge No, or no value for an unknown Work Pack.
+  - **Worker:** `CreateHourJournalLinesWorker` finds the Work Pack by process instance, calls `createFor`, and completes with no variables; a Work Pack with no Header fails the job with no retries and a message.
+  - **Endpoint:** `HourJournalLineController` implements the generated `HourJournalLinesApi` (404 "Work Pack not found", 400 "Workpack number must match WP-######", an empty list for a Work Pack without Lines).
+    `SecurityConfig` lets `ppc-team` and `supervisor` through on every method (new `SUPERVISOR` constant).
+  - **BPA-15 placeholder:** `CreateDigitalTimesheetsWorker` fails with "create-digital-timesheets is built by BPA-15", excluded in `ProcessTestApplication` with the real Lines worker.
+  - **Tests:** `HourJournalLineApiTest` has the 6 scenario tests and 5 more (supervisor, HEAD and anonymous, the 400s, the empty list, the audit rows, the role and designation snapshot).
+  - **Re-checked earlier tests:** in `WorkerAssignmentApiTest` and `AssignmentFileApiTest` the constant for the step the instance stops at moved from ServiceTask_CreateHourJournalLines to ServiceTask_CreateDigitalTimesheets,
+    `atBpa14Incident` became `atBpa15Incident` and `aRoutedInstanceStopsWithTheBpa14Incident` became `...Bpa15Incident` ("built by BPA-15"). No assertion was changed beyond that.
+- Red run (0238dd3): 17 of 49 failed for the expected reasons: no Lines were ever created (`timed out waiting for 2 Line(s) ...; last: []`), the stub answered 200 where 404 and 400 were expected, and the re-checked tests found the
+  instance still at ServiceTask_CreateHourJournalLines. One test passed against a stub, said in the PR: `aWorkPackWithoutLinesYetAnswersAnEmptyList` (the stub returns an empty list). `BPA14_otherRolesCannotReadLines` failed
+  in its set-up (no Lines), so its 403 assertion was not exercised red; it is exercised green, and `supervisorReadsAndHeadAndAnonymousFollowTheRule` covers the same rule.
+- Green: the three process classes 49/49, and the full `./mvnw -B verify` 226 tests with 0 failures.
+- Local stack (rebuilt bpa-app, through the API with a real `.xlsx`): a Work Pack at AwaitingFile and a file with E1021 (40), E1099 (60), E1150 (0.01) and a rejected E9999: three Lines (Welder Grade 3 40.00, Fitter Grade 2 60.00,
+  Rigger Grade 1 0.01, all Open, by production-team), none for E9999, 18 audit rows; GET as ppc-team 200 with the three Lines, as supervisor 200, as production-planner 403, an unknown Work Pack 404, `WP-12` 400; the instance at
+  ServiceTask_CreateDigitalTimesheets with the incident "built by BPA-15". The first attempt failed in my script, not in the code (it ran just after midnight in Riyadh and its schedule date was a day inside the lead time:
+  "Date cannot be earlier than 16 Nov 2026"); I widened its offsets and ran it again. Not checked in a browser (no portal change).
+- Size: 3 points as estimated.

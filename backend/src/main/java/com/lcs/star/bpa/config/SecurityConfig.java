@@ -44,6 +44,9 @@ public class SecurityConfig {
     static final String PRODUCTION_PLANNER = "production-planner";
     static final String PRODUCTION_TEAM = "production-team";
 
+    /** Reads the Project Hour Journal Lines with the PPC Team (BPA-14; groups ASSUMPTION in the story, 09 S6). */
+    static final String SUPERVISOR = "supervisor";
+
     @Bean
     SecurityFilterChain api(HttpSecurity http, ObjectMapper json) throws Exception {
         http
@@ -63,6 +66,9 @@ public class SecurityConfig {
                         // BPA-12: the Worker assignment upload, its result and the template are the Production Team's (D58, 09 S6; group
                         // ASSUMPTION in the story), every method, so HEAD cannot skip the rule (the BPA-10 lesson).
                         .requestMatchers("/api/v1/assignment-files", "/api/v1/assignment-files/**").hasAuthority(PRODUCTION_TEAM)
+                        // BPA-14 (D39): the Lines are read by the PPC Team and the Supervisor (groups ASSUMPTION in the story); the backend answers
+                        // 403 for anyone else (09 S6). Every method, so a HEAD request cannot skip the rule (the BPA-10 lesson).
+                        .requestMatchers("/api/v1/hour-journal-lines").hasAnyAuthority(PPC_TEAM, SUPERVISOR)
                         .anyRequest().authenticated())
                 // S26: token in the XSRF-TOKEN cookie (readable by React), sent back as X-XSRF-TOKEN on every state-changing call,
                 // the login included. The plain handler lets React send the cookie value unchanged.
