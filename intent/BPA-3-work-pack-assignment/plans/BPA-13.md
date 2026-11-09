@@ -227,3 +227,29 @@ Recorded by `Bpa13CorrelationChecksTest` (Camunda only, no application workers; 
 - **A different key** starts its own instance (200): the guard is per Work Pack number.
 - **After the instance ended, the same key** starts a new instance (200), so the key is free again (7d).
 No change to the plan: this is the answer the design assumed.
+
+## Build notes (9 Nov 2026, as built)
+- Built as planned, with these details:
+  - **Rule:** `domain/ReplacementPlanner` (pure) is the table in "How the previous assignment is replaced", one decision per Worker (Added, Replaced, Unchanged, Removed, Kept-and-flagged), hours compared as numbers.
+  - **Upload:** `AssignmentFileService` now treats an Assigned Work Pack's group as a replacement: claim the pair (D73), `AssignmentFileRepository.startReplacing` (Assigned to Replacing by compare-and-set, one audit row), send `AssignmentFileReplaced` after the commit
+    with `assignmentFileId` and `workpackNumber`. The send has three answers: delivered; not received (404, the probe's answer for a key that is already active), which reverts and reads "Replacement already in progress" (C3); failed (unreachable, or any other
+    exception), which reverts and reads "Replacement could not be started; try again" (D75). A compare-and-set that finds another state unclaims and reads "Replacement already in progress". The BPA-12 text "Replacement is not available yet" is gone.
+  - **Worker:** `ReplaceWorkerAssignmentWorker` (job `replace-worker-assignment`) reads `workpackNumber` and `assignmentFileId` from the message, finds the Work Pack by number, and completes with `replacementApplied`. `WorkerReplacementService.replace` runs in one transaction
+    with the Work Pack locked: a retry (no row still Pending) answers without writing; a Work Pack that is not Replacing fails the job with no retries and its state in the message; rows are checked with BPA-22's validator; a rejected row means nothing is applied, valid rows get no
+    outcome of their own and every row gets the Work Pack's message; otherwise the planner's steps are applied, the Lines and time sheets are synchronised, the accepted rows read "Assigned" and the state goes back to Assigned.
+  - **Reuse, not copy:** `HourJournalLineRepository.createFor` and `DigitalTimesheetRepository.createFor` keep their behaviour and now call a private `insertMissing` that a replacement calls too, with the replacement's uploader as the user (their tests passed unchanged).
+    New `syncWithAssignments` (add missing, reopen, follow the assignment's hours, Close the Lines of Workers no longer assigned) and `syncWithLines` (add missing, reset a Cancelled sheet to Draft when its Line is Open again, Cancel empty Draft sheets of Closed Lines).
+    `WorkerAssignmentRepository.insert` answers the new assignment's id (the history row needs it); `assign` is unchanged for BPA-22.
+  - **Audit (D64):** every changed business column of `worker_assignment` (old and new, new null for a deleted one), `worker_assignment_history` (all columns of a new row), `hour_journal_line`, `digital_timesheet` and the Work Pack's state, by the replacement's uploader (D63).
+- **Departures from the approved plan (said in the PR):**
+  - `WorkerReplacementServiceTest` (mocked) was not written. The decision table is covered by `ReplacementPlannerTest` (pure, 6 tests) and the process-level class covers the service end to end; the upload's reverts are in `AssignmentFileServiceTest` (4 new tests).
+  - The clock in `WorkerReplacementApiTest` stays at 30 Oct 2026, not the AC's 03 Nov: nothing in a replacement reads the date, and the helpers that take a Work Pack to AwaitingFile are checked for 30 Oct.
+  - New test file not in the plan's list: `Bpa13CorrelationChecksTest` (the probe). `AssignmentFlow` gained `settled`, `assignedWorkPack`, `reassignmentInstances` and `awaitReassignmentEnd`.
+- Red run (4f7562d): planner 6 of 6 failed (empty plan); the 4 new upload tests failed with "Replacement is not available yet"; 12 of 14 process tests failed for the same text or because no reassignment instance ever started or ended. **Two passed against the old code, said here:**
+  `BPA13_replacementWhileAssignmentInProgressIsRejected` and `BPA13_concurrentReplacementIsRejected` pin BPA-12's existing Assigning and Replacing answers, which this story does not change.
+- Green: the new class 14/14 (one of my own tests had a wrong expectation, E1099 is correctly removed by a file that lists only E1021, and was fixed), BPA-14's and BPA-15's classes unchanged and green, and the full `./mvnw -B verify` 275 tests, 0 failures, 30 minutes.
+- Local stack (rebuilt bpa-app, through the API with real `.xlsx` files, WP-000026): first assignment E1021 40 and E1099 60 run to Assigned (Lines Open, sheets Draft); replacement (E1021 50, E1150 30): result rows both "Assigned", assignments E1021 50 and E1150 30,
+  history `E1021 40->50 Replaced`, `E1099 60->0 Removed`, `E1150 0->30 Added`, Lines E1021 Open 50, E1099 Closed, E1150 Open 30, sheets E1021 Draft, E1099 Cancelled, E1150 Draft, the state audit `AwaitingFile->Assigning`, `Assigning->Assigned`, `Assigned->Replacing`,
+  `Replacing->Assigned`; a second replacement with a rejected row (E1021 60, E9999): rows with the Work Pack message, E9999 "Worker not in worker master data", assignments unchanged; the first file again: "File already processed". Camunda: `EndEvent_AssignmentReplaced` and
+  `EndEvent_ReplacementNotApplied` each completed once for the Work Pack, no incident. Not checked in a browser (no portal change).
+- Size: about 11 against the 5 on the story (kept whole by Ahsan, 9 Nov). The backend suite now takes about 30 minutes locally (it was about 20): every new class adds Work Packs that run to the end.
