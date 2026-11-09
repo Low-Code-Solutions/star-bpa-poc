@@ -24,6 +24,7 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-11](BPA-3-work-pack-assignment/plans/BPA-11.md) | Production Planner can schedule a Released Work Pack | Closed (2026-11-05) |
 | [BPA-12](BPA-3-work-pack-assignment/plans/BPA-12.md) | Production Team can submit a Worker assignment file for a scheduled Work Pack | Closed (2026-11-06); approved by Ahsan, Build Lead, 2026-11-06 |
 | [BPA-14](BPA-3-work-pack-assignment/plans/BPA-14.md) | PPC Team can see a Project Hour Journal Line for each assigned Worker | Closed (2026-11-09); approved by Ahsan, Build Lead, 2026-11-09 |
+| [BPA-15](BPA-3-work-pack-assignment/plans/BPA-15.md) | Supervisor can find a Digital Time sheet ready for each Worker on a Work Pack | Approved (Ahsan, Build Lead, 2026-11-09) |
 | [BPA-22](BPA-3-work-pack-assignment/plans/BPA-22.md) | Production Team can have each assignment row validated | Closed (2026-11-06); approved by Ahsan, Build Lead, 2026-11-06 |
 | [BPA-23](BPA-3-work-pack-assignment/plans/BPA-23.md) | Time & Method Analyst can correct a Draft Work Pack before confirming it | Closed (2026-11-05) |
 | [BPA-25](BPA-3-work-pack-assignment/plans/BPA-25.md) | ? | ? |
