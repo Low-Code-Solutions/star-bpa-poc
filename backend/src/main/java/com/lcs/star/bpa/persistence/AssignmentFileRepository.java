@@ -59,6 +59,18 @@ public class AssignmentFileRepository {
         jdbc.update("DELETE FROM bpa.published_message WHERE sha256 = ? AND workpack_number = ?", sha256, workpackNumber);
     }
 
+    /**
+     * STUB for the red run (L15): Assigned to Replacing by compare-and-set (BPA-13, D61); true when this call made the change. Built in the build step.
+     */
+    public boolean startReplacing(String workpackNumber, String username, Instant at) {
+        throw new UnsupportedOperationException("BPA-13: built in the build step");
+    }
+
+    /** STUB for the red run (L15): Replacing back to Assigned when the replacement could not be started (C3, D75). Built in the build step. */
+    public void revertReplacing(String workpackNumber, String username, Instant at) {
+        throw new UnsupportedOperationException("BPA-13: built in the build step");
+    }
+
     public UUID saveFile(String fileName, String sha256, String uploadedBy, Instant receivedAt, String outcome) {
         Timestamp when = Timestamp.from(receivedAt);
         return jdbc.queryForObject("""
