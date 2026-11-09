@@ -404,13 +404,17 @@ class ReleaseCheckApiTest {
         return jdbc.queryForObject("SELECT status FROM bpa.workpack WHERE id = ?", String.class, wp.id());
     }
 
-    /** Everything the check could change, as text: the Work Pack, its lines, its Header and the audit rows. */
+    /** Everything the check could change, as text: the Work Pack, its lines, its Header and the audit rows of those (not the whole log: other Work Packs write theirs meanwhile). */
     private String snapshotOfWorkPackData(Draft wp) {
         return jdbc.queryForList("SELECT * FROM bpa.workpack WHERE id = ?", wp.id())
                 + "|" + jdbc.queryForList("SELECT * FROM bpa.workpack_phase WHERE workpack_id = ? ORDER BY phase", wp.id())
                 + "|" + jdbc.queryForList("SELECT * FROM bpa.workpack_material WHERE workpack_id = ? ORDER BY id", wp.id())
                 + "|" + jdbc.queryForList("SELECT * FROM bpa.hour_journal_header WHERE workpack_id = ?", wp.id())
-                + "|" + jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log", Integer.class);
+                + "|" + jdbc.queryForObject("""
+                SELECT count(*) FROM bpa.audit_log WHERE record_id = ?
+                   OR record_id IN (SELECT id FROM bpa.workpack_phase WHERE workpack_id = ?)
+                   OR record_id IN (SELECT id FROM bpa.workpack_material WHERE workpack_id = ?)
+                   OR record_id IN (SELECT id FROM bpa.hour_journal_header WHERE workpack_id = ?)""", Integer.class, wp.id(), wp.id(), wp.id(), wp.id());
     }
 
     private TestBrowser loggedInAs(String username) {

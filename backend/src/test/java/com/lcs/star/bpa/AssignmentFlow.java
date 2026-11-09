@@ -4,6 +4,7 @@ import static com.lcs.star.bpa.CamundaSteps.activeElements;
 import static com.lcs.star.bpa.CamundaSteps.awaitOpenTask;
 import static com.lcs.star.bpa.CamundaSteps.awaitSignOffTask;
 import static com.lcs.star.bpa.CamundaSteps.completeSignOff;
+import static com.lcs.star.bpa.CamundaSteps.completed;
 import static com.lcs.star.bpa.CamundaSteps.elements;
 import static com.lcs.star.bpa.CamundaSteps.json;
 import static com.lcs.star.bpa.CamundaSteps.poll;
@@ -35,6 +36,7 @@ public final class AssignmentFlow {
     public static final String CONFIRM = "UserTask_ConfirmWorkPack";
     public static final String SCHEDULE = "UserTask_ScheduleWorkPack";
     public static final String CATCH = "IntermediateCatchEvent_AssignmentFileReceived";
+    public static final String END = "EndEvent_WorkPackAssigned";
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final int port;
@@ -57,13 +59,18 @@ public final class AssignmentFlow {
     // --- Work Packs in the state a scenario needs ---------------------------------------------------------------------------
 
     public Work draft() {
+        return draft("A-2201");
+    }
+
+    /** A Work Pack for this activity (A-2201 has a CBS code; A-2299 has none, BPA-15), at the Confirm task. */
+    public Work draft(String activityRef) {
         TestBrowser analyst = loggedInAs("time-method-analyst");
         HttpResponse<String> started = analyst.post("/api/v1/workpacks", "");
         assertThat(started.statusCode()).as("POST /api/v1/workpacks: " + started.body()).isEqualTo(201);
         long instance = Long.parseLong(json(started.body()).path("processInstanceKey").asText());
         String create = awaitOpenTask(instance, CREATE).path("userTaskKey").asText();
         Map<String, Object> variables = new LinkedHashMap<>();
-        variables.put("activityRef", "A-2201");
+        variables.put("activityRef", activityRef);
         variables.put("drawingRef", "DWG-118");
         variables.put("phases", List.of(Map.of("phase", "Cutting", "manhours", 150)));
         variables.put("materials", List.of(Map.of("materialRef", "MAT-PIPE-06", "phase", "Cutting")));
@@ -79,7 +86,11 @@ public final class AssignmentFlow {
 
     /** Confirmed unchanged, the release check Ready, approved: Released, waiting to be scheduled. */
     public Work released() {
-        Work draft = draft();
+        return released("A-2201");
+    }
+
+    public Work released(String activityRef) {
+        Work draft = draft(activityRef);
         TestBrowser analyst = loggedInAs("time-method-analyst");
         HttpResponse<String> open = analyst.get("/api/v1/tasks/" + draft.confirmTask());
         Map<String, Object> variables = JSON.convertValue(json(open.body()).path("variables"), new TypeReference<Map<String, Object>>() {
@@ -102,10 +113,19 @@ public final class AssignmentFlow {
 
     /** Scheduled and printed: assignment_state AwaitingFile, the instance waiting at the catch event. */
     public Work awaiting() {
-        Work wp = released();
+        return awaiting("A-2201");
+    }
+
+    public Work awaiting(String activityRef) {
+        Work wp = released(activityRef);
         schedule(wp);
         assertThat(state(wp)).isEqualTo("AwaitingFile");
         return wp;
+    }
+
+    /** Waits until the instance has run to EndEvent_WorkPackAssigned (BPA-15), the end of Process_PPC_WorkPackAssignment (an end event completes at most once per instance). */
+    public void awaitEnd(Work wp) {
+        poll(() -> completed(wp.instance(), END, 1), done -> done, "the instance of " + wp.number() + " at " + END);
     }
 
     // --- uploads and what they leave behind ----------------------------------------------------------------------------------

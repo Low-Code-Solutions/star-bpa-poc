@@ -1,0 +1,242 @@
+# Plan: BPA-15 Supervisor can find a Digital Time sheet ready for each Worker on a Work Pack
+Jira: BPA-15 (Story, epic BPA-3)
+Story last updated: 2026-11-09T13:16:36.003+0400 (status moved to In Progress; the content last changed 2 Nov 13:04)
+Status: Closed (2026-11-09); approved by Ahsan, Build Lead, 2026-11-09
+Approver: Ahsan (Build Lead)
+Branch: BPA-15-digital-timesheets, from main 274bd9c
+
+
+## Context
+BPA-14 (merged, 274bd9c) creates one Project Hour Journal Line per assigned Worker, then the instance stops at
+`ServiceTask_CreateDigitalTimesheets` with the placeholder incident "built by BPA-15".
+
+BPA-15 builds the real `create-digital-timesheets` worker. It creates one Digital Time sheet per Worker per Work Pack, from each
+Open Line:
+- **Project ID and WBS** come from the Work Pack's activity (`activity.wbs_ref`, then `wbs.project_ref`).
+- **CBS code** comes from the activity's CBS assignment (`cbs_activity`).
+- **Cost centre** comes from the Worker's personal cost centre (`worker.cost_centre_ref`, D40).
+- **CBS code and cost centre may be blank:** the time sheet is still created.
+
+The worker then sets `workpack.assignment_state = Assigned` (D61), and the process ends at `EndEvent_WorkPackAssigned`. Nothing of
+Epic 2 (BPA-4) is started.
+
+It also builds `GET /api/v1/digital-timesheets?workpackNumber=` for the group `supervisor` only. **That group is an ASSUMPTION in
+the story;** the PR and the Jira comment flag it. There is no department or project scope (BPA-44, PO 2 Nov).
+
+## Readiness check
+| DoR item | State |
+|---|---|
+| Template, persona, outcome | Met (Supervisor) |
+| Gherkin, testable, unhappy paths | Met: 9 scenarios |
+| BPMN IDs exist | Met: ServiceTask_CreateDigitalTimesheets (`create-digital-timesheets`, retries 3; documentation "Idempotent: unique(worker_id, workpack_id). D40. Sets workpack.assignment_state = Assigned (G7)"), then EndEvent_WorkPackAssigned |
+| SOR per field | Met: digital_timesheet (POC database; real SOR D365 timesheet / digital tab); project_ref, wbs_ref (D365 F&O PM), activity_ref (P6 via PMS), cbs_code_ref (D365 Cost Control Report), cost_centre_ref (myPeople, ASSUMPTION D40). Data model §5.7 |
+| DMN complete | n/a |
+| No blocking question | Met: C8, C13, C14, D40, D61 decided; the reader group, the blanks and the re-run rule are ASSUMPTIONs (non-blocking) |
+| ≤ 8 points | 2. **My estimate is about 3**: the story is small, but this step ends the process, so three earlier test classes must be re-checked (below) |
+| Spec accepted | Met (Faraz, 2 Nov) |
+| PO approved | Faraz, 28 Oct (comment 10387). **The re-approval after the 2 Nov change is recorded by Ahsan, not by a Faraz comment** (see the note) |
+
+Notes:
+- **2 Nov change and re-approval.** On 2 Nov Ahsan:
+  - edited the AC: the department-scope scenarios became the supervisor and production-team personas (BPA-44);
+  - moved the story Backlog → Ready;
+  - changed the DoR line from "re-approval needed" to "Faraz, 2 Nov 2026".
+
+  No comment on BPA-15 from Faraz records that re-approval, and CLAUDE.md says only the PO moves a story to Ready. I take the DoR
+  line as Ahsan recording Faraz's decision (BPA-44, PO 2 Nov), but flag it here rather than resolve it silently.
+- **Contract already in place.** `listDigitalTimesheets` and `DigitalTimesheet` came in with BPA-46:
+  - fields: employeeRef, workpackNumber, projectRef, wbsRef, activityRef, cbsCodeRef and costCentreRef (both absent when blank),
+    submissionStatus;
+  - responses: 400, 401, 403, 404 "Work Pack not found".
+
+  **No contract change.** Null fields are already left out (`default-property-inclusion: non_null`).
+- **Seed matches the AC:**
+  - A-2201 → WBS 11031 → PRJ-139, CBS CBS-139-PIP-01;
+  - A-2299 → WBS 11031 → PRJ-139, no CBS;
+  - E1021 and E1099 have cost centre STRP01; E1150 has none; E9999 does not exist.
+- **Project ID and WBS can always be derived.** `workpack.activity_ref`, `activity.wbs_ref` and `wbs.project_ref` are all NOT NULL
+  with foreign keys, so there is no "missing Project ID" path.
+
+## Design: the worker (`worker/CreateDigitalTimesheetsWorker`, replacing the placeholder; skill `new-job-worker`)
+1. Find the Work Pack by `job.getProcessInstanceKey()` (`WorkPackRepository.find`).
+2. One transaction (`persistence/DigitalTimesheetRepository`, `@Transactional`), with the Work Pack row locked `FOR UPDATE`.
+3. **State guard (D61):**
+   - `Assigning` → go on;
+   - `Assigned` → a re-run: go on (inserts nothing);
+   - anything else (empty, AwaitingFile, Replacing) → nothing is written, and the job fails with no retries and a message naming
+     the state (an incident). This is the same pattern BPA-22 uses.
+4. **No Open Line** on the Work Pack (no process path reaches this step without one) → nothing is written, and the job fails with
+   no retries and a message.
+5. **Insert.** `INSERT ... SELECT` one time sheet per Open `hour_journal_line` under the Work Pack's Header, with `ON CONFLICT
+   (worker_id, workpack_id) DO NOTHING RETURNING ...`, ordered by worker. The columns are:
+   - `worker_id`, and `journal_line_id` = the Line;
+   - `activity_ref` from `workpack.activity_ref`;
+   - `wbs_ref` from `activity`; `project_ref` from `wbs`;
+   - `cbs_code_ref` from `cbs_activity`, left-joined, so it can be null;
+   - `cost_centre_ref` from `worker`, so it can be null;
+   - `submission_status` "Draft".
+
+   These values are copies taken at creation (data model §5.7, A). No `digital_timesheet_line` is created; Epic 2 enters the daily
+   lines.
+6. **State change.** `UPDATE workpack SET assignment_state = 'Assigned' WHERE id = ? AND assignment_state = 'Assigning'`, with one
+   audit row `Assigning → Assigned` when it changes.
+7. **Who (D63).** `created_by`, `updated_by` and `audit_log.username` are the Line's `created_by`, which is the file's uploader
+   (BPA-14 and BPA-22). The time comes from the injected `Clock` (S9).
+8. **Audit (D64).** One row per business column of each new time sheet, with old value null: `worker_id`, `workpack_id`,
+   `journal_line_id`, `project_ref`, `wbs_ref`, `activity_ref`, `submission_status`, plus `cbs_code_ref` and `cost_centre_ref`
+   only when present. A re-run writes none.
+9. **Complete** with no variables. The instance then ends at EndEvent_WorkPackAssigned.
+
+## Design: the read endpoint (`api/DigitalTimesheetController`, implements the generated `TimesheetsApi`)
+- `GET /api/v1/digital-timesheets?workpackNumber=` returns the Work Pack's time sheets as `DigitalTimesheet`, ordered by employeeRef.
+- 404 "Work Pack not found"; 400 "Workpack number must match WP-######" (the BPA-7 and BPA-14 handler).
+- A Work Pack without time sheets yet answers 200 `[]`. This is an ASSUMPTION, as BPA-7 and BPA-14 chose.
+- **SecurityConfig:** `/api/v1/digital-timesheets` for `supervisor` only (the existing constant), on every method, so HEAD cannot
+  skip the rule. Everyone else gets 403 with no data; anonymous callers get 401.
+
+## Re-check of earlier tests (said in the PR)
+This step ends the process, so nothing waits at a BPA-15 incident any more, and a Work Pack moves on from Assigning to Assigned
+within seconds.
+- **New helper `AssignmentFlow.awaitEnd(Work)`:** polls until `EndEvent_WorkPackAssigned` has completed for the instance
+  (`CamundaSteps.completed`). The re-checked tests use it in place of "at ServiceTask_CreateDigitalTimesheets with the BPA-15
+  incident".
+- **`AssignmentFileApiTest` (BPA-12):**
+  - the six `TIMESHEETS` polls become `awaitEnd`;
+  - "nothing changes in the process" becomes "the end event completed exactly once";
+  - `aRoutedInstanceStopsWithTheBpa15Incident` becomes `aRoutedInstanceRunsToWorkPackAssigned`: the end event completed and the
+    instance has no incident.
+- **`WorkerAssignmentApiTest` (BPA-22):**
+  - `atBpa15Incident` → `awaitEnd`;
+  - `BPA22_acceptedRowSetsAssigning`: the state is now Assigned a moment later, so the test waits for the end, then asserts the
+    audit trail is exactly `AwaitingFile->Assigning` (by production-team, BPA-22's transition) then `Assigning->Assigned`. The
+    final state is Assigned. **This changes what the test asserts at the end; the PR says so.** BPA-22's own transition is still
+    proved, by its audit row;
+  - the retried-job test waits for the end, and asserts Assigned (unchanged by the retry);
+  - the state-guard test waits for the end, sets the state to `Assigning` by hand (as it already sets rows by hand), and keeps its
+    message.
+- **`HourJournalLineApiTest` (BPA-14):**
+  - `atBpa15Incident` → `awaitEnd`;
+  - `aJobCreatesLinesOnlyForItsOwnWorkPack` deletes the other Work Pack's time sheets (and their audit rows) before its Lines,
+    because `digital_timesheet.journal_line_id` references them.
+
+## Scenario-to-test table
+New class `DigitalTimesheetApiTest`, on the BPA-14 pattern:
+- the integration Camunda with workers on, the TestClock at 30 Oct 2026 Asia/Riyadh, `@DirtiesContext`;
+- `@BeforeAll` clean-up of instances left at the catch event;
+- Work Packs taken the real way to AwaitingFile (`AssignmentFlow`), then an assignment file from `AssignmentFileBuilder`.
+
+`AssignmentFlow.draft()` gains an activity parameter (default A-2201) for scenario 4's A-2299.
+
+| # | Scenario | Test |
+|---|---|---|
+| 1 | Time sheets are created | BPA15_timesheetsAreCreatedForAssignedWorkers: assign E1021 and E1099 on an A-2201 Work Pack. One time sheet each: Employee ID, PRJ-139, CBS-139-PIP-01, STRP01, 11031 / A-2201, "Draft", no `digital_timesheet_line`. The instance ends at EndEvent_WorkPackAssigned |
+| 2 | Rejected rows get none | BPA15_rejectedRowsGetNoTimesheet: E1021 and E9999. After the end, one time sheet on the Work Pack (E1021), none for E9999 |
+| 3 | Worker on two Work Packs | BPA15_workerOnTwoWorkPacksHasTwoTimesheets: one file, E1021 on two AwaitingFile Work Packs. E1021 has one time sheet for each |
+| 4 | Missing CBS or cost centre | BPA15_missingCbsOrCostCentreStillCreatesTimesheet: an A-2299 Work Pack with E1150. The time sheet has PRJ-139 and 11031, and the CBS code and cost centre are null in the database and absent in the JSON |
+| 5 | Re-run does not duplicate | BPA15_rerunDoesNotDuplicateTimesheets: after scenario 1's set-up and the end, call `handle` twice (mocked `JobClient`). Still one time sheet per Worker, the job completes each time, no audit row added |
+| 6 | Marked Assigned | BPA15_workPackIsMarkedAssigned: after the end, `assignment_state` is Assigned, with one audit row `Assigning->Assigned` by production-team |
+| 7 | Supervisor finds them | BPA15_supervisorFindsTimesheets: as supervisor, GET is 200 with two time sheets, each with Worker, Project ID, WBS / Activity, CBS Code, Cost Centre, Submission Status |
+| 8 | Other personas | BPA15_otherRolesCannotReadTimesheets: as production-team, 403 and no time sheet data in the body |
+| 9 | Unknown Work Pack | BPA15_unknownWorkPackReturnsNotFound: as supervisor, WP-999999 gives 404 "Work Pack not found" |
+
+Non-scenario tests:
+- Other personas (ppc-team, production-planner) get 403; HEAD gets 403; anonymous gets 401; a trailing slash is never a 200 with
+  data; `WP-12` gives 400; a Work Pack without time sheets gives 200 `[]`.
+- **Audit:** the rows of a new time sheet with their values and `changed_at` from the clock. A blank CBS code or cost centre writes
+  no row for that column.
+- **Snapshot:** after a time sheet exists, changing the Worker's cost centre and re-running the job leaves it as created.
+- **State guard:** a job for a Work Pack that is not Assigning or Assigned (a draft) fails with no retries and its message, writing
+  nothing.
+- **Scope:** a job writes time sheets only for its own Work Pack.
+
+Stubs keep the classes compiling for the red run: a controller that returns an empty list, and the current placeholder worker. All
+9 scenario tests are expected to fail first for the expected reason; any that passes against a stub is named in the PR.
+
+## Files that change
+- Backend:
+  - `worker/CreateDigitalTimesheetsWorker.java` (rewritten; stays excluded in `ProcessTestApplication`, as it now needs the
+    database);
+  - new `persistence/DigitalTimesheetRepository.java` and `api/DigitalTimesheetController.java`;
+  - `config/SecurityConfig.java` (the rule).
+- Tests:
+  - new `DigitalTimesheetApiTest`;
+  - `AssignmentFlow` (activity parameter, `awaitEnd`);
+  - `AssignmentFileApiTest`, `WorkerAssignmentApiTest`, `HourJournalLineApiTest` (re-check).
+- Docs: `REVIEW.md`, this plan, `intent/README.md` (generated).
+- No BPMN, DMN, migration, seed, contract or portal change.
+
+## Order of work
+1. Commit this plan (Approved). You move statuses.
+2. Tests first: the 9 scenario tests, the non-scenario tests and the re-checked tests, with stubs. Run them and show they fail for
+   the expected reason.
+3. Build the repository, the worker, the controller and the security rule. Get green, then run the full `./mvnw -B verify`.
+4. Local stack (rebuild bpa-app), through the API:
+   - a Work Pack assigned E1021 and E1099, with time sheets created;
+   - GET as supervisor (200), and as production-team and ppc-team (403);
+   - the Work Pack Assigned and, in Operate, the instance completed at EndEvent_WorkPackAssigned with no incident.
+5. qa-reviewer → REVIEW.md → fixes → plan Closed → push → PR → wait for all CI checks green → tell you → Jira comments (text
+   shown first). You merge.
+
+## Risks
+- **Size:** about 3 points against the 2 on the story, because the end of the process changes three earlier test classes.
+- **Test time:** about 8 Work Packs taken to AwaitingFile at about 20 s each, so the new class runs about 3 to 4 minutes.
+
+## Proof
+`./mvnw -B verify` (red first, then green), the local-stack run with Operate, CI.
+
+## Questions (for Khitaba, ASSUMPTIONs; Jira comment, text shown first)
+- Q1: the reader is the `supervisor` group only (the story's ASSUMPTION, flagged as asked).
+- Q2: a Work Pack without time sheets yet answers 200 `[]`, not 404.
+- Q3: time sheets are made from **Open** Lines only. Closed is set only by BPA-13, so in Epic 1 every Line is Open.
+- Q4: a job for a Work Pack whose state is not Assigning or Assigned fails with an incident instead of creating time sheets.
+- For Faraz: please confirm on BPA-15 the 2 Nov re-approval that the DoR line records.
+
+## Human-gap log
+- Local Maven build: map `subst S: "D:\LCS CLaude"` first (lost at reboot); JAVA_HOME per command; Docker Desktop must be running.
+
+## Build notes (9 Nov 2026, as built)
+- Built as planned, with these details:
+  - **Repository:** `persistence/DigitalTimesheetRepository.createFor` runs in one `@Transactional` method: it locks the Work Pack row, refuses a state other than Assigning or Assigned (`WRONG_STATE`) or a Work Pack with no Open Line
+    (`NO_LINES`), then inserts the time sheets with one `INSERT ... SELECT ... ON CONFLICT (worker_id, workpack_id) DO NOTHING RETURNING ...` over the Open Lines joined to the Work Pack, its activity, the WBS, the Worker and (left join) the
+    CBS assignment, writes the audit rows for the rows the insert returned (nine per time sheet, seven when the CBS code and cost centre are blank), and moves Assigning to Assigned with one audit row. The user is the Lines' `created_by`, the
+    uploader of the file (D63).
+  - **Worker:** `CreateDigitalTimesheetsWorker` completes with no variables; the two refusals fail the job with no retries and a message. It stays excluded in `ProcessTestApplication` (it needs the database).
+  - **Endpoint:** `DigitalTimesheetController` implements the generated `TimesheetsApi` (404 "Work Pack not found", 400 for a bad number, `[]` for a Work Pack without time sheets); `SecurityConfig` lets only `supervisor` through on every method.
+  - **Tests:** `DigitalTimesheetApiTest` has the 9 scenario tests and 8 more (the other personas and HEAD, anonymous, a trailing slash, the 400s, the empty list, the audit rows and their time, blank columns writing no audit row, the cost-centre snapshot,
+    the state refusal, scope).
+  - **Re-checked earlier tests:** `AssignmentFlow` gained `awaitEnd(Work)` (waits for EndEvent_WorkPackAssigned) and an activity parameter. In `AssignmentFileApiTest`, `WorkerAssignmentApiTest` and `HourJournalLineApiTest` every wait for "the instance at
+    ServiceTask_CreateDigitalTimesheets with the BPA-15 incident" became `awaitEnd`; `aRoutedInstanceStopsWithTheBpa15Incident` became `aRoutedInstanceRunsToWorkPackAssigned` (the end event completed, no incident, state Assigned).
+    `BPA22_acceptedRowSetsAssigning` now waits for the end and asserts BOTH audit rows (`AwaitingFile->Assigning` and `Assigning->Assigned`, both by production-team) and the final state Assigned: BPA-22's own transition is still proved, by its audit row,
+    but the test no longer sees the state rest at Assigning. The state-guard test waits for the end and sets the state back to Assigning by hand.
+  - **CI failure fixed here (said in the PR):** the `backend-tests` check of PR #35 (BPA-14) failed on BPA-22's `aRetriedJobChangesNothingAndAnswersTheSameCount` ("expected: 80 but was: 86"). It counted the whole `audit_log`, and BPA-14's worker
+    (six audit rows for one new Line) wrote its rows between the snapshot and the check. It passed locally by timing. This story re-checks that test anyway, so the fix is here: it waits for the end of the process and counts only the audit rows of
+    this Work Pack's `worker_assignment` rows. PR #35 was merged with that check red; until this PR merges, main carries the flaky test.
+- Red run (e9fe490): 29 of 69 failed for the expected reasons: the process never reached EndEvent_WorkPackAssigned (`timed out waiting for the instance ... at EndEvent_WorkPackAssigned`), the stub answered 200 where 404 and 400 were expected, and the
+  state-refusal message differed. One test passed against the stub, said in the PR: `aWorkPackWithoutTimesheetsYetAnswersAnEmptyList` (the stub returns an empty list).
+- Green: the four process classes, with one failure of my own making fixed (a count of E1021's time sheets over the whole class database, 9 instead of 2, now limited to the scenario's two Work Packs), and the full `./mvnw -B verify` 246 tests, 0 failures.
+- Local stack (rebuilt bpa-app, through the API with a real `.xlsx`): a Work Pack on A-2201 with E1021 (40), E1099 (60), E1150 (0.01) and a rejected E9999: three time sheets (PRJ-139, WBS 11031, A-2201, CBS-139-PIP-01, cost centre STRP01 for E1021 and
+  E1099, none for E1150, all Draft), none for E9999, no daily lines; supervisor 200, ppc-team and production-team 403, an unknown Work Pack 404; `assignment_state` Assigned with the audit trail `AwaitingFile->Assigning` then `Assigning->Assigned`; the
+  instance completed EndEvent_WorkPackAssigned with no incident. A Work Pack on A-2299 with E1150: one time sheet with Project ID and WBS and no CBS code or cost centre. Not checked in a browser (no portal change).
+- Size: about 3 points against the 2 on the story (see Risks).
+
+## Review fixes (9 Nov 2026, after the qa-reviewer pass; see REVIEW.md)
+- **Retry of a finished step (M3):** `createFor` checked "no Open Line" before anything else, so a retry after the time sheets existed and BPA-13 had closed the Lines would have failed with an incident. It now completes when the Work Pack is Assigned
+  and already has time sheets (D65); with no Open Line and no time sheet it still fails with the BPA-14 message. Tests: a retry with the Lines Closed completes; with the time sheets gone and the state Assigning it fails with its message and writes nothing.
+- **Mutation gaps (M1, M2), tests added:**
+  - a re-run changes neither the `workpack` audit rows nor its `updated_at`;
+  - a re-run with the state still Assigning moves it on with one audit row and writes no time sheet audit;
+  - AwaitingFile and Replacing are refused with their names and nothing changes;
+  - a Closed Line makes no time sheet (the Open filter);
+  - the Assigned update is scoped to the job's own Work Pack.
+
+  Most of these passed on first run because they pin behaviour already built, except the Closed-Lines retry, which exercised the new code above.
+- **BPA-12 test (M4):** "nothing changes in the process" had become two assertions that are always true after an end (`completed(END, 2)` means at least two; an ended instance is never at the catch event). Both are removed; the duplicate guard stays
+  proved by the single claim and "File already processed". The `awaitEnd` Javadoc no longer says "exactly once".
+- **Whole-table counts (L3):** the one other whole-table audit count, in `ReleaseCheckApiTest.snapshotOfWorkPackData`, is scoped to the Work Pack's own rows (its phases, materials and Header). The `digital_timesheet_line` count of zero stays (each class has its own database).
+- **Hand-edited seed rows (L4):** the cost-centre snapshot test and BPA-14's role and designation snapshot test read the original value first and restore that, not a hard-coded one.
+- **Stale text (L6):** the comments in `ProcessTestApplication`, `WorkerAssignmentApiTest` and `AssignmentFileApiTest` no longer call BPA-15 a placeholder or say BPA-22 is not built.
+- **Not changed:**
+  - `BPA22_acceptedRowSetsAssigning` uses `containsExactlyInAnyOrder` for the two state audit rows, because the fixed TestClock gives both the same `changed_at`, so the order cannot be asserted;
+  - instances left at the BPA-14 and BPA-15 service tasks by earlier classes are not cancelled by the `@BeforeAll` (noise in the log, not a failure);
+  - the POST, PUT and DELETE methods are not tested as supervisor.
+- Final run after the review fixes: full `./mvnw -B verify` 250 tests, 0 failures. No portal change, so no frontend run beyond CI.

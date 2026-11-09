@@ -50,8 +50,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * Background: today is 30 Oct 2026 (Asia/Riyadh); Workers E1021 and E1099 are in the Worker master (seed); E9999 is not.
  *
  * <p>The AC's Work Pack numbers (WP-000457, ...) are illustrative: each test creates its own Work Packs and uses the numbers they get.
- * Row validation is BPA-22 (WorkerAssignmentApiTest): a routed instance with valid rows passes ServiceTask_ValidateWorkerAssignment and ServiceTask_CreateHourJournalLines (BPA-14, the Lines) and stops at
- * ServiceTask_CreateDigitalTimesheets (BPA-15) with an incident "built by BPA-15". The upload answers right after the send, so a routed row reads
+ * Row validation is BPA-22 (WorkerAssignmentApiTest): a routed instance with valid rows passes ServiceTask_ValidateWorkerAssignment and ServiceTask_CreateHourJournalLines (BPA-14, the Lines) and runs through
+ * ServiceTask_CreateDigitalTimesheets (BPA-15), which ends the process at EndEvent_WorkPackAssigned. The upload answers right after the send, so a routed row reads
  * "Pending" or, when the worker was quicker, "Assigned".
  */
 @Tag("integration")
@@ -66,7 +66,6 @@ class AssignmentFileApiTest {
     static final String CONFIRM = "UserTask_ConfirmWorkPack";
     static final String SCHEDULE = "UserTask_ScheduleWorkPack";
     static final String CATCH = "IntermediateCatchEvent_AssignmentFileReceived";
-    static final String TIMESHEETS = "ServiceTask_CreateDigitalTimesheets";
     /** BPA-22 answers a routed row within seconds, so the upload's own answer reads Pending or, when the worker was quicker, Assigned. */
     static final java.util.Set<String> ROUTED = java.util.Set.of("Pending", "Assigned");
     static final String NOT_PROCESSED = "Not processed: Work Pack not ready; resend the file";
@@ -122,7 +121,7 @@ class AssignmentFileApiTest {
         assertThat(rows(upload)).extracting(r -> r.path("workerName").asText()).containsExactly("Worker E1021", "Worker E1099");
         assertThat(claims(sha256(file), wp.number())).as("published_message claim for the Work Pack").isEqualTo(1);
         // "Then message AssignmentFileReceived is published with correlation key WP / And the instance continues to ServiceTask_ValidateWorkerAssignment"
-        poll(() -> activeIds(wp), ids -> ids.contains(TIMESHEETS), "the instance of " + wp.number() + " at " + TIMESHEETS);
+        flow.awaitEnd(wp);
         assertThat(poll(() -> variable(wp.instance(), "assignmentFileId"), v -> v != null, "assignmentFileId of " + wp.number()).replace("\"", ""))
                 .as("the message carries the upload's id").isEqualTo(upload.id());
     }
@@ -168,7 +167,7 @@ class AssignmentFileApiTest {
     @Test
     void BPA12_assignmentInProgressRejectsUpload() {
         // Examples: | Assigning | Assignment still in progress; try again later |, | Replacing | Replacement already in progress |
-        // Both states are set by hand: BPA-22 sets Assigning and BPA-13 sets Replacing, neither is built.
+        // Both states are set by hand: since BPA-15 no process path leaves a Work Pack in Assigning, and BPA-13 (Replacing) is not built.
         Map<String, String> examples = new LinkedHashMap<>();
         examples.put("Assigning", "Assignment still in progress; try again later");
         examples.put("Replacing", "Replacement already in progress");
@@ -203,7 +202,7 @@ class AssignmentFileApiTest {
         assertThat(outcomes(upload)).satisfiesExactly(o -> assertThat(o).isIn(ROUTED), o -> assertThat(o).isEqualTo("Work Pack is not Released"));
         assertThat(claims(sha256(file), waiting.number())).as("published for the first Work Pack only").isEqualTo(1);
         assertThat(claims(sha256(file), notReleased.number())).isZero();
-        poll(() -> activeIds(waiting), ids -> ids.contains(TIMESHEETS), "the instance of " + waiting.number() + " at " + TIMESHEETS);
+        flow.awaitEnd(waiting);
     }
 
     @Test
@@ -243,7 +242,7 @@ class AssignmentFileApiTest {
         Work wp = awaiting();
         byte[] file = AssignmentFileBuilder.assignment().row(wp.number(), "E1021", 40).row(wp.number(), "E1099", 60).build();
         assertThat(outcomes(upload("production-team", "assign-01.xlsx", file))).hasSize(2).allMatch(ROUTED::contains);
-        poll(() -> activeIds(wp), ids -> ids.contains(TIMESHEETS), "the instance of " + wp.number() + " at " + TIMESHEETS);
+        flow.awaitEnd(wp);
         int filesBefore = fileRows();
 
         // identical content (same SHA-256) under a different name
@@ -254,7 +253,6 @@ class AssignmentFileApiTest {
         assertThat(fileRows()).as("recorded as its own assignment_file row").isEqualTo(filesBefore + 1);
         assertThat(jdbc.queryForObject("SELECT outcome FROM bpa.assignment_file WHERE id = ?::uuid", String.class, again.id())).isEqualTo("File already processed");
         assertThat(claims(sha256(file), wp.number())).as("no message is published again").isEqualTo(1);
-        assertThat(activeIds(wp)).as("and nothing changes in the process").contains(TIMESHEETS);
     }
 
     @Test
@@ -274,7 +272,7 @@ class AssignmentFileApiTest {
         assertThat(outcomes(resend)).hasSize(1).allMatch(ROUTED::contains);
         assertThat(resend.body().has("outcome")).as("the result does not show \"File already processed\"").isFalse();
         assertThat(claims(sha256(file), wp.number())).isEqualTo(1);
-        poll(() -> activeIds(wp), ids -> ids.contains(TIMESHEETS), "the instance of " + wp.number() + " at " + TIMESHEETS);
+        flow.awaitEnd(wp);
     }
 
     @Test
@@ -285,7 +283,7 @@ class AssignmentFileApiTest {
         jdbc.update("UPDATE bpa.workpack SET assignment_state = 'AwaitingFile' WHERE id = ?", b.id()); // by hand
         byte[] file = AssignmentFileBuilder.assignment().row(a.number(), "E1021", 40).row(b.number(), "E1099", 10).build();
         assertThat(outcomes(upload("production-team", "assign-03.xlsx", file))).satisfiesExactly(o -> assertThat(o).isIn(ROUTED), o -> assertThat(o).isEqualTo(NOT_PROCESSED));
-        poll(() -> activeIds(a), ids -> ids.contains(TIMESHEETS), "the instance of " + a.number() + " at " + TIMESHEETS);
+        flow.awaitEnd(a);
         // And B now waits at the catch event
         schedule(b);
 
@@ -296,7 +294,7 @@ class AssignmentFileApiTest {
         assertThat(resend.body().has("outcome")).as("the result holds no file-level line").isFalse();
         assertThat(claims(sha256(file), a.number())).isEqualTo(1);
         assertThat(claims(sha256(file), b.number())).isEqualTo(1);
-        poll(() -> activeIds(b), ids -> ids.contains(TIMESHEETS), "the instance of " + b.number() + " at " + TIMESHEETS);
+        flow.awaitEnd(b);
     }
 
     @Test
@@ -387,18 +385,19 @@ class AssignmentFileApiTest {
         assertThat(rows(upload).get(1).path("badgeNo").asText()).isEqualTo("E9999");
     }
 
-    /** BPA-15 builds the next step: until then an instance with Lines stops there with an incident saying so (as BPA-6 did for BPA-23). */
+    /** With BPA-22, BPA-14 and BPA-15 built, a routed instance with valid rows runs all the way to EndEvent_WorkPackAssigned, with no incident on the way. */
     @Test
-    void aRoutedInstanceStopsWithTheBpa15Incident() {
+    void aRoutedInstanceRunsToWorkPackAssigned() {
         Work wp = awaiting();
         assertThat(outcomes(upload("production-team", "assign-incident.xlsx", AssignmentFileBuilder.assignment().row(wp.number(), "E1021", 40).build())))
                 .hasSize(1).allMatch(ROUTED::contains);
 
-        List<JsonNode> incidents = poll(() -> elements(IntegrationApp.admin.post("/v2/incidents/search",
-                        Map.of("filter", Map.of("processInstanceKey", Long.toString(wp.instance())))).body().path("items")),
-                list -> !list.isEmpty(), "an incident on the instance of " + wp.number());
+        flow.awaitEnd(wp);
 
-        assertThat(incidents.get(0).path("errorMessage").asText()).contains("built by BPA-15");
+        List<JsonNode> incidents = elements(IntegrationApp.admin.post("/v2/incidents/search",
+                Map.of("filter", Map.of("processInstanceKey", Long.toString(wp.instance())))).body().path("items"));
+        assertThat(incidents).as("no incident on the instance of " + wp.number()).isEmpty();
+        assertThat(state(wp)).isEqualTo("Assigned");
     }
 
     @Test

@@ -418,3 +418,20 @@ Newest last. One entry per review; the full report goes in the PR description.
   used the whole table: fixed; the audit test checked 4 of 6 columns and not the time: all six and `changed_at` now; the insert lacked an order for concurrent jobs: `ORDER BY a.worker_id`; plan header and file list: updated.
   Left: the 403 of scenario 6 was not seen red (it failed in its set-up; the other-role tests exercise it green); no real two-thread concurrency test (theoretical, not a defect).
 - Not verified by the reviewer: test runs, CI, the local-stack run, the browser.
+
+### BPA-15 at 01e3fac, 9 Nov 2026 (qa-reviewer)
+- Code: 0 High, 4 Medium, 7 Low. Reviewer read BPA-15 in Jira, the plan, the AC (9 scenarios), the schema and every main and test source in the diff; it ran no tests (Docker needed). Author's runs: red (e9fe490) 29 of 69 failed for the expected reasons
+  (the process never reached EndEvent_WorkPackAssigned, the stub answered 200 for 404 and 400); green the four process classes, then the full `./mvnw -B verify` 246 tests; local stack through the API with a real `.xlsx` (three time sheets with the coding from
+  A-2201, none for the rejected E9999, no daily lines; supervisor 200, ppc-team and production-team 403, unknown Work Pack 404; Assigned with the two-step audit trail; the end event completed with no incident; an A-2299 Work Pack with E1150 gave a time sheet
+  with no CBS code or cost centre).
+- Checks passed: the 9 test names equal the Jira DoD list and each asserts its Gherkin values; the CI-failure fix of BPA-22's retried-job test is sound (waits for the end, counts only this Work Pack's `worker_assignment` audit rows; the plan's "80 vs 86" is
+  the six rows of one BPA-14 Line); data model 5.7 (unique key, NOT NULL columns, Draft, no daily lines); nine audit rows per sheet (seven when blank) by the uploader with the clock's instant; the one `@Transactional` method locks the Work Pack so two jobs
+  serialise; the rule is supervisor only on every method and is decided before the controller.
+- Medium (4):
+  - The re-run test did not catch dropping the `assignment_state = 'Assigning'` guard (a second state audit row): it now checks the state audit rows and `updated_at`, and a re-run with the state still Assigning is tested.
+  - Several branches survived mutation (NO_LINES, a named state in the refusal, the Open filter, the state update scope): tests added.
+  - A retry failed once the Lines were Closed although the time sheets existed: fixed (D65).
+  - The BPA-12 "nothing changes" assertions were always true after an end: removed, the duplicate guard stays proved by the claim.
+- Low: BPA-22's state audit rows are asserted in any order (the fixed clock gives both one instant): left; the `ReleaseCheckApiTest` whole-table audit count: scoped; hand-edited seed rows are restored from the read value: fixed; stale comments: fixed; instances left at
+  the BPA-14 and BPA-15 steps are not cancelled between classes (noise, not failure) and non-GET methods as supervisor are not tested: left.
+- Not verified by the reviewer: test runs, CI, the local-stack run, the browser, that `variable()` in AssignmentFileApiTest still returns `assignmentFileId` after the instance has ended (the test passes locally).
