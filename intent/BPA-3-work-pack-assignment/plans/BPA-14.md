@@ -1,7 +1,7 @@
 # Plan: BPA-14 PPC Team can see a Project Hour Journal Line for each assigned Worker
 Jira: BPA-14 (Story, epic BPA-3)
-Story last updated: 2026-11-06T17:06:38.827+0400 (Sprint and Rank only; the content last changed 28 Oct 13:29, before the PO's approval at 13:31)
-Status: Approved (Ahsan, Build Lead, 2026-11-09)
+Story last updated: 2026-11-09T11:28:07+0400 (status moved to In Progress; the content last changed 28 Oct 13:29, before the PO's approval at 13:31)
+Status: Closed (2026-11-09); approved by Ahsan, Build Lead, 2026-11-09
 Approver: Ahsan (Build Lead)
 Branch: BPA-14-hour-journal-lines, from main 9f78ea2
 
@@ -172,3 +172,18 @@ All 6 scenario tests are expected to fail first for the expected reason. If one 
   ServiceTask_CreateDigitalTimesheets with the incident "built by BPA-15". The first attempt failed in my script, not in the code (it ran just after midnight in Riyadh and its schedule date was a day inside the lead time:
   "Date cannot be earlier than 16 Nov 2026"); I widened its offsets and ran it again. Not checked in a browser (no portal change).
 - Size: 3 points as estimated.
+
+## Review fixes (9 Nov 2026, after the qa-reviewer pass; see REVIEW.md)
+- **Snapshot against a re-run (M2):** the snapshot test now changes the Worker's role and designation and then runs the job again; the Line keeps Welder / Grade 3 and its hours, there is still one Line, and no audit row is
+  added. (Before, replacing `DO NOTHING` with `DO UPDATE` would have passed every test.)
+- **Pinned by tests that passed on first run (said in the PR):** a Work Pack without a Header fails the job with no retries, the message and no completion; a job creates Lines only for its own Work Pack (another Work Pack's
+  assignment, whose Lines were removed by hand, gets none); the Lines are ordered by Badge No (the file lists E1150, E1099, E1021); a trailing slash on the path is never a 200 with data; the audit test now checks all six
+  columns with their values and one `changed_at` equal to the injected clock's instant.
+- **Test hygiene (L2, L6):** "no Line for E9999" was always true (E9999 is not in the master), so the test now also waits for the instance to pass the step and counts the Lines under the Header; the audit counts are for this
+  Work Pack's Lines only, not the whole `audit_log`.
+- **Repository (L7):** the insert selects `ORDER BY a.worker_id`, so two concurrent jobs take the unique-index locks in the same order.
+- **Index (M1):** `intent/README.md` is regenerated; the first run was cut short when the command was stopped, which dropped nine rows. It now differs from main by the BPA-14 row only.
+- **Header (L9):** "Story last updated" is 2026-11-09T11:28:07 (status moved to In Progress; no content change).
+- **Not changed:** the 403 assertion of `BPA14_otherRolesCannotReadLines` was not seen failing red (the test failed in its set-up first); `supervisorReadsAndHeadAndAnonymousFollowTheRule` and the green run exercise it. I did not
+  remove the rule to prove it.
+- Final run after the review fixes: full `./mvnw -B verify` 229 tests, 0 failures. No portal change, so no frontend run beyond CI.

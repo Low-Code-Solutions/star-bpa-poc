@@ -23,7 +23,7 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-10](BPA-3-work-pack-assignment/plans/BPA-10.md) | Time & Method Analyst can print a scheduled Work Pack | Closed (2026-11-05) |
 | [BPA-11](BPA-3-work-pack-assignment/plans/BPA-11.md) | Production Planner can schedule a Released Work Pack | Closed (2026-11-05) |
 | [BPA-12](BPA-3-work-pack-assignment/plans/BPA-12.md) | Production Team can submit a Worker assignment file for a scheduled Work Pack | Closed (2026-11-06); approved by Ahsan, Build Lead, 2026-11-06 |
-| [BPA-14](BPA-3-work-pack-assignment/plans/BPA-14.md) | PPC Team can see a Project Hour Journal Line for each assigned Worker | Approved (Ahsan, Build Lead, 2026-11-09) |
+| [BPA-14](BPA-3-work-pack-assignment/plans/BPA-14.md) | PPC Team can see a Project Hour Journal Line for each assigned Worker | Closed (2026-11-09); approved by Ahsan, Build Lead, 2026-11-09 |
 | [BPA-22](BPA-3-work-pack-assignment/plans/BPA-22.md) | Production Team can have each assignment row validated | Closed (2026-11-06); approved by Ahsan, Build Lead, 2026-11-06 |
 | [BPA-23](BPA-3-work-pack-assignment/plans/BPA-23.md) | Time & Method Analyst can correct a Draft Work Pack before confirming it | Closed (2026-11-05) |
 | [BPA-25](BPA-3-work-pack-assignment/plans/BPA-25.md) | ? | ? |
@@ -35,3 +35,13 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-39](BPA-3-work-pack-assignment/plans/BPA-39.md) | Docs catch-up after the ADRs: CLAUDE.md test-first rule and ADR reference, 09 stale rows | Closed (2026-10-29) |
 | [BPA-40](BPA-3-work-pack-assignment/plans/BPA-40.md) | Data model v0.5: approval fixes | Closed (2026-10-29) |
 | [BPA-42](BPA-3-work-pack-assignment/plans/BPA-42.md) | Generate V1__baseline_schema.sql and R__seed_reference_data.sql from data model v0.5 | Closed (2026-10-29) |
+| [BPA-43](BPA-3-work-pack-assignment/plans/BPA-43.md) | Walking skeleton: Spring Boot backend, Flyway, model deploy, one worker, login and CI | Closed (2026-10-30) |
+| [BPA-44](BPA-3-work-pack-assignment/plans/BPA-44.md) | Remove department/project scope: 7 personas, access by group only | Closed (2026-11-02) |
+| [BPA-45](BPA-3-work-pack-assignment/plans/BPA-45.md) | Record PO acceptance of Epic 1 intent and spec, repo-master sign-off and team change | Closed (2026-11-02) |
+| [BPA-46](BPA-3-work-pack-assignment/plans/BPA-46.md) | Draft the full api/openapi.yaml contract (09 S20, §4 item 4) | Closed (2026-11-04) |
+| [BPA-47](BPA-3-work-pack-assignment/plans/BPA-47.md) | Set the React portal structure and add project skills for task screens and job workers | Closed (2026-11-04) |
+| [BPA-6](BPA-3-work-pack-assignment/plans/BPA-6.md) | Time & Method Analyst can create a Work Pack with estimates | Closed (2026-11-04) |
+| [BPA-7](BPA-3-work-pack-assignment/plans/BPA-7.md) | PPC Team can track a Work Pack's estimated man hours in a Project Hour Journal Header | Closed (2026-11-04) |
+| [BPA-8](BPA-3-work-pack-assignment/plans/BPA-8.md) | Time & Method Analyst can confirm a Work Pack only when materials are reserved and the drawing is approved | Closed (2026-11-05) |
+| [BPA-9](BPA-3-work-pack-assignment/plans/BPA-9.md) | Project Engineer can sign off a Work Pack release | Closed (2026-11-05) |
+

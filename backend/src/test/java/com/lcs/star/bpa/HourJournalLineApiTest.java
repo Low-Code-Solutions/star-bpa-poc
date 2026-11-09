@@ -119,6 +119,8 @@ class HourJournalLineApiTest {
         List<JsonNode> lines = linesOf(wp, 1);
 
         assertThat(lines).extracting(l -> l.path("employeeRef").asText()).containsExactly("E1021");
+        atBpa15Incident(wp); // the step has finished, so a second Line could no longer arrive
+        assertThat(linesUnderHeader(wp)).as("one Line under the Header, none for E9999 (it is not in the Worker master, so it has no assignment)").isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.hour_journal_line l JOIN bpa.worker w ON w.id = l.worker_id WHERE w.employee_ref = 'E9999'",
                 Integer.class)).as("no Line exists for E9999").isZero();
     }
@@ -139,7 +141,7 @@ class HourJournalLineApiTest {
     void BPA14_rerunDoesNotDuplicateLines() {
         Work wp = assigned(Map.of("E1021", 40, "E1099", 60));
         linesOf(wp, 2);
-        int audit = auditRows();
+        int audit = lineAuditRows(wp);
         JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
 
         worker.handle(client, job(61L, wp.instance()));
@@ -149,7 +151,7 @@ class HourJournalLineApiTest {
         Mockito.verify(client).newCompleteCommand(62L);
         assertThat(lineCount(wp, "E1021")).as("exactly one Line for E1021 under the Header").isEqualTo(1);
         assertThat(lineCount(wp, "E1099")).as("and one for E1099").isEqualTo(1);
-        assertThat(auditRows()).as("the re-run adds no audit row").isEqualTo(audit);
+        assertThat(lineAuditRows(wp)).as("the re-run adds no audit row").isEqualTo(audit);
     }
 
     @Test
@@ -185,6 +187,55 @@ class HourJournalLineApiTest {
         assertThat(flow.loggedInAs("production-planner").head(LINES + wp.number()).statusCode()).as("HEAD is not a way round").isEqualTo(403);
         assertThat(flow.loggedInAs("production-team").get(LINES + wp.number()).statusCode()).isEqualTo(403);
         assertThat(new TestBrowser(port).get(LINES + wp.number()).statusCode()).isEqualTo(401);
+        // a trailing slash is not a way round the rule: it is no route, so it is never a 200 with data
+        HttpResponse<String> slash = flow.loggedInAs("production-planner").get("/api/v1/hour-journal-lines/?workpackNumber=" + wp.number());
+        assertThat(slash.statusCode()).isNotEqualTo(200);
+        assertThat(slash.body()).doesNotContain("employeeRef");
+    }
+
+    /** The Lines come back by Badge No, not in the order the file listed the Workers. */
+    @Test
+    void linesAreOrderedByBadgeNo() {
+        Work wp = flow.awaiting();
+        Upload upload = flow.upload("production-team", "assign-lines-order.xlsx", AssignmentFileBuilder.assignment()
+                .row(wp.number(), "E1150", 5).row(wp.number(), "E1099", 60).row(wp.number(), "E1021", 40).build());
+        assertThat(settled(upload)).allMatch("Assigned"::equals);
+
+        assertThat(linesOf(wp, 3)).extracting(l -> l.path("employeeRef").asText()).containsExactly("E1021", "E1099", "E1150");
+    }
+
+    /** A job creates Lines only for its own Work Pack: another Work Pack's assignments stay without Lines (WHERE workpack_id). */
+    @Test
+    void aJobCreatesLinesOnlyForItsOwnWorkPack() {
+        Work mine = assigned(Map.of("E1021", 40));
+        Work other = assigned(Map.of("E1099", 60));
+        linesOf(mine, 1);
+        linesOf(other, 1);
+        atBpa15Incident(other);
+        // by hand: the other Work Pack is assigned but has no Lines (as if its job had not run yet)
+        jdbc.update("DELETE FROM bpa.audit_log WHERE table_name = 'hour_journal_line' AND record_id IN (SELECT l.id FROM bpa.hour_journal_line l JOIN bpa.hour_journal_header h ON h.id = l.header_id WHERE h.workpack_id = ?)", other.id());
+        jdbc.update("DELETE FROM bpa.hour_journal_line WHERE header_id IN (SELECT id FROM bpa.hour_journal_header WHERE workpack_id = ?)", other.id());
+
+        worker.handle(Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS), job(72L, mine.instance()));
+
+        assertThat(linesUnderHeader(other)).as("the other Work Pack's assignment got no Line from this job").isZero();
+        assertThat(lineAuditRows(other)).isZero();
+        assertThat(linesUnderHeader(mine)).isEqualTo(1);
+    }
+
+    /** No Header (BPA-7 makes it before any assignment): the job fails with no retries and says why; nothing is written (the story's SOR: the Line hangs off the Header). */
+    @Test
+    void aWorkPackWithoutAHeaderFailsTheJobWithNoRetries() {
+        Work wp = flow.draft();
+        jdbc.update("DELETE FROM bpa.hour_journal_header WHERE workpack_id = ?", wp.id()); // by hand: no process path leaves a Work Pack without one
+        JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+
+        worker.handle(client, job(73L, wp.instance()));
+
+        Mockito.verify(client.newFailCommand(73L)).retries(0);
+        Mockito.verify(client.newFailCommand(73L).retries(0)).errorMessage(wp.number() + " has no Project Hour Journal Header, so its Lines cannot be created (BPA-7)");
+        Mockito.verify(client, Mockito.never()).newCompleteCommand(Mockito.anyLong());
+        assertThat(lineAuditRows(wp)).isZero();
     }
 
     @Test
@@ -220,8 +271,16 @@ class HourJournalLineApiTest {
                 WHERE a.table_name = 'hour_journal_line' AND h.workpack_id = ? ORDER BY a.column_name
                 """, String.class, wp.id());
 
-        assertThat(audit).contains("role=Welder (old null) by production-team", "designation=Grade 3 (old null) by production-team",
-                "estimated_hours=40 (old null) by production-team", "status=Open (old null) by production-team").hasSize(6);
+        String header = jdbc.queryForObject("SELECT id::text FROM bpa.hour_journal_header WHERE workpack_id = ?", String.class, wp.id());
+        String worker = jdbc.queryForObject("SELECT id::text FROM bpa.worker WHERE employee_ref = 'E1021'", String.class);
+        assertThat(audit).containsExactlyInAnyOrder("designation=Grade 3 (old null) by production-team", "estimated_hours=40 (old null) by production-team",
+                "header_id=" + header + " (old null) by production-team", "role=Welder (old null) by production-team",
+                "status=Open (old null) by production-team", "worker_id=" + worker + " (old null) by production-team");
+        assertThat(jdbc.queryForList("""
+                SELECT DISTINCT a.changed_at FROM bpa.audit_log a JOIN bpa.hour_journal_line l ON l.id = a.record_id
+                JOIN bpa.hour_journal_header h ON h.id = l.header_id WHERE a.table_name = 'hour_journal_line' AND h.workpack_id = ?""",
+                java.sql.Timestamp.class, wp.id())).as("one instant, from the injected clock (S9)").extracting(java.sql.Timestamp::toInstant)
+                .containsExactly(AssignmentFileApiTest.TODAY);
     }
 
     /** Role and designation are copies taken when the Line is created and never refreshed (data model N3, C14). */
@@ -229,12 +288,20 @@ class HourJournalLineApiTest {
     void roleAndDesignationAreASnapshot() {
         Work wp = assigned(Map.of("E1021", 40));
         linesOf(wp, 1);
+        int audit = lineAuditRows(wp);
         jdbc.update("UPDATE bpa.worker SET role = 'Foreman', designation = 'Grade 9' WHERE employee_ref = 'E1021'");
         try {
+            // the master changed and the job runs again (a retry): the Line keeps what it was created with, and nothing is written
+            JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+            worker.handle(client, job(71L, wp.instance()));
             List<JsonNode> lines = linesOf(wp, 1);
 
+            Mockito.verify(client).newCompleteCommand(71L);
             assertThat(lines.get(0).path("role").asText()).isEqualTo("Welder");
             assertThat(lines.get(0).path("designation").asText()).isEqualTo("Grade 3");
+            assertThat(hours(lines)).containsExactly("40");
+            assertThat(lineCount(wp, "E1021")).isEqualTo(1);
+            assertThat(lineAuditRows(wp)).isEqualTo(audit);
         } finally {
             jdbc.update("UPDATE bpa.worker SET role = 'Welder', designation = 'Grade 3' WHERE employee_ref = 'E1021'");
         }
@@ -276,8 +343,18 @@ class HourJournalLineApiTest {
                 JOIN bpa.worker w ON w.id = l.worker_id WHERE h.workpack_id = ? AND w.employee_ref = ?""", Integer.class, wp.id(), badge);
     }
 
-    private int auditRows() {
-        return jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log", Integer.class);
+    /** Lines under the Work Pack's Header, whatever the API shows. */
+    private int linesUnderHeader(Work wp) {
+        return jdbc.queryForObject("SELECT count(*) FROM bpa.hour_journal_line l JOIN bpa.hour_journal_header h ON h.id = l.header_id WHERE h.workpack_id = ?",
+                Integer.class, wp.id());
+    }
+
+    /** Audit rows of this Work Pack's Lines only (other Work Packs' late audit rows cannot move it). */
+    private int lineAuditRows(Work wp) {
+        return jdbc.queryForObject("""
+                SELECT count(*) FROM bpa.audit_log a JOIN bpa.hour_journal_line l ON l.id = a.record_id
+                JOIN bpa.hour_journal_header h ON h.id = l.header_id WHERE a.table_name = 'hour_journal_line' AND h.workpack_id = ?""",
+                Integer.class, wp.id());
     }
 
     /** The instance has its Lines, so it passes this step and stops at BPA-15's step with its incident. */

@@ -54,6 +54,7 @@ public class HourJournalLineRepository {
                 JOIN bpa.worker w ON w.id = a.worker_id
                 JOIN bpa.hour_journal_header h ON h.workpack_id = a.workpack_id
                 WHERE a.workpack_id = ?
+                ORDER BY a.worker_id
                 ON CONFLICT (header_id, worker_id) DO NOTHING
                 RETURNING id, header_id, worker_id, role, designation, estimated_hours, status, created_by""",
                 (rs, n) -> new NewLine(rs.getObject("id", UUID.class), rs.getObject("header_id", UUID.class),
