@@ -402,3 +402,19 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Low: retried job with no Pending row only logged nothing (log added); a retried all-rejected file untested (test added); no concurrency test for FOR UPDATE (noted in the plan); scenarios 3 and 13 did not assert state or audit
   unchanged (added). Left: `settled()` polls up to 60 s and the class takes about 6 minutes of Work Pack set-up (the plan's risk); instances left at the BPA-14 incident accumulate in the shared Camunda (harmless).
 - Not verified by the reviewer: test runs, CI, the local-stack run, the browser.
+
+### BPA-14 at 0058d5e, 9 Nov 2026 (qa-reviewer)
+- Code: 0 High, 2 Medium, 9 Low. Reviewer read BPA-14 in Jira, the plan, the AC (6 scenarios), the schema and every main and test source in the diff; it ran no tests (Docker needed). Author's runs: red (0238dd3) 17 of 49 failed for
+  the expected reasons (no Lines created, the stub answered 200 for 404 and 400, the re-checked tests found the instance still at the Lines step); green the three process classes 49/49 and the full `./mvnw -B verify` 226 tests; local
+  stack through the API with a real `.xlsx` (three Lines for E1021, E1099 and E1150, none for the rejected E9999, 18 audit rows, ppc-team and supervisor 200, production-planner 403, unknown Work Pack 404, `WP-12` 400, the
+  instance at ServiceTask_CreateDigitalTimesheets with "built by BPA-15").
+- Checks passed: the 6 test names equal the Jira DoD list and each asserts its Gherkin; the re-checked BPA-12 and BPA-22 assertions were not weakened (constant, method and incident-text renames only); the security rule has no
+  HTTP method so HEAD is covered, is decided before the controller (a 403 reveals nothing about a Work Pack), and sits before `anyRequest().authenticated()`; the re-run is idempotent (ON CONFLICT with RETURNING-driven audit, one
+  transaction); the BPA-15 placeholder follows the skill and is excluded in `ProcessTestApplication`.
+- Medium (2):
+  - `intent/README.md` was truncated in the commit (nine rows dropped): the generator run was cut short when the command was stopped; regenerated, it differs from main by the BPA-14 row only.
+  - Nothing proved the snapshot rule against a re-run (a `DO UPDATE` mutant passed everything): the snapshot test now runs the job again after the master changed.
+- Low: the header-missing branch, scope (`WHERE workpack_id`), read ordering and the trailing-slash path had no test: tests added (some passed on first run); the "no Line for E9999" assertion was a tautology and the audit counts
+  used the whole table: fixed; the audit test checked 4 of 6 columns and not the time: all six and `changed_at` now; the insert lacked an order for concurrent jobs: `ORDER BY a.worker_id`; plan header and file list: updated.
+  Left: the 403 of scenario 6 was not seen red (it failed in its set-up; the other-role tests exercise it green); no real two-thread concurrency test (theoretical, not a defect).
+- Not verified by the reviewer: test runs, CI, the local-stack run, the browser.

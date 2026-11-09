@@ -39,8 +39,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * One test per Gherkin scenario, named as in the Jira DoD. The Background: today is 30 Oct 2026 (Asia/Riyadh), Workers E1021 and E1099
  * exist, and the Work Pack is Released, scheduled and printed (assignment_state AwaitingFile) with its instance waiting at
  * IntermediateCatchEvent_AssignmentFileReceived. Work Packs are taken there the real way (AssignmentFlow), as in BPA-12; files come from
- * the AssignmentFileBuilder, never from templates/demo (09 S18, ADR 0009). The next step, ServiceTask_CreateHourJournalLines, is BPA-14: an
- * instance that has Assigned Workers stops there with an incident "built by BPA-14". "Assigned" means a worker_assignment row with those
+ * the AssignmentFileBuilder, never from templates/demo (09 S18, ADR 0009). The next steps, ServiceTask_CreateHourJournalLines (BPA-14) and ServiceTask_CreateDigitalTimesheets (BPA-15): an
+ * instance that has Assigned Workers passes the first and stops at the second with an incident "built by BPA-15". "Assigned" means a worker_assignment row with those
  * hours and the result row reading "Assigned". A rejected-only file sends the instance back through Gateway_HasAssignedWorkers (No) to wait
  * at the catch event again (D5), so one Work Pack can take several files one after another.
  */
@@ -52,7 +52,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class WorkerAssignmentApiTest {
 
     static final String VALIDATE = "ServiceTask_ValidateWorkerAssignment";
-    static final String CREATE_LINES = "ServiceTask_CreateHourJournalLines";
+    static final String TIMESHEETS = "ServiceTask_CreateDigitalTimesheets";
     static final String GATEWAY = "Gateway_HasAssignedWorkers";
     static final String PENDING = "Pending";
 
@@ -111,7 +111,7 @@ class WorkerAssignmentApiTest {
                 String.class, wp.id())).as("created by the uploader (D63), from this file").containsExactly("production-team/" + upload.id());
         assertThat(flow.result(upload).path("rows")).as("the on-screen result (D49, D58)").extracting(r -> r.path("outcome").asText())
                 .containsExactly("Assigned", "Assigned");
-        atBpa14Incident(wp);
+        atBpa15Incident(wp);
     }
 
     @Test
@@ -377,13 +377,13 @@ class WorkerAssignmentApiTest {
                 "the instance of " + wp.number() + " back at the catch event after " + times + " rejected file(s)");
     }
 
-    /** The instance has Assigned Workers, so it passes the gateway and stops at BPA-14's step with its incident. */
-    private void atBpa14Incident(Work wp) {
-        poll(() -> activeIds(wp), ids -> ids.contains(CREATE_LINES), "the instance of " + wp.number() + " at " + CREATE_LINES);
+    /** The instance has Assigned Workers and its Lines (BPA-14), so it stops at BPA-15's step with its incident. */
+    private void atBpa15Incident(Work wp) {
+        poll(() -> activeIds(wp), ids -> ids.contains(TIMESHEETS), "the instance of " + wp.number() + " at " + TIMESHEETS);
         List<JsonNode> incidents = poll(() -> elements(IntegrationApp.admin.post("/v2/incidents/search",
                         Map.of("filter", Map.of("processInstanceKey", Long.toString(wp.instance())))).body().path("items")),
                 list -> !list.isEmpty(), "an incident on the instance of " + wp.number());
-        assertThat(incidents.get(0).path("errorMessage").asText()).contains("built by BPA-14");
+        assertThat(incidents.get(0).path("errorMessage").asText()).contains("built by BPA-15");
     }
 
     /** The Work Pack's assignment_state changes made by BPA-22 (the first audit row, null to AwaitingFile, is the print's). */
