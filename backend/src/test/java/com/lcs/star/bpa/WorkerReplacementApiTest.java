@@ -135,6 +135,67 @@ class WorkerReplacementApiTest {
                 });
         assertThat(history(wp, upload)).as("E1021 is unchanged (no history), E1099 is not removed (no Removed row)")
                 .containsExactly("E1150 0->30 Added replace-02.xlsx");
+        assertThat(line(wp, "E1099")).as("the kept Worker's Journal Line is left alone").isEqualTo("Open 60");
+        assertThat(sheet(wp, "E1099")).as("and so is his time sheet").isEqualTo("Draft");
+        assertThat(flagAudit(wp)).as("the flag is audited (D64)").containsExactly("null->HoursLoadedNotRemoved by production-team");
+    }
+
+    /** Q3: a Worker kept because hours are loaded who is listed again is updated like any other, and the flag stays (data model B14). */
+    @Test
+    void aFlaggedWorkerListedAgainIsUpdatedAndKeepsTheFlag() {
+        Work wp = flow.assignedWorkPack(Map.of("E1021", 40, "E1099", 60));
+        seedHoursLoaded(wp, "E1099", "8");
+        flow.settled(replace(wp, "replace-15-a.xlsx", row(wp, "E1021", 40), row(wp, "E1150", 30)));
+        flow.awaitReassignmentEnd(wp, END_REPLACED, 1);
+        assertThat(flag(wp, "E1099")).isEqualTo("HoursLoadedNotRemoved");
+
+        Upload second = replace(wp, "replace-15-b.xlsx", row(wp, "E1021", 40), row(wp, "E1099", 70), row(wp, "E1150", 30));
+        flow.settled(second);
+        flow.awaitReassignmentEnd(wp, END_REPLACED, 2);
+
+        assertThat(assignments(wp)).containsExactly("E1021=40", "E1099=70", "E1150=30");
+        assertThat(flag(wp, "E1099")).as("the flag stays").isEqualTo("HoursLoadedNotRemoved");
+        assertThat(history(wp, second)).containsExactly("E1099 60->70 Replaced replace-15-b.xlsx");
+        assertThat(line(wp, "E1099")).isEqualTo("Open 70");
+    }
+
+    /** Q2: "hours loaded" is a line with hours above 0: a time sheet with only a 0-hour line is empty, so its Worker is removed and the sheet Cancelled. */
+    @Test
+    void aTimesheetWithOnlyZeroHourLinesDoesNotCountAsHoursLoaded() {
+        Work wp = flow.assignedWorkPack(Map.of("E1021", 40, "E1099", 60));
+        seedHoursLoaded(wp, "E1099", "0");
+
+        flow.settled(replace(wp, "replace-16.xlsx", row(wp, "E1021", 40)));
+        flow.awaitReassignmentEnd(wp, END_REPLACED, 1);
+
+        assertThat(assignments(wp)).as("E1099 is removed").containsExactly("E1021=40");
+        assertThat(sheet(wp, "E1099")).isEqualTo("Cancelled");
+        assertThat(line(wp, "E1099")).startsWith("Closed");
+    }
+
+    /** Q1: reopening a Line and a time sheet does not refresh what was copied when they were created (data model N3, 5.7). */
+    @Test
+    void reopeningDoesNotRefreshTheCopiedRoleDesignationOrCostCentre() {
+        Work wp = flow.assignedWorkPack(Map.of("E1021", 40, "E1099", 60));
+        flow.settled(replace(wp, "replace-17-remove.xlsx", row(wp, "E1021", 40)));
+        flow.awaitReassignmentEnd(wp, END_REPLACED, 1);
+        Map<String, Object> original = jdbc.queryForMap("SELECT role, designation, cost_centre_ref FROM bpa.worker WHERE employee_ref = 'E1099'");
+        jdbc.update("UPDATE bpa.worker SET role = 'Foreman', designation = 'Grade 9', cost_centre_ref = 'STRP02' WHERE employee_ref = 'E1099'"); // by hand
+        try {
+            flow.settled(replace(wp, "replace-17-readd.xlsx", row(wp, "E1021", 40), row(wp, "E1099", 25)));
+            flow.awaitReassignmentEnd(wp, END_REPLACED, 2);
+
+            assertThat(jdbc.queryForObject("""
+                    SELECT l.role || '/' || l.designation FROM bpa.hour_journal_line l JOIN bpa.hour_journal_header h ON h.id = l.header_id
+                    JOIN bpa.worker w ON w.id = l.worker_id WHERE h.workpack_id = ? AND w.employee_ref = 'E1099'""", String.class, wp.id()))
+                    .as("the Line keeps its copied role and designation").isEqualTo(original.get("role") + "/" + original.get("designation"));
+            assertThat(jdbc.queryForObject("""
+                    SELECT t.cost_centre_ref FROM bpa.digital_timesheet t JOIN bpa.worker w ON w.id = t.worker_id WHERE t.workpack_id = ? AND w.employee_ref = 'E1099'""",
+                    String.class, wp.id())).as("and the time sheet its copied cost centre").isEqualTo(original.get("cost_centre_ref"));
+        } finally {
+            jdbc.update("UPDATE bpa.worker SET role = ?, designation = ?, cost_centre_ref = ? WHERE employee_ref = 'E1099'", original.get("role"),
+                    original.get("designation"), original.get("cost_centre_ref"));
+        }
     }
 
     @Test
@@ -289,7 +350,7 @@ class WorkerReplacementApiTest {
 
         Upload back = replace(wp, "replace-11-readd.xlsx", row(wp, "E1021", 40), row(wp, "E1099", 25));
         flow.settled(back);
-        flow.awaitReassignmentEnd(wp, END_REPLACED);
+        flow.awaitReassignmentEnd(wp, END_REPLACED, 2); // the second replacement itself, not the first one's end
 
         assertThat(assignments(wp)).containsExactly("E1021=40", "E1099=25");
         assertThat(lineCount(wp, "E1099")).as("exactly one Journal Line for E1099").isEqualTo(1);
@@ -313,6 +374,9 @@ class WorkerReplacementApiTest {
         Upload again = flow.upload("production-team", "replace-12-copy.xlsx", file);
 
         assertThat(again.body().path("outcome").asText()).isEqualTo("File already processed");
+        for (int i = 0; i < 4; i++) {
+            CamundaSteps.pause(); // the variable search is eventually consistent: give a wrongly started second instance time to show
+        }
         assertThat(flow.reassignmentInstances(wp.number())).as("no second replacement started").hasSize(1);
     }
 
@@ -320,7 +384,7 @@ class WorkerReplacementApiTest {
     @Test
     void theStateAndTheHoursAreAudited() {
         Work wp = flow.assignedWorkPack(Map.of("E1021", 40, "E1099", 60));
-        Upload upload = replace(wp, "replace-13.xlsx", row(wp, "E1021", 50));
+        Upload upload = replace(wp, "replace-13.xlsx", row(wp, "E1021", 50), row(wp, "E1150", 30));
         flow.settled(upload);
         flow.awaitReassignmentEnd(wp, END_REPLACED);
 
@@ -330,6 +394,33 @@ class WorkerReplacementApiTest {
                 SELECT a.old_value || '->' || a.new_value || ' by ' || a.username FROM bpa.audit_log a JOIN bpa.worker_assignment w ON w.id = a.record_id
                 JOIN bpa.worker k ON k.id = w.worker_id WHERE a.table_name = 'worker_assignment' AND a.column_name = 'estimated_hours'
                 AND w.workpack_id = ? AND k.employee_ref = 'E1021' AND a.old_value IS NOT NULL""", String.class, wp.id())).containsExactly("40->50 by production-team");
+        assertThat(jdbc.queryForList("""
+                SELECT a.column_name || ' ' || a.old_value || '->' || coalesce(a.new_value, 'null') || ' by ' || a.username FROM bpa.audit_log a
+                WHERE a.table_name = 'worker_assignment' AND a.new_value IS NULL
+                  AND a.record_id IN (SELECT h.worker_assignment_id FROM bpa.worker_assignment_history h WHERE h.workpack_id = ? AND h.change_type = 'Removed')
+                  AND a.column_name = 'estimated_hours'""", String.class, wp.id())).as("a removed assignment is audited with a null new value")
+                .containsExactly("estimated_hours 60->null by production-team");
+        assertThat(jdbc.queryForList("""
+                SELECT a.column_name || '=' || a.new_value FROM bpa.audit_log a WHERE a.table_name = 'worker_assignment_history'
+                  AND a.record_id IN (SELECT h.id FROM bpa.worker_assignment_history h WHERE h.workpack_id = ? AND h.assignment_file_id = ?::uuid AND h.change_type = 'Removed')
+                  AND a.column_name IN ('change_type', 'old_estimated_hours', 'new_estimated_hours', 'source_file')""", String.class, wp.id(), upload.id()))
+                .as("a history row is audited").containsExactlyInAnyOrder("change_type=Removed", "old_estimated_hours=60", "new_estimated_hours=0", "source_file=replace-13.xlsx");
+        assertThat(jdbc.queryForList("""
+                SELECT a.old_value || '->' || a.new_value || ' by ' || a.username FROM bpa.audit_log a
+                WHERE a.table_name = 'hour_journal_line' AND a.column_name = 'status' AND a.old_value IS NOT NULL
+                  AND a.record_id IN (SELECT l.id FROM bpa.hour_journal_line l JOIN bpa.hour_journal_header h ON h.id = l.header_id WHERE h.workpack_id = ?)""", String.class, wp.id()))
+                .as("the Closed Line is audited").containsExactly("Open->Closed by production-team");
+        assertThat(jdbc.queryForList("""
+                SELECT a.old_value || '->' || a.new_value || ' by ' || a.username FROM bpa.audit_log a
+                WHERE a.table_name = 'digital_timesheet' AND a.column_name = 'submission_status' AND a.old_value IS NOT NULL
+                  AND a.record_id IN (SELECT t.id FROM bpa.digital_timesheet t WHERE t.workpack_id = ?)""", String.class, wp.id()))
+                .as("the Cancelled time sheet is audited").containsExactly("Draft->Cancelled by production-team");
+        assertThat(jdbc.queryForList("""
+                SELECT a.column_name || '=' || a.new_value || ' by ' || a.username FROM bpa.audit_log a
+                WHERE a.table_name = 'hour_journal_line' AND a.column_name = 'role'
+                  AND a.record_id IN (SELECT l.id FROM bpa.hour_journal_line l JOIN bpa.hour_journal_header h ON h.id = l.header_id
+                                      JOIN bpa.worker w ON w.id = l.worker_id WHERE h.workpack_id = ? AND w.employee_ref = 'E1150')""", String.class, wp.id()))
+                .as("the new Line of E1150 is audited with the uploader as user (D63)").containsExactly("role=Rigger by production-team");
     }
 
     /** A job for a Work Pack that is not Replacing is refused with its state in the text and nothing is written (D61). */
@@ -430,6 +521,14 @@ class WorkerReplacementApiTest {
                 WHERE t.workpack_id = ? AND w.employee_ref = ?""", hours, wp.id(), badge);
     }
 
+    /** The audit rows of the flag on this Work Pack's assignments, as "old->new by user". */
+    private List<String> flagAudit(Work wp) {
+        return jdbc.queryForList("""
+                SELECT coalesce(a.old_value, 'null') || '->' || a.new_value || ' by ' || a.username FROM bpa.audit_log a
+                WHERE a.table_name = 'worker_assignment' AND a.column_name = 'flag'
+                  AND a.record_id IN (SELECT id FROM bpa.worker_assignment WHERE workpack_id = ?)""", String.class, wp.id());
+    }
+
     /** The Work Pack's assignment_state changes as "old->new by user" (the print's null -> AwaitingFile is not counted). */
     private List<String> stateChanges(Work wp) {
         return jdbc.queryForList("""
@@ -441,9 +540,10 @@ class WorkerReplacementApiTest {
     private int scopedAuditRows(Work wp) {
         return jdbc.queryForObject("""
                 SELECT count(*) FROM bpa.audit_log a WHERE (a.table_name = 'workpack' AND a.record_id = ?)
+                   OR a.record_id IN (SELECT id FROM bpa.worker_assignment WHERE workpack_id = ?)
                    OR a.record_id IN (SELECT id FROM bpa.worker_assignment_history WHERE workpack_id = ?)
                    OR a.record_id IN (SELECT l.id FROM bpa.hour_journal_line l JOIN bpa.hour_journal_header h ON h.id = l.header_id WHERE h.workpack_id = ?)
-                   OR a.record_id IN (SELECT id FROM bpa.digital_timesheet WHERE workpack_id = ?)""", Integer.class, wp.id(), wp.id(), wp.id(), wp.id());
+                   OR a.record_id IN (SELECT id FROM bpa.digital_timesheet WHERE workpack_id = ?)""", Integer.class, wp.id(), wp.id(), wp.id(), wp.id(), wp.id());
     }
 
     private static ActivatedJob job(long key, Work wp, Upload upload) {

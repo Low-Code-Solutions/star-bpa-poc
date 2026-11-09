@@ -59,6 +59,12 @@ public class AssignmentFileRepository {
         jdbc.update("DELETE FROM bpa.published_message WHERE sha256 = ? AND workpack_number = ?", sha256, workpackNumber);
     }
 
+    /** True while any row of the file for this Work Pack still reads Pending: nothing has answered it yet, so an undo of its start is still its own (BPA-13 review). */
+    public boolean hasPendingRows(UUID fileId, String workpackNumber) {
+        return jdbc.queryForObject("SELECT count(*) FROM bpa.assignment_file_row WHERE assignment_file_id = ? AND workpack_number = ? AND outcome = 'Pending'",
+                Integer.class, fileId, workpackNumber) > 0;
+    }
+
     /**
      * Assigned to Replacing by compare-and-set (D61, C3): true when this call made the change, with one audit row (D64). False when the Work Pack is
      * no longer Assigned (another upload got there first), writing nothing.

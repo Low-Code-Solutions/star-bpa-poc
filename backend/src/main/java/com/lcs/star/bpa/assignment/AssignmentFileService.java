@@ -73,20 +73,35 @@ public class AssignmentFileService {
         for (Claim claim : intake.claimed()) {
             Delivery delivery = delivered(claim, intake.fileId());
             if (delivery != Delivery.DELIVERED) {
-                transaction.executeWithoutResult(status -> {
-                    repository.unclaim(sha256, claim.workpackNumber());
-                    if (claim.replacement()) {
-                        // the Work Pack goes back to Assigned (C3, D75); nothing was started, so the user can send the file again
-                        repository.revertReplacing(claim.workpackNumber(), username, clock.instant().truncatedTo(ChronoUnit.MICROS));
-                        repository.setPendingRowsOutcome(intake.fileId(), claim.workpackNumber(),
-                                delivery == Delivery.NOT_RECEIVED ? REPLACEMENT_IN_PROGRESS : REPLACEMENT_NOT_STARTED);
-                    } else {
-                        repository.setPendingRowsOutcome(intake.fileId(), claim.workpackNumber(), NOT_PROCESSED);
-                    }
-                });
+                try {
+                    transaction.executeWithoutResult(status -> undo(claim, delivery, intake.fileId(), sha256, username));
+                } catch (RuntimeException e) {
+                    // One failed undo must not stop the others of a multi-Work Pack file (BPA-13 review); the log says which Work Pack to look at.
+                    LOG.error("The start of {} (file {}) could not be undone: {}", claim.workpackNumber(), intake.fileId(), e.toString(), e);
+                }
             }
         }
         return intake.fileId();
+    }
+
+    /**
+     * Undoes the start of a routed Work Pack that was not delivered: the claim goes, so the file can be sent again, and the rows say why. A replacement also
+     * goes back from Replacing to Assigned (C3, D75), but only while its rows still read Pending: if the worker has already answered them (the engine did start
+     * the instance although the call looked failed), the replacement ran and nothing is undone (BPA-13 review).
+     */
+    private void undo(Claim claim, Delivery delivery, UUID fileId, String sha256, String username) {
+        if (claim.replacement()) {
+            if (!repository.hasPendingRows(fileId, claim.workpackNumber())) {
+                LOG.warn("The replacement of {} (file {}) was answered although its start looked failed; nothing is undone", claim.workpackNumber(), fileId);
+                return;
+            }
+            repository.revertReplacing(claim.workpackNumber(), username, clock.instant().truncatedTo(ChronoUnit.MICROS));
+            repository.unclaim(sha256, claim.workpackNumber());
+            repository.setPendingRowsOutcome(fileId, claim.workpackNumber(), delivery == Delivery.NOT_RECEIVED ? REPLACEMENT_IN_PROGRESS : REPLACEMENT_NOT_STARTED);
+        } else {
+            repository.unclaim(sha256, claim.workpackNumber());
+            repository.setPendingRowsOutcome(fileId, claim.workpackNumber(), NOT_PROCESSED);
+        }
     }
 
     /** A Work Pack whose rows were routed: a first assignment (AssignmentFileReceived) or a replacement of an Assigned one (AssignmentFileReplaced, BPA-13). */
@@ -103,7 +118,8 @@ public class AssignmentFileService {
         }
         Map<String, String> outcomes = new LinkedHashMap<>();
         List<Claim> claimed = new ArrayList<>();
-        for (String workpackNumber : groups.keySet()) {
+        // In Work Pack order, so two uploads that cover the same Work Packs take their locks in the same order (BPA-13 review).
+        for (String workpackNumber : new java.util.TreeSet<>(groups.keySet())) {
             outcomes.put(workpackNumber, decide(workpackNumber, sha256, username, now, claimed));
         }
         // D73: the file-level line only when every Work Pack in the file was published before.

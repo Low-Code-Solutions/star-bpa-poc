@@ -435,3 +435,18 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Low: BPA-22's state audit rows are asserted in any order (the fixed clock gives both one instant): left; the `ReleaseCheckApiTest` whole-table audit count: scoped; hand-edited seed rows are restored from the read value: fixed; stale comments: fixed; instances left at
   the BPA-14 and BPA-15 steps are not cancelled between classes (noise, not failure) and non-GET methods as supervisor are not tested: left.
 - Not verified by the reviewer: test runs, CI, the local-stack run, the browser, that `variable()` in AssignmentFileApiTest still returns `assignmentFileId` after the instance has ended (the test passes locally).
+
+### BPA-13 at d50f3f9, 9 Nov 2026 (qa-reviewer)
+- Code: 0 High, 4 Medium, 9 Low. Reviewer read BPA-13 in Jira, the plan, the AC (11 scenarios), the BPMN, the schema and every main and test source in the diff; it ran no tests (Docker needed). Author's runs: probe of Camunda's replacement message (second correlate while
+  active: 404 NOT_FOUND, no second instance); red (4f7562d) planner 6 of 6, 4 new upload tests and 12 of 14 process tests failed for the expected reason ("Replacement is not available yet", no reassignment end), two passed against the old code (the Assigning and Replacing rejections, BPA-12's);
+  green the new class 14/14, BPA-14's and BPA-15's classes unchanged, then the full `./mvnw -B verify` 275 tests; local stack through the API with real `.xlsx` files (applied replacement, rejected replacement, duplicate file; both end events completed, no incident).
+- Checks passed: every scenario's text and value matches the AC; the decision table matches the code (unchanged hours write no history but update remarks and file, history hours only, planner order, `compareTo`); the worker's `FOR UPDATE` against the upload's compare-and-set is sound under
+  READ COMMITTED; the message variables and the gateway condition match the BPMN; the BPA-14 and BPA-15 refactors preserve behaviour by reading and by their unchanged tests.
+- Medium (4):
+  - Decision-table cases and audit assertions were untested (Q1, Q2, Q3, a kept Worker left alone, deletes, history, Line and sheet status, the uploader on new Lines): tests added.
+  - The re-add scenario did not wait for its own second instance: `awaitReassignmentEnd(wp, end, n)`.
+  - A failing undo could leave a Work Pack in Replacing and stop the loop: each undo is isolated and logged; the application-stops-in-between window is a known limitation in the plan.
+  - The undo was not tied to its file: it only runs while the file's rows are still Pending; two residual cases are recorded in the plan.
+- Low: stale comment fixed (the ADR 0009 line left for its owner); the plan header refreshed; the probe now completes its leftover instances; a weak negative assertion strengthened; lock order made deterministic. Noted, not changed: the 404 always reads "already in progress", D73 blocks going back to an earlier
+  file's exact bytes, the short window before the instance ends, result rows not audited.
+- Not verified by the reviewer: test runs, CI, the local-stack run, the browser, `coalesce(?, a.created_by)` with a null parameter (it works in the unchanged BPA-14 and BPA-15 tests).

@@ -167,7 +167,7 @@ class AssignmentFileApiTest {
     @Test
     void BPA12_assignmentInProgressRejectsUpload() {
         // Examples: | Assigning | Assignment still in progress; try again later |, | Replacing | Replacement already in progress |
-        // Both states are set by hand: since BPA-15 no process path leaves a Work Pack in Assigning, and BPA-13 (Replacing) is not built.
+        // Both states are set by hand: since BPA-15 no process path leaves a Work Pack in Assigning, and a replacement (BPA-13) is only in Replacing while its worker runs.
         Map<String, String> examples = new LinkedHashMap<>();
         examples.put("Assigning", "Assignment still in progress; try again later");
         examples.put("Replacing", "Replacement already in progress");

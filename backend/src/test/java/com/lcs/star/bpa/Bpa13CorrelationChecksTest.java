@@ -96,5 +96,9 @@ class Bpa13CorrelationChecksTest {
         System.out.println("BPA-13 PROBE correlate after the instance ended: status=" + again.status() + " body=" + again.body());
         assertThat(again.status()).as("correlate after the instance ended: " + again.body()).isEqualTo(200);
         assertThat(again.body().path("processInstanceKey").asText()).isNotEqualTo(instance);
+
+        // leave nothing running at ServiceTask_ReplaceAssignment: a later class with workers would pick these jobs up (BPA-13 review)
+        completeReplaceJob(other.body().path("processInstanceKey").asText());
+        completeReplaceJob(again.body().path("processInstanceKey").asText());
     }
 }

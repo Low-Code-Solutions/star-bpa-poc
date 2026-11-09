@@ -220,8 +220,13 @@ public final class AssignmentFlow {
 
     /** Waits until the replacement of this Work Pack has run to the given end event (END_REPLACED or END_NOT_APPLIED), which also frees the Work Pack's key for the next replacement. */
     public void awaitReassignmentEnd(Work wp, String endElementId) {
-        poll(() -> reassignmentInstances(wp.number()).stream().anyMatch(i -> completed(Long.parseLong(i), endElementId, 1)), done -> done,
-                "the replacement of " + wp.number() + " at " + endElementId);
+        awaitReassignmentEnd(wp, endElementId, 1);
+    }
+
+    /** Waits until this many replacements of the Work Pack have run to the end event: the second replacement is waited for itself, not satisfied by the first one's end. */
+    public void awaitReassignmentEnd(Work wp, String endElementId, int times) {
+        poll(() -> reassignmentInstances(wp.number()).stream().filter(i -> completed(Long.parseLong(i), endElementId, 1)).count() >= times, done -> done,
+                "the replacement #" + times + " of " + wp.number() + " at " + endElementId);
     }
 
     public TestBrowser loggedInAs(String username) {

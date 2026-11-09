@@ -25,6 +25,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -175,6 +176,7 @@ class AssignmentFileServiceTest {
     @Test
     void aReplacementNoInstanceReceivedIsRevertedAndTheRowsSayInProgress() {
         assigned(A);
+        when(repository.hasPendingRows(FILE_ID, A)).thenReturn(true);
         when(camunda.correlate(eq("AssignmentFileReplaced"), eq(A), anyMap())).thenReturn(false); // 404: a reassignment with the key is still running (BPA-13 probe)
 
         service.upload("replace-02.xlsx", file(A), "production-team");
@@ -188,6 +190,8 @@ class AssignmentFileServiceTest {
     void aReplacementWhoseSendFailsIsRevertedAndTheRowsSayItCouldNotBeStarted() {
         assigned(A);
         assigned(B);
+        when(repository.hasPendingRows(FILE_ID, A)).thenReturn(true);
+        when(repository.hasPendingRows(FILE_ID, B)).thenReturn(true);
         when(camunda.correlate(eq("AssignmentFileReplaced"), eq(A), anyMap())).thenThrow(new EngineUnavailableException("Camunda cannot be reached"));
         when(camunda.correlate(eq("AssignmentFileReplaced"), eq(B), anyMap())).thenThrow(new IllegalStateException("Camunda message correlation returned 403"));
 
@@ -212,5 +216,34 @@ class AssignmentFileServiceTest {
         assertThat(outcome.getValue()).isEqualTo("Replacement already in progress");
         verify(repository).unclaim(anyString(), eq(A));
         verify(camunda, never()).correlate(anyString(), anyString(), anyMap());
+    }
+
+    @Test
+    void aReplacementThatWasAnsweredAlthoughItsStartLookedFailedIsNotUndone() {
+        // the engine did start the instance, the HTTP call failed afterwards, and the worker has already answered the rows: undoing now would lie to the user
+        assigned(A);
+        when(camunda.correlate(eq("AssignmentFileReplaced"), eq(A), anyMap())).thenThrow(new EngineUnavailableException("Camunda cannot be reached"));
+        when(repository.hasPendingRows(FILE_ID, A)).thenReturn(false);
+
+        service.upload("replace-05.xlsx", file(A), "production-team");
+
+        verify(repository, never()).revertReplacing(anyString(), anyString(), any());
+        verify(repository, never()).unclaim(anyString(), eq(A));
+        verify(repository, never()).setPendingRowsOutcome(any(), eq(A), anyString());
+    }
+
+    @Test
+    void oneUndoThatFailsDoesNotStopTheUndoOfTheNextWorkPack() {
+        assigned(A);
+        assigned(B);
+        when(repository.hasPendingRows(FILE_ID, A)).thenReturn(true);
+        when(repository.hasPendingRows(FILE_ID, B)).thenReturn(true);
+        when(camunda.correlate(eq("AssignmentFileReplaced"), anyString(), anyMap())).thenReturn(false);
+        Mockito.doThrow(new IllegalStateException("database is down")).when(repository).revertReplacing(eq(A), anyString(), any());
+
+        assertThatCode(() -> service.upload("replace-06.xlsx", file(A, B), "production-team")).as("no 500 for the user").doesNotThrowAnyException();
+
+        verify(repository).revertReplacing(eq(B), eq("production-team"), any());
+        verify(repository).setPendingRowsOutcome(FILE_ID, B, "Replacement already in progress");
     }
 }

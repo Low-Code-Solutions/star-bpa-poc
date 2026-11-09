@@ -1,7 +1,7 @@
 # Plan: BPA-13 Production Team can replace a Work Pack's Worker assignment with a new Excel file
 Jira: BPA-13 (Story, epic BPA-3)
-Story last updated: 2026-11-06T17:06:52.920+0400 (Sprint and Rank only; the content last changed 29 Oct 13:46, by Faraz)
-Status: Approved (Ahsan, Build Lead, 2026-11-09)
+Story last updated: 2026-11-09T17:38 (status moved to In Progress; the content last changed 29 Oct 13:46, by Faraz)
+Status: Closed (2026-11-09); approved by Ahsan, Build Lead, 2026-11-09
 Approver: Ahsan (Build Lead)
 Branch: BPA-13-replace-worker-assignment, from main 2e085e2
 
@@ -253,3 +253,24 @@ No change to the plan: this is the answer the design assumed.
   `Replacing->Assigned`; a second replacement with a rejected row (E1021 60, E9999): rows with the Work Pack message, E9999 "Worker not in worker master data", assignments unchanged; the first file again: "File already processed". Camunda: `EndEvent_AssignmentReplaced` and
   `EndEvent_ReplacementNotApplied` each completed once for the Work Pack, no incident. Not checked in a browser (no portal change).
 - Size: about 11 against the 5 on the story (kept whole by Ahsan, 9 Nov). The backend suite now takes about 30 minutes locally (it was about 20): every new class adds Work Packs that run to the end.
+
+## Review fixes (9 Nov 2026, after the qa-reviewer pass; see REVIEW.md)
+- **A Work Pack must not stay in Replacing (M3):** the undo of a start that was not delivered is now guarded: each Work Pack's undo runs on its own and a failure is logged, so the others of a multi-Work Pack file are still undone. **Known limitation (a Jira question):**
+  the Assigned to Replacing change is committed in the intake transaction and the message is sent after the commit; if the application stops in between, the Work Pack stays Replacing and every later upload reads "Replacement already in progress" until
+  someone sets it back by hand. No sweep is built.
+- **The undo is tied to its own file (M4):** a replacement is reverted only while the file's rows for that Work Pack still read Pending. If the engine did start the instance although the call looked failed and the worker has already answered, nothing is undone (a warning is
+  logged), so the user is not told "could not be started" about a replacement that ran. **Known limitations:** if the worker only runs after the undo, the instance ends at EndEvent_AssignmentReplaced with nothing applied and the user has been told to try again;
+  a very late undo of one upload could still flip another upload's Replacing back to Assigned (the state has no marker of its file).
+- **Lock order (L5):** the Work Packs of a file are decided in Work Pack order, so two uploads that cover the same Work Packs take their locks in the same order.
+- **Tests added for the decision table (M1), most passed on first run because they pin behaviour already built:** a Worker kept because hours are loaded stays Open with a Draft sheet and the flag is audited; a flagged Worker listed again is updated and keeps the flag (Q3);
+  a time sheet with only a 0-hour line is not "hours loaded" (Q2); reopening does not refresh the copied role, designation or cost centre (Q1); the audit rows of deletes (new value null), history rows, the Closed Line, the Cancelled sheet and a new Line's uploader.
+  `scopedAuditRows` now includes the Work Pack's `worker_assignment` rows.
+- **Waits (M2, L3, L4):** `awaitReassignmentEnd(wp, end, n)` waits for the nth replacement to end, so the re-add scenario waits for its own second instance; the probe completes the two instances it leaves running; the "same file again" check gives a wrongly started second instance time to show.
+- **Unit tests:** an undo of a replacement already answered writes nothing, and one failed undo does not stop the next Work Pack.
+- **Stale text (L1):** a comment in `AssignmentFileApiTest` no longer says BPA-13 is not built. `docs/adr/0009-assignment-file-intake.md` line 46 ("BPA-13 files wait for Epic 2 (S18)") is left for its owner: ADRs change by their own decision.
+- **Noted, not changed (Jira questions for Khitaba):**
+  - Q6: the claim for a file's content stays after a successful replacement (D73), so uploading an earlier file's exact bytes to go back (A to B to A) reads "File already processed"; the user changes the file.
+  - A 404 from the engine always reads "Replacement already in progress"; the probe shows the cause is the duplicate key (C3).
+  - Between the job committing and the instance ending there is a short window in which a resend reads "Replacement already in progress".
+  - Result rows are not audited (plan Q4).
+- Final run after the review fixes: full `./mvnw -B verify` 280 tests, 0 failures. No portal change, so no frontend run beyond CI.
