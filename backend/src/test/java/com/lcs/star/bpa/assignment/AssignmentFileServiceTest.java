@@ -25,6 +25,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -146,5 +147,103 @@ class AssignmentFileServiceTest {
         verify(repository).saveFile(eq("assign-08.xlsx"), anyString(), eq("production-team"), any(), eq("File cannot be read"));
         verify(repository, never()).workPack(any());
         verify(camunda, never()).correlate(any(), any(), any());
+    }
+
+    // --- BPA-13: a file for an Assigned Work Pack is a replacement (D61, C3, D75) -------------------------------------------------
+
+    private void assigned(String workpackNumber) {
+        when(repository.workPack(workpackNumber)).thenReturn(Optional.of(new WorkPackState("Released", "Assigned")));
+        when(repository.claim(anyString(), eq(workpackNumber), anyString(), any())).thenReturn(true);
+        when(repository.startReplacing(eq(workpackNumber), anyString(), any())).thenReturn(true);
+    }
+
+    @Test
+    void aFileForAnAssignedWorkPackStartsAReplacementThroughTheReplacementMessage() {
+        assigned(A);
+        when(camunda.correlate(eq("AssignmentFileReplaced"), eq(A), anyMap())).thenReturn(true);
+
+        service.upload("replace-01.xlsx", file(A), "production-team");
+
+        ArgumentCaptor<String> outcome = ArgumentCaptor.forClass(String.class);
+        verify(repository).saveRow(eq(FILE_ID), anyInt(), eq(A), any(), any(), any(), outcome.capture(), anyString(), any());
+        assertThat(outcome.getValue()).as("the rows wait for the worker").isEqualTo("Pending");
+        verify(repository).startReplacing(eq(A), eq("production-team"), any());
+        verify(camunda).correlate(eq("AssignmentFileReplaced"), eq(A), anyMap());
+        verify(camunda, never()).correlate(eq("AssignmentFileReceived"), anyString(), anyMap());
+        verify(repository, never()).revertReplacing(anyString(), anyString(), any());
+    }
+
+    @Test
+    void aReplacementNoInstanceReceivedIsRevertedAndTheRowsSayInProgress() {
+        assigned(A);
+        when(repository.hasPendingRows(FILE_ID, A)).thenReturn(true);
+        when(camunda.correlate(eq("AssignmentFileReplaced"), eq(A), anyMap())).thenReturn(false); // 404: a reassignment with the key is still running (BPA-13 probe)
+
+        service.upload("replace-02.xlsx", file(A), "production-team");
+
+        verify(repository).revertReplacing(eq(A), eq("production-team"), any());
+        verify(repository).unclaim(anyString(), eq(A));
+        verify(repository).setPendingRowsOutcome(FILE_ID, A, "Replacement already in progress");
+    }
+
+    @Test
+    void aReplacementWhoseSendFailsIsRevertedAndTheRowsSayItCouldNotBeStarted() {
+        assigned(A);
+        assigned(B);
+        when(repository.hasPendingRows(FILE_ID, A)).thenReturn(true);
+        when(repository.hasPendingRows(FILE_ID, B)).thenReturn(true);
+        when(camunda.correlate(eq("AssignmentFileReplaced"), eq(A), anyMap())).thenThrow(new EngineUnavailableException("Camunda cannot be reached"));
+        when(camunda.correlate(eq("AssignmentFileReplaced"), eq(B), anyMap())).thenThrow(new IllegalStateException("Camunda message correlation returned 403"));
+
+        assertThatCode(() -> service.upload("replace-03.xlsx", file(A, B), "production-team")).as("no 500 for the user").doesNotThrowAnyException();
+
+        for (String number : new String[] {A, B}) {
+            verify(repository).revertReplacing(eq(number), eq("production-team"), any());
+            verify(repository).unclaim(anyString(), eq(number));
+            verify(repository).setPendingRowsOutcome(FILE_ID, number, "Replacement could not be started; try again");
+        }
+    }
+
+    @Test
+    void aReplacementLostToAConcurrentChangeOfTheStateIsAnsweredInProgressAndNothingIsSent() {
+        assigned(A);
+        when(repository.startReplacing(eq(A), anyString(), any())).thenReturn(false); // the compare-and-set found another state
+
+        service.upload("replace-04.xlsx", file(A), "production-team");
+
+        ArgumentCaptor<String> outcome = ArgumentCaptor.forClass(String.class);
+        verify(repository).saveRow(eq(FILE_ID), anyInt(), eq(A), any(), any(), any(), outcome.capture(), anyString(), any());
+        assertThat(outcome.getValue()).isEqualTo("Replacement already in progress");
+        verify(repository).unclaim(anyString(), eq(A));
+        verify(camunda, never()).correlate(anyString(), anyString(), anyMap());
+    }
+
+    @Test
+    void aReplacementThatWasAnsweredAlthoughItsStartLookedFailedIsNotUndone() {
+        // the engine did start the instance, the HTTP call failed afterwards, and the worker has already answered the rows: undoing now would lie to the user
+        assigned(A);
+        when(camunda.correlate(eq("AssignmentFileReplaced"), eq(A), anyMap())).thenThrow(new EngineUnavailableException("Camunda cannot be reached"));
+        when(repository.hasPendingRows(FILE_ID, A)).thenReturn(false);
+
+        service.upload("replace-05.xlsx", file(A), "production-team");
+
+        verify(repository, never()).revertReplacing(anyString(), anyString(), any());
+        verify(repository, never()).unclaim(anyString(), eq(A));
+        verify(repository, never()).setPendingRowsOutcome(any(), eq(A), anyString());
+    }
+
+    @Test
+    void oneUndoThatFailsDoesNotStopTheUndoOfTheNextWorkPack() {
+        assigned(A);
+        assigned(B);
+        when(repository.hasPendingRows(FILE_ID, A)).thenReturn(true);
+        when(repository.hasPendingRows(FILE_ID, B)).thenReturn(true);
+        when(camunda.correlate(eq("AssignmentFileReplaced"), anyString(), anyMap())).thenReturn(false);
+        Mockito.doThrow(new IllegalStateException("database is down")).when(repository).revertReplacing(eq(A), anyString(), any());
+
+        assertThatCode(() -> service.upload("replace-06.xlsx", file(A, B), "production-team")).as("no 500 for the user").doesNotThrowAnyException();
+
+        verify(repository).revertReplacing(eq(B), eq("production-team"), any());
+        verify(repository).setPendingRowsOutcome(FILE_ID, B, "Replacement already in progress");
     }
 }

@@ -179,6 +179,56 @@ public final class AssignmentFlow {
         }
     }
 
+    // --- BPA-13: replacements ----------------------------------------------------------------------------------------------------
+
+    public static final String END_REPLACED = "EndEvent_AssignmentReplaced";
+    public static final String END_NOT_APPLIED = "EndEvent_ReplacementNotApplied";
+    private static final String REASSIGNMENT = "Process_PPC_WorkerReassignment";
+
+    /** Waits until no row of the upload reads Pending (the worker has answered) and returns the outcomes in file order (an empty text for a row with no outcome of its own). */
+    public List<String> settled(Upload upload) {
+        assertThat(upload.status()).as("upload: " + upload.body()).isEqualTo(201);
+        return poll(() -> elements(result(upload).path("rows")).stream().map(r -> r.path("outcome").asText()).toList(),
+                outcomes -> !outcomes.isEmpty() && !outcomes.contains("Pending"), "the rows of " + upload.id() + " answered");
+    }
+
+    /** A Work Pack taken to Assigned the real way: at AwaitingFile, given a file with these Workers and hours, all accepted, and run to EndEvent_WorkPackAssigned (BPA-22, BPA-14, BPA-15). */
+    public Work assignedWorkPack(java.util.Map<String, ? extends Number> hoursByBadge) {
+        Work wp = awaiting();
+        AssignmentFileBuilder file = AssignmentFileBuilder.assignment();
+        hoursByBadge.entrySet().stream().sorted(java.util.Map.Entry.comparingByKey()).forEach(e -> file.row(wp.number(), e.getKey(), e.getValue()));
+        Upload upload = upload("production-team", "assign-first-" + wp.number() + ".xlsx", file.build());
+        assertThat(settled(upload)).as("every row of the first file is accepted").allMatch("Assigned"::equals);
+        awaitEnd(wp);
+        assertThat(state(wp)).isEqualTo("Assigned");
+        return wp;
+    }
+
+    /** The Process_PPC_WorkerReassignment instances started for this Work Pack number (found by the variable the message carries; the Work Pack's own instance is not one of them). */
+    public List<String> reassignmentInstances(String workpackNumber) {
+        List<String> found = new java.util.ArrayList<>();
+        for (JsonNode variable : elements(IntegrationApp.admin.post("/v2/variables/search",
+                java.util.Map.of("filter", java.util.Map.of("name", "workpackNumber"), "page", java.util.Map.of("limit", 1000))).body().path("items"))) {
+            String instance = variable.path("processInstanceKey").asText();
+            if (variable.path("value").asText().contains(workpackNumber) && !found.contains(instance)
+                    && REASSIGNMENT.equals(IntegrationApp.admin.get("/v2/process-instances/" + instance).body().path("processDefinitionId").asText())) {
+                found.add(instance);
+            }
+        }
+        return found;
+    }
+
+    /** Waits until the replacement of this Work Pack has run to the given end event (END_REPLACED or END_NOT_APPLIED), which also frees the Work Pack's key for the next replacement. */
+    public void awaitReassignmentEnd(Work wp, String endElementId) {
+        awaitReassignmentEnd(wp, endElementId, 1);
+    }
+
+    /** Waits until this many replacements of the Work Pack have run to the end event: the second replacement is waited for itself, not satisfied by the first one's end. */
+    public void awaitReassignmentEnd(Work wp, String endElementId, int times) {
+        poll(() -> reassignmentInstances(wp.number()).stream().filter(i -> completed(Long.parseLong(i), endElementId, 1)).count() >= times, done -> done,
+                "the replacement #" + times + " of " + wp.number() + " at " + endElementId);
+    }
+
     public TestBrowser loggedInAs(String username) {
         TestBrowser browser = new TestBrowser(port);
         HttpResponse<String> login = browser.login(username, PersonaSyncTest.DEMO_PASSWORD);

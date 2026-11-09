@@ -65,11 +65,30 @@ public class DigitalTimesheetRepository {
         }
         Instant at = clock.instant().truncatedTo(ChronoUnit.MICROS);
         Timestamp now = Timestamp.from(at);
+        int created = insertMissing(workpackId, null, now);
+        String username = uploaders.get(0);
+        int moved = jdbc.update("""
+                UPDATE bpa.workpack SET assignment_state = 'Assigned', updated_at = ?, updated_by = ?
+                WHERE id = ? AND assignment_state = 'Assigning'""", now, username, workpackId);
+        if (moved == 1) {
+            jdbc.update("""
+                    INSERT INTO bpa.audit_log (table_name, record_id, column_name, old_value, new_value, username, changed_at)
+                    VALUES ('workpack', ?, 'assignment_state', 'Assigning', 'Assigned', ?, ?)""", workpackId, username, now);
+        }
+        return new Result(Status.DONE, state, created);
+    }
+
+    /**
+     * The insert both the first assignment and a replacement use: a time sheet for every Open Line under the Work Pack that has none, with the coding derived
+     * as in the class comment. {@code forcedUser} null means each Line's own creator (the uploader of the first file, D63); a replacement passes its uploader.
+     * Returns how many time sheets it created; nine audit rows each (seven when the CBS code and cost centre are blank).
+     */
+    private int insertMissing(UUID workpackId, String forcedUser, Timestamp now) {
         List<NewSheet> created = jdbc.query("""
                 INSERT INTO bpa.digital_timesheet (worker_id, workpack_id, journal_line_id, project_ref, wbs_ref, activity_ref, cbs_code_ref,
                                                    cost_centre_ref, submission_status, created_at, created_by, updated_at, updated_by)
                 SELECT l.worker_id, p.id, l.id, wb.project_ref, a.wbs_ref, p.activity_ref, c.cbs_code_ref, w.cost_centre_ref, 'Draft',
-                       ?, l.created_by, ?, l.created_by
+                       ?, coalesce(?, l.created_by), ?, coalesce(?, l.created_by)
                 FROM bpa.hour_journal_line l
                 JOIN bpa.hour_journal_header h ON h.id = l.header_id
                 JOIN bpa.workpack p ON p.id = h.workpack_id
@@ -86,7 +105,7 @@ public class DigitalTimesheetRepository {
                         rs.getObject("workpack_id", UUID.class), rs.getObject("journal_line_id", UUID.class), rs.getString("project_ref"),
                         rs.getString("wbs_ref"), rs.getString("activity_ref"), rs.getString("cbs_code_ref"), rs.getString("cost_centre_ref"),
                         rs.getString("submission_status"), rs.getString("created_by")),
-                now, now, workpackId);
+                now, forcedUser, now, forcedUser, workpackId);
         for (NewSheet sheet : created) {
             audit(sheet.id(), "worker_id", sheet.workerId().toString(), sheet.createdBy(), now);
             audit(sheet.id(), "workpack_id", sheet.workpackId().toString(), sheet.createdBy(), now);
@@ -102,16 +121,35 @@ public class DigitalTimesheetRepository {
             }
             audit(sheet.id(), "submission_status", sheet.submissionStatus(), sheet.createdBy(), now);
         }
-        String username = uploaders.get(0);
-        int moved = jdbc.update("""
-                UPDATE bpa.workpack SET assignment_state = 'Assigned', updated_at = ?, updated_by = ?
-                WHERE id = ? AND assignment_state = 'Assigning'""", now, username, workpackId);
-        if (moved == 1) {
-            jdbc.update("""
-                    INSERT INTO bpa.audit_log (table_name, record_id, column_name, old_value, new_value, username, changed_at)
-                    VALUES ('workpack', ?, 'assignment_state', 'Assigning', 'Assigned', ?, ?)""", workpackId, username, now);
+        return created.size();
+    }
+
+    /**
+     * The time sheets follow the Lines after a replacement (BPA-13; D7, D72), idempotently, after {@code HourJournalLineRepository.syncWithAssignments}:
+     * a time sheet is added for every Open Line that has none (the same insert as the first assignment); the Cancelled time sheet of a Worker who is
+     * assigned again (his Line Open again) is reset to Draft; and the Draft time sheet of a Closed Line is Cancelled when it is empty, which means
+     * no digital_timesheet_line with hours above 0 (the same test as "hours loaded"; ASSUMPTION, plan Q2). The coding of an existing time sheet is a
+     * copy taken at creation and is not refreshed (data model 5.7). The user and time are the replacement's (D63); every change is audited (D64).
+     */
+    @Transactional
+    public void syncWithLines(UUID workpackId, String username, Instant at) {
+        Timestamp now = Timestamp.from(at.truncatedTo(ChronoUnit.MICROS));
+        insertMissing(workpackId, username, now);
+        List<UUID> reopened = jdbc.queryForList("""
+                SELECT t.id FROM bpa.digital_timesheet t JOIN bpa.hour_journal_line l ON l.id = t.journal_line_id
+                WHERE t.workpack_id = ? AND t.submission_status = 'Cancelled' AND l.status = 'Open'""", UUID.class, workpackId);
+        for (UUID id : reopened) {
+            jdbc.update("UPDATE bpa.digital_timesheet SET submission_status = 'Draft', updated_at = ?, updated_by = ? WHERE id = ?", now, username, id);
+            audit(id, "submission_status", "Cancelled", "Draft", username, now);
         }
-        return new Result(Status.DONE, state, created.size());
+        List<UUID> emptyAndClosed = jdbc.queryForList("""
+                SELECT t.id FROM bpa.digital_timesheet t JOIN bpa.hour_journal_line l ON l.id = t.journal_line_id
+                WHERE t.workpack_id = ? AND t.submission_status = 'Draft' AND l.status = 'Closed'
+                  AND NOT EXISTS (SELECT 1 FROM bpa.digital_timesheet_line d WHERE d.digital_timesheet_id = t.id AND d.hours > 0)""", UUID.class, workpackId);
+        for (UUID id : emptyAndClosed) {
+            jdbc.update("UPDATE bpa.digital_timesheet SET submission_status = 'Cancelled', updated_at = ?, updated_by = ? WHERE id = ?", now, username, id);
+            audit(id, "submission_status", "Draft", "Cancelled", username, now);
+        }
     }
 
     /** The time sheets of the Work Pack with this number, by Badge No; empty when it has none yet; no value when there is no such Work Pack. */
@@ -145,5 +183,11 @@ public class DigitalTimesheetRepository {
         jdbc.update("""
                 INSERT INTO bpa.audit_log (table_name, record_id, column_name, old_value, new_value, username, changed_at)
                 VALUES ('digital_timesheet', ?, ?, NULL, ?, ?, ?)""", recordId, column, newValue, username, at);
+    }
+
+    private void audit(UUID recordId, String column, String oldValue, String newValue, String username, Timestamp at) {
+        jdbc.update("""
+                INSERT INTO bpa.audit_log (table_name, record_id, column_name, old_value, new_value, username, changed_at)
+                VALUES ('digital_timesheet', ?, ?, ?, ?, ?, ?)""", recordId, column, oldValue, newValue, username, at);
     }
 }

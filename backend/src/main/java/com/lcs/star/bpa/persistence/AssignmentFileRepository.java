@@ -59,6 +59,39 @@ public class AssignmentFileRepository {
         jdbc.update("DELETE FROM bpa.published_message WHERE sha256 = ? AND workpack_number = ?", sha256, workpackNumber);
     }
 
+    /** True while any row of the file for this Work Pack still reads Pending: nothing has answered it yet, so an undo of its start is still its own (BPA-13 review). */
+    public boolean hasPendingRows(UUID fileId, String workpackNumber) {
+        return jdbc.queryForObject("SELECT count(*) FROM bpa.assignment_file_row WHERE assignment_file_id = ? AND workpack_number = ? AND outcome = 'Pending'",
+                Integer.class, fileId, workpackNumber) > 0;
+    }
+
+    /**
+     * Assigned to Replacing by compare-and-set (D61, C3): true when this call made the change, with one audit row (D64). False when the Work Pack is
+     * no longer Assigned (another upload got there first), writing nothing.
+     */
+    public boolean startReplacing(String workpackNumber, String username, Instant at) {
+        return moveState(workpackNumber, "Assigned", "Replacing", username, at);
+    }
+
+    /** Replacing back to Assigned when the replacement could not be started (C3, D75), with one audit row. */
+    public void revertReplacing(String workpackNumber, String username, Instant at) {
+        moveState(workpackNumber, "Replacing", "Assigned", username, at);
+    }
+
+    private boolean moveState(String workpackNumber, String from, String to, String username, Instant at) {
+        Timestamp when = Timestamp.from(at);
+        List<UUID> moved = jdbc.queryForList("""
+                UPDATE bpa.workpack SET assignment_state = ?, updated_at = ?, updated_by = ?
+                WHERE workpack_number = ? AND assignment_state = ? RETURNING id""", UUID.class, to, when, username, workpackNumber, from);
+        if (moved.isEmpty()) {
+            return false;
+        }
+        jdbc.update("""
+                INSERT INTO bpa.audit_log (table_name, record_id, column_name, old_value, new_value, username, changed_at)
+                VALUES ('workpack', ?, 'assignment_state', ?, ?, ?, ?)""", moved.get(0), from, to, username, when);
+        return true;
+    }
+
     public UUID saveFile(String fileName, String sha256, String uploadedBy, Instant receivedAt, String outcome) {
         Timestamp when = Timestamp.from(receivedAt);
         return jdbc.queryForObject("""
