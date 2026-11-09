@@ -217,3 +217,13 @@ The probe recorded, `./mvnw -B verify` (red first, then green), the local-stack 
 
 ## Human-gap log
 - Local Maven build: map `subst S: "D:\LCS CLaude"` first (lost at reboot); JAVA_HOME per command; Docker Desktop must be running.
+
+## Probe result (9 Nov 2026): Camunda's answers to the replacement message (BPA-25 check 7)
+Recorded by `Bpa13CorrelationChecksTest` (Camunda only, no application workers; the instance waits at ServiceTask_ReplaceAssignment until the test completes its job):
+- **First correlate** of `AssignmentFileReplaced` for a key with no running instance: **200**, a new `Process_PPC_WorkerReassignment` instance starts (7a).
+- **Second correlate for the same key while that instance is active: 404 `NOT_FOUND`**, detail "Command 'CORRELATE' rejected with code 'NOT_FOUND': Expected to find subscription for message with name 'AssignmentFileReplaced' and correlation key '…', but no active
+  subscription was found. A process instance with this correlation key is already active for a message start event with this message name in process IDs [Process_PPC_WorkerReassignment]. Only one active process instance per correlation key is allowed for message
+  start events." No second instance starts (7b). So `CamundaProcessClient.correlate` (200 true, 404 false) already gives "no instance started" for this message, and the upload's revert to "Replacement already in progress" (C3) is built on it as planned.
+- **A different key** starts its own instance (200): the guard is per Work Pack number.
+- **After the instance ended, the same key** starts a new instance (200), so the key is free again (7d).
+No change to the plan: this is the answer the design assumed.
