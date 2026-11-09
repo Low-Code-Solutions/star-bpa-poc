@@ -161,6 +161,8 @@ class DigitalTimesheetApiTest {
         Work wp = ended(flow.awaiting(), Map.of("E1021", 40, "E1099", 60));
         sheetsOf(wp, 2);
         int audit = sheetAuditRows(wp);
+        int stateAudit = stateAuditRows(wp);
+        java.sql.Timestamp updatedAt = updatedAt(wp);
         JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
 
         worker.handle(client, job(81L, wp.instance()));
@@ -172,6 +174,86 @@ class DigitalTimesheetApiTest {
         assertThat(sheetCount(wp, "E1099")).as("and one for E1099").isEqualTo(1);
         assertThat(sheetAuditRows(wp)).as("the re-run adds no audit row").isEqualTo(audit);
         assertThat(flow.state(wp)).isEqualTo("Assigned");
+        assertThat(stateAuditRows(wp)).as("nor a second Assigning -> Assigned audit row").isEqualTo(stateAudit);
+        assertThat(updatedAt(wp)).as("and the Work Pack row is not touched again").isEqualTo(updatedAt);
+    }
+
+    /** The same job again with the state still Assigning (a retry after the time sheets were written but the state was not): it moves the Work Pack on, with one audit row, and writes no time sheet audit. */
+    @Test
+    void aRerunWithTheStateStillAssigningMovesItOnAndWritesNoSheetAudit() {
+        Work wp = ended(flow.awaiting(), Map.of("E1021", 40));
+        sheetsOf(wp, 1);
+        int audit = sheetAuditRows(wp);
+        int stateAudit = stateAuditRows(wp);
+        jdbc.update("UPDATE bpa.workpack SET assignment_state = 'Assigning' WHERE id = ?", wp.id()); // by hand: the state step had not been committed
+
+        worker.handle(Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS), job(86L, wp.instance()));
+
+        assertThat(flow.state(wp)).isEqualTo("Assigned");
+        assertThat(stateAuditRows(wp)).as("one more Assigning -> Assigned audit row").isEqualTo(stateAudit + 1);
+        assertThat(sheetAuditRows(wp)).isEqualTo(audit);
+        assertThat(sheetCount(wp)).isEqualTo(1);
+    }
+
+    /** Only Assigning (the first run) and Assigned (a re-run) are accepted: every other state is refused with its name and nothing changes (D61). */
+    @Test
+    void aJobForAWorkPackInAnotherStateFailsWithItsStateAndChangesNothing() {
+        for (String state : List.of("AwaitingFile", "Replacing")) {
+            Work wp = ended(flow.awaiting(), Map.of("E1021", 40));
+            sheetsOf(wp, 1);
+            int audit = sheetAuditRows(wp);
+            jdbc.update("UPDATE bpa.workpack SET assignment_state = ? WHERE id = ?", state, wp.id()); // by hand: no path puts an ended Work Pack here yet
+            JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+
+            worker.handle(client, job(87L, wp.instance()));
+
+            Mockito.verify(client.newFailCommand(87L)).retries(0);
+            Mockito.verify(client.newFailCommand(87L).retries(0)).errorMessage(wp.number() + " is " + state
+                    + ", not Assigning or Assigned, so its Digital Time sheets cannot be created (D61)");
+            Mockito.verify(client, Mockito.never()).newCompleteCommand(Mockito.anyLong());
+            assertThat(flow.state(wp)).as(state + " is left as it was").isEqualTo(state);
+            assertThat(sheetAuditRows(wp)).isEqualTo(audit);
+        }
+    }
+
+    /** Only Open Lines make a time sheet: with the Line Closed and no time sheet yet, the job fails with no retries and creates nothing; with the time sheet there, a retry still completes (D65). */
+    @Test
+    void closedLinesMakeNoTimesheetButARetryOfAFinishedStepStillCompletes() {
+        Work wp = ended(flow.awaiting(), Map.of("E1021", 40, "E1099", 60));
+        sheetsOf(wp, 2);
+        // by hand: the Lines are Closed (BPA-13 sets that); first a retry of a finished step, with its time sheets in place
+        jdbc.update("UPDATE bpa.hour_journal_line SET status = 'Closed' WHERE header_id IN (SELECT id FROM bpa.hour_journal_header WHERE workpack_id = ?)", wp.id());
+        JobClient finished = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+        worker.handle(finished, job(88L, wp.instance()));
+        Mockito.verify(finished).newCompleteCommand(88L);
+        assertThat(sheetCount(wp)).isEqualTo(2);
+        // then the time sheets are gone and the state is Assigning again: no Open Line, so nothing can be made
+        jdbc.update("DELETE FROM bpa.audit_log WHERE table_name = 'digital_timesheet' AND record_id IN (SELECT id FROM bpa.digital_timesheet WHERE workpack_id = ?)", wp.id());
+        jdbc.update("DELETE FROM bpa.digital_timesheet WHERE workpack_id = ?", wp.id());
+        jdbc.update("UPDATE bpa.workpack SET assignment_state = 'Assigning' WHERE id = ?", wp.id());
+        JobClient none = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
+
+        worker.handle(none, job(89L, wp.instance()));
+
+        Mockito.verify(none.newFailCommand(89L)).retries(0);
+        Mockito.verify(none.newFailCommand(89L).retries(0)).errorMessage(wp.number() + " has no Open Project Hour Journal Line, so its Digital Time sheets cannot be created (BPA-14)");
+        assertThat(sheetCount(wp)).as("a Closed Line makes no time sheet").isZero();
+        assertThat(flow.state(wp)).as("and the state stays Assigning").isEqualTo("Assigning");
+    }
+
+    /** The state change is scoped to the job's own Work Pack: another Work Pack that is also Assigning is left alone (WHERE id). */
+    @Test
+    void aJobMovesOnlyItsOwnWorkPackToAssigned() {
+        Work mine = ended(flow.awaiting(), Map.of("E1021", 40));
+        Work other = ended(flow.awaiting(), Map.of("E1099", 60));
+        sheetsOf(mine, 1);
+        sheetsOf(other, 1);
+        jdbc.update("UPDATE bpa.workpack SET assignment_state = 'Assigning' WHERE id IN (?, ?)", mine.id(), other.id()); // by hand
+
+        worker.handle(Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS), job(90L, mine.instance()));
+
+        assertThat(flow.state(mine)).isEqualTo("Assigned");
+        assertThat(flow.state(other)).as("the other Work Pack is not touched").isEqualTo("Assigning");
     }
 
     @Test
@@ -307,6 +389,7 @@ class DigitalTimesheetApiTest {
         Work wp = ended(flow.awaiting(), Map.of("E1021", 40));
         sheetsOf(wp, 1);
         int audit = sheetAuditRows(wp);
+        String original = jdbc.queryForObject("SELECT cost_centre_ref FROM bpa.worker WHERE employee_ref = 'E1021'", String.class);
         jdbc.update("UPDATE bpa.worker SET cost_centre_ref = 'STRP02' WHERE employee_ref = 'E1021'");
         try {
             JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
@@ -318,7 +401,7 @@ class DigitalTimesheetApiTest {
             assertThat(sheetCount(wp)).isEqualTo(1);
             assertThat(sheetAuditRows(wp)).isEqualTo(audit);
         } finally {
-            jdbc.update("UPDATE bpa.worker SET cost_centre_ref = 'STRP01' WHERE employee_ref = 'E1021'");
+            jdbc.update("UPDATE bpa.worker SET cost_centre_ref = ? WHERE employee_ref = 'E1021'", original);
         }
     }
 
@@ -392,6 +475,17 @@ class DigitalTimesheetApiTest {
         return jdbc.queryForObject("""
                 SELECT count(*) FROM bpa.audit_log a JOIN bpa.digital_timesheet t ON t.id = a.record_id
                 WHERE a.table_name = 'digital_timesheet' AND t.workpack_id = ?""", Integer.class, wp.id());
+    }
+
+    /** The Work Pack's assignment_state audit rows (the transitions of BPA-22 and BPA-15; the print's null -> AwaitingFile is not counted). */
+    private int stateAuditRows(Work wp) {
+        return jdbc.queryForObject("""
+                SELECT count(*) FROM bpa.audit_log WHERE table_name = 'workpack' AND record_id = ? AND column_name = 'assignment_state' AND old_value IS NOT NULL""",
+                Integer.class, wp.id());
+    }
+
+    private java.sql.Timestamp updatedAt(Work wp) {
+        return jdbc.queryForObject("SELECT updated_at FROM bpa.workpack WHERE id = ?", java.sql.Timestamp.class, wp.id());
     }
 
     private static ActivatedJob job(long key, long instance) {

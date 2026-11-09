@@ -167,7 +167,7 @@ class AssignmentFileApiTest {
     @Test
     void BPA12_assignmentInProgressRejectsUpload() {
         // Examples: | Assigning | Assignment still in progress; try again later |, | Replacing | Replacement already in progress |
-        // Both states are set by hand: BPA-22 sets Assigning and BPA-13 sets Replacing, neither is built.
+        // Both states are set by hand: since BPA-15 no process path leaves a Work Pack in Assigning, and BPA-13 (Replacing) is not built.
         Map<String, String> examples = new LinkedHashMap<>();
         examples.put("Assigning", "Assignment still in progress; try again later");
         examples.put("Replacing", "Replacement already in progress");
@@ -253,8 +253,6 @@ class AssignmentFileApiTest {
         assertThat(fileRows()).as("recorded as its own assignment_file row").isEqualTo(filesBefore + 1);
         assertThat(jdbc.queryForObject("SELECT outcome FROM bpa.assignment_file WHERE id = ?::uuid", String.class, again.id())).isEqualTo("File already processed");
         assertThat(claims(sha256(file), wp.number())).as("no message is published again").isEqualTo(1);
-        assertThat(CamundaSteps.completed(wp.instance(), AssignmentFlow.END, 2)).as("and nothing changes in the process: the end was reached once").isFalse();
-        assertThat(activeIds(wp)).as("the instance is not waiting for another file").doesNotContain(CATCH);
     }
 
     @Test

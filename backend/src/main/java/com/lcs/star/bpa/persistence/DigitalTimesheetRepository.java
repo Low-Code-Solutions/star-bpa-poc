@@ -58,7 +58,10 @@ public class DigitalTimesheetRepository {
                 SELECT l.created_by FROM bpa.hour_journal_line l JOIN bpa.hour_journal_header h ON h.id = l.header_id
                 WHERE h.workpack_id = ? AND l.status = 'Open' ORDER BY l.worker_id LIMIT 1""", String.class, workpackId);
         if (uploaders.isEmpty()) {
-            return new Result(Status.NO_LINES, state, 0);
+            // A retry after the process has gone on (BPA-13 may have closed the Lines since) must still complete when the time sheets are there (D65).
+            boolean alreadyDone = ASSIGNED.equals(state) && jdbc.queryForObject(
+                    "SELECT count(*) FROM bpa.digital_timesheet WHERE workpack_id = ?", Integer.class, workpackId) > 0;
+            return alreadyDone ? new Result(Status.DONE, state, 0) : new Result(Status.NO_LINES, state, 0);
         }
         Instant at = clock.instant().truncatedTo(ChronoUnit.MICROS);
         Timestamp now = Timestamp.from(at);

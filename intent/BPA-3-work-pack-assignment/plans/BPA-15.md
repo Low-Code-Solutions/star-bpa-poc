@@ -1,7 +1,7 @@
 # Plan: BPA-15 Supervisor can find a Digital Time sheet ready for each Worker on a Work Pack
 Jira: BPA-15 (Story, epic BPA-3)
 Story last updated: 2026-11-09T13:16:36.003+0400 (status moved to In Progress; the content last changed 2 Nov 13:04)
-Status: Approved (Ahsan, Build Lead, 2026-11-09)
+Status: Closed (2026-11-09); approved by Ahsan, Build Lead, 2026-11-09
 Approver: Ahsan (Build Lead)
 Branch: BPA-15-digital-timesheets, from main 274bd9c
 
@@ -218,3 +218,25 @@ Stubs keep the classes compiling for the red run: a controller that returns an e
   E1099, none for E1150, all Draft), none for E9999, no daily lines; supervisor 200, ppc-team and production-team 403, an unknown Work Pack 404; `assignment_state` Assigned with the audit trail `AwaitingFile->Assigning` then `Assigning->Assigned`; the
   instance completed EndEvent_WorkPackAssigned with no incident. A Work Pack on A-2299 with E1150: one time sheet with Project ID and WBS and no CBS code or cost centre. Not checked in a browser (no portal change).
 - Size: about 3 points against the 2 on the story (see Risks).
+
+## Review fixes (9 Nov 2026, after the qa-reviewer pass; see REVIEW.md)
+- **Retry of a finished step (M3):** `createFor` checked "no Open Line" before anything else, so a retry after the time sheets existed and BPA-13 had closed the Lines would have failed with an incident. It now completes when the Work Pack is Assigned
+  and already has time sheets (D65); with no Open Line and no time sheet it still fails with the BPA-14 message. Tests: a retry with the Lines Closed completes; with the time sheets gone and the state Assigning it fails with its message and writes nothing.
+- **Mutation gaps (M1, M2), tests added:**
+  - a re-run changes neither the `workpack` audit rows nor its `updated_at`;
+  - a re-run with the state still Assigning moves it on with one audit row and writes no time sheet audit;
+  - AwaitingFile and Replacing are refused with their names and nothing changes;
+  - a Closed Line makes no time sheet (the Open filter);
+  - the Assigned update is scoped to the job's own Work Pack.
+
+  Most of these passed on first run because they pin behaviour already built, except the Closed-Lines retry, which exercised the new code above.
+- **BPA-12 test (M4):** "nothing changes in the process" had become two assertions that are always true after an end (`completed(END, 2)` means at least two; an ended instance is never at the catch event). Both are removed; the duplicate guard stays
+  proved by the single claim and "File already processed". The `awaitEnd` Javadoc no longer says "exactly once".
+- **Whole-table counts (L3):** the one other whole-table audit count, in `ReleaseCheckApiTest.snapshotOfWorkPackData`, is scoped to the Work Pack's own rows (its phases, materials and Header). The `digital_timesheet_line` count of zero stays (each class has its own database).
+- **Hand-edited seed rows (L4):** the cost-centre snapshot test and BPA-14's role and designation snapshot test read the original value first and restore that, not a hard-coded one.
+- **Stale text (L6):** the comments in `ProcessTestApplication`, `WorkerAssignmentApiTest` and `AssignmentFileApiTest` no longer call BPA-15 a placeholder or say BPA-22 is not built.
+- **Not changed:**
+  - `BPA22_acceptedRowSetsAssigning` uses `containsExactlyInAnyOrder` for the two state audit rows, because the fixed TestClock gives both the same `changed_at`, so the order cannot be asserted;
+  - instances left at the BPA-14 and BPA-15 service tasks by earlier classes are not cancelled by the `@BeforeAll` (noise in the log, not a failure);
+  - the POST, PUT and DELETE methods are not tested as supervisor.
+- Final run after the review fixes: full `./mvnw -B verify` 250 tests, 0 failures. No portal change, so no frontend run beyond CI.

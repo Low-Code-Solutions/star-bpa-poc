@@ -123,7 +123,7 @@ public final class AssignmentFlow {
         return wp;
     }
 
-    /** The instance has run to EndEvent_WorkPackAssigned (BPA-15): the end of Process_PPC_WorkPackAssignment, completed exactly once. */
+    /** Waits until the instance has run to EndEvent_WorkPackAssigned (BPA-15), the end of Process_PPC_WorkPackAssignment (an end event completes at most once per instance). */
     public void awaitEnd(Work wp) {
         poll(() -> completed(wp.instance(), END, 1), done -> done, "the instance of " + wp.number() + " at " + END);
     }

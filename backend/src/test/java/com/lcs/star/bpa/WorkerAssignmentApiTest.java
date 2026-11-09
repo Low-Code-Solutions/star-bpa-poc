@@ -40,7 +40,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * exist, and the Work Pack is Released, scheduled and printed (assignment_state AwaitingFile) with its instance waiting at
  * IntermediateCatchEvent_AssignmentFileReceived. Work Packs are taken there the real way (AssignmentFlow), as in BPA-12; files come from
  * the AssignmentFileBuilder, never from templates/demo (09 S18, ADR 0009). The next steps, ServiceTask_CreateHourJournalLines (BPA-14) and ServiceTask_CreateDigitalTimesheets (BPA-15): an
- * instance that has Assigned Workers passes the first and stops at the second with an incident "built by BPA-15". "Assigned" means a worker_assignment row with those
+ * instance that has Assigned Workers passes the first and runs through the second, which ends the process at EndEvent_WorkPackAssigned. "Assigned" means a worker_assignment row with those
  * hours and the result row reading "Assigned". A rejected-only file sends the instance back through Gateway_HasAssignedWorkers (No) to wait
  * at the catch event again (D5), so one Work Pack can take several files one after another.
  */

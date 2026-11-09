@@ -20,7 +20,7 @@ import org.springframework.context.annotation.FilterType;
 /**
  * Camunda Process Test application: only the job workers and the models, no database. It sits in a package of its own, as the
  * Camunda Process Test documentation asks, and lists the worker packages it needs. Workers that need the database are left out
- * (BPA-6: SaveWorkPackWorker; BPA-7: HourJournalHeaderWorker; BPA-8: EvaluateReleaseInputsWorker; BPA-9: RecordSignOffWorker; BPA-11: SaveWorkPackScheduleWorker; BPA-10: GenerateWorkPackPrintWorker; BPA-12, BPA-22: ValidateWorkerAssignmentWorker; BPA-14: CreateHourJournalLinesWorker; BPA-15 placeholder: CreateDigitalTimesheetsWorker); the tests that use this app complete those jobs themselves.
+ * (BPA-6: SaveWorkPackWorker; BPA-7: HourJournalHeaderWorker; BPA-8: EvaluateReleaseInputsWorker; BPA-9: RecordSignOffWorker; BPA-11: SaveWorkPackScheduleWorker; BPA-10: GenerateWorkPackPrintWorker; BPA-12, BPA-22: ValidateWorkerAssignmentWorker; BPA-14: CreateHourJournalLinesWorker; BPA-15: CreateDigitalTimesheetsWorker); the tests that use this app complete those jobs themselves.
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {DataSourceAutoConfiguration.class, FlywayAutoConfiguration.class})

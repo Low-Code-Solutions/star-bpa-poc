@@ -290,6 +290,7 @@ class HourJournalLineApiTest {
         Work wp = assigned(Map.of("E1021", 40));
         linesOf(wp, 1);
         int audit = lineAuditRows(wp);
+        Map<String, Object> original = jdbc.queryForMap("SELECT role, designation FROM bpa.worker WHERE employee_ref = 'E1021'");
         jdbc.update("UPDATE bpa.worker SET role = 'Foreman', designation = 'Grade 9' WHERE employee_ref = 'E1021'");
         try {
             // the master changed and the job runs again (a retry): the Line keeps what it was created with, and nothing is written
@@ -304,7 +305,7 @@ class HourJournalLineApiTest {
             assertThat(lineCount(wp, "E1021")).isEqualTo(1);
             assertThat(lineAuditRows(wp)).isEqualTo(audit);
         } finally {
-            jdbc.update("UPDATE bpa.worker SET role = 'Welder', designation = 'Grade 3' WHERE employee_ref = 'E1021'");
+            jdbc.update("UPDATE bpa.worker SET role = ?, designation = ? WHERE employee_ref = 'E1021'", original.get("role"), original.get("designation"));
         }
     }
 
