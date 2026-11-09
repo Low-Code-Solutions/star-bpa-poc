@@ -60,15 +60,30 @@ public class AssignmentFileRepository {
     }
 
     /**
-     * STUB for the red run (L15): Assigned to Replacing by compare-and-set (BPA-13, D61); true when this call made the change. Built in the build step.
+     * Assigned to Replacing by compare-and-set (D61, C3): true when this call made the change, with one audit row (D64). False when the Work Pack is
+     * no longer Assigned (another upload got there first), writing nothing.
      */
     public boolean startReplacing(String workpackNumber, String username, Instant at) {
-        throw new UnsupportedOperationException("BPA-13: built in the build step");
+        return moveState(workpackNumber, "Assigned", "Replacing", username, at);
     }
 
-    /** STUB for the red run (L15): Replacing back to Assigned when the replacement could not be started (C3, D75). Built in the build step. */
+    /** Replacing back to Assigned when the replacement could not be started (C3, D75), with one audit row. */
     public void revertReplacing(String workpackNumber, String username, Instant at) {
-        throw new UnsupportedOperationException("BPA-13: built in the build step");
+        moveState(workpackNumber, "Replacing", "Assigned", username, at);
+    }
+
+    private boolean moveState(String workpackNumber, String from, String to, String username, Instant at) {
+        Timestamp when = Timestamp.from(at);
+        List<UUID> moved = jdbc.queryForList("""
+                UPDATE bpa.workpack SET assignment_state = ?, updated_at = ?, updated_by = ?
+                WHERE workpack_number = ? AND assignment_state = ? RETURNING id""", UUID.class, to, when, username, workpackNumber, from);
+        if (moved.isEmpty()) {
+            return false;
+        }
+        jdbc.update("""
+                INSERT INTO bpa.audit_log (table_name, record_id, column_name, old_value, new_value, username, changed_at)
+                VALUES ('workpack', ?, 'assignment_state', ?, ?, ?, ?)""", moved.get(0), from, to, username, when);
+        return true;
     }
 
     public UUID saveFile(String fileName, String sha256, String uploadedBy, Instant receivedAt, String outcome) {

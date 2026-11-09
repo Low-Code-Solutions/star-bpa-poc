@@ -41,6 +41,9 @@ public class AssignmentFileService {
     static final String FILE_ALREADY_PROCESSED = "File already processed";
     static final String NOT_PROCESSED = "Not processed: Work Pack not ready; resend the file";
     static final String MESSAGE = "AssignmentFileReceived";
+    static final String REPLACED_MESSAGE = "AssignmentFileReplaced";
+    static final String REPLACEMENT_IN_PROGRESS = "Replacement already in progress";
+    static final String REPLACEMENT_NOT_STARTED = "Replacement could not be started; try again";
 
     private static final Logger LOG = LoggerFactory.getLogger(AssignmentFileService.class);
 
@@ -67,18 +70,30 @@ public class AssignmentFileService {
         }
 
         Intake intake = transaction.execute(status -> intake(fileName, sha256, username, now, parsed.rows()));
-        for (String workpackNumber : intake.claimed()) {
-            if (!delivered(workpackNumber, intake.fileId())) {
+        for (Claim claim : intake.claimed()) {
+            Delivery delivery = delivered(claim, intake.fileId());
+            if (delivery != Delivery.DELIVERED) {
                 transaction.executeWithoutResult(status -> {
-                    repository.unclaim(sha256, workpackNumber);
-                    repository.setPendingRowsOutcome(intake.fileId(), workpackNumber, NOT_PROCESSED);
+                    repository.unclaim(sha256, claim.workpackNumber());
+                    if (claim.replacement()) {
+                        // the Work Pack goes back to Assigned (C3, D75); nothing was started, so the user can send the file again
+                        repository.revertReplacing(claim.workpackNumber(), username, clock.instant().truncatedTo(ChronoUnit.MICROS));
+                        repository.setPendingRowsOutcome(intake.fileId(), claim.workpackNumber(),
+                                delivery == Delivery.NOT_RECEIVED ? REPLACEMENT_IN_PROGRESS : REPLACEMENT_NOT_STARTED);
+                    } else {
+                        repository.setPendingRowsOutcome(intake.fileId(), claim.workpackNumber(), NOT_PROCESSED);
+                    }
                 });
             }
         }
         return intake.fileId();
     }
 
-    private record Intake(UUID fileId, List<String> claimed) {
+    /** A Work Pack whose rows were routed: a first assignment (AssignmentFileReceived) or a replacement of an Assigned one (AssignmentFileReplaced, BPA-13). */
+    private record Claim(String workpackNumber, boolean replacement) {
+    }
+
+    private record Intake(UUID fileId, List<Claim> claimed) {
     }
 
     private Intake intake(String fileName, String sha256, String username, Instant now, List<Row> rows) {
@@ -87,7 +102,7 @@ public class AssignmentFileService {
             groups.computeIfAbsent(row.workpackNumber() == null ? "" : row.workpackNumber(), k -> new ArrayList<>()).add(row);
         }
         Map<String, String> outcomes = new LinkedHashMap<>();
-        List<String> claimed = new ArrayList<>();
+        List<Claim> claimed = new ArrayList<>();
         for (String workpackNumber : groups.keySet()) {
             outcomes.put(workpackNumber, decide(workpackNumber, sha256, username, now, claimed));
         }
@@ -106,7 +121,7 @@ public class AssignmentFileService {
     }
 
     /** The outcome of one Work Pack group; for a group that will be sent, the pair is claimed here and the Work Pack added to {@code claimed}. */
-    private String decide(String workpackNumber, String sha256, String username, Instant now, List<String> claimed) {
+    private String decide(String workpackNumber, String sha256, String username, Instant now, List<Claim> claimed) {
         if (workpackNumber.isEmpty()) {
             return "Workpack number is required"; // data model 7.3: an intake outcome, since no instance would ever see the row
         }
@@ -128,35 +143,55 @@ public class AssignmentFileService {
             case "Assigning":
                 return "Assignment still in progress; try again later";
             case "Replacing":
-                return "Replacement already in progress";
+                return REPLACEMENT_IN_PROGRESS;
             case "AwaitingFile":
                 if (!repository.claim(sha256, workpackNumber, username, now)) {
                     return ALREADY_PROCESSED_ROW; // a concurrent identical upload claimed the pair first
                 }
-                claimed.add(workpackNumber);
+                claimed.add(new Claim(workpackNumber, false));
                 return PENDING;
             default:
-                // Assigned: a replacement is BPA-13's. Until it exists the rows say so (ASSUMPTION text).
-                return "Replacement is not available yet";
+                // Assigned: this file is a replacement of the Worker list (BPA-13, D35, D61). Claim the pair (D73), then Assigned -> Replacing by
+                // compare-and-set; the message is sent after the commit (C3).
+                if (!repository.claim(sha256, workpackNumber, username, now)) {
+                    return ALREADY_PROCESSED_ROW;
+                }
+                if (!repository.startReplacing(workpackNumber, username, now)) {
+                    repository.unclaim(sha256, workpackNumber); // the state changed under us: another upload is ahead
+                    return REPLACEMENT_IN_PROGRESS;
+                }
+                claimed.add(new Claim(workpackNumber, true));
+                return PENDING;
         }
     }
 
-    /** Sends AssignmentFileReceived; false when no instance received it, or Camunda could not be reached (ASSUMPTION: the user resends). */
-    private boolean delivered(String workpackNumber, UUID fileId) {
+    /** What happened to the message of one routed Work Pack. */
+    private enum Delivery { DELIVERED, NOT_RECEIVED, FAILED }
+
+    /**
+     * Sends AssignmentFileReceived (a first assignment) or AssignmentFileReplaced (a replacement) with the synchronous correlate call (C3): not received
+     * when no instance took it (nothing waiting, or, for a replacement, one is already running for the key: the BPA-13 probe), failed when Camunda could not
+     * be reached or refused (ASSUMPTION: the user resends).
+     */
+    private Delivery delivered(Claim claim, UUID fileId) {
+        String message = claim.replacement() ? REPLACED_MESSAGE : MESSAGE;
+        String number = claim.workpackNumber();
+        Map<String, Object> variables = claim.replacement() ? Map.of("assignmentFileId", fileId.toString(), "workpackNumber", number)
+                : Map.of("assignmentFileId", fileId.toString());
         try {
-            boolean correlated = camunda.correlate(MESSAGE, workpackNumber, Map.of("assignmentFileId", fileId.toString()));
+            boolean correlated = camunda.correlate(message, number, variables);
             if (!correlated) {
-                LOG.info("{} for {} (file {}): no instance was waiting for it", MESSAGE, workpackNumber, fileId);
+                LOG.info("{} for {} (file {}): no instance took it", message, number, fileId);
             }
-            return correlated;
+            return correlated ? Delivery.DELIVERED : Delivery.NOT_RECEIVED;
         } catch (EngineUnavailableException e) {
-            LOG.warn("{} for {} (file {}) could not be sent: {}", MESSAGE, workpackNumber, fileId, e.getMessage());
-            return false;
+            LOG.warn("{} for {} (file {}) could not be sent: {}", message, number, fileId, e.getMessage());
+            return Delivery.FAILED;
         } catch (RuntimeException e) {
             // Any other failure of the send (a refusal, a bad answer) is "not delivered" too: the claim is undone and the loop goes on
             // with the next Work Pack, so a failed send never leaves a claim that blocks a resend for ever (data model 5.12; found in review).
-            LOG.error("{} for {} (file {}) failed: {}", MESSAGE, workpackNumber, fileId, e.toString(), e);
-            return false;
+            LOG.error("{} for {} (file {}) failed: {}", message, number, fileId, e.toString(), e);
+            return Delivery.FAILED;
         }
     }
 

@@ -347,7 +347,7 @@ class WorkerReplacementApiTest {
         Mockito.verify(client.newFailCommand(93L)).retries(0);
         Mockito.verify(client.newFailCommand(93L).retries(0)).errorMessage(wp.number() + " is Assigned, not Replacing, so its replacement cannot be applied (D61)");
         Mockito.verify(client, Mockito.never()).newCompleteCommand(Mockito.anyLong());
-        assertThat(assignments(wp)).containsExactly("E1021=50", "E1099=60");
+        assertThat(assignments(wp)).as("the replacement had removed E1099 (no hours loaded); the refused job changes nothing more").containsExactly("E1021=50");
     }
 
     // --- helpers ---------------------------------------------------------------------------------------------------------------

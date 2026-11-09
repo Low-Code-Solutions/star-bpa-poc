@@ -75,6 +75,11 @@ public class WorkerAssignmentRepository {
      * (a re-run), writing nothing. Otherwise one audit row per business column, old value null.
      */
     public boolean assign(UUID workpackId, UUID workerId, BigDecimal hours, String remarks, UUID fileId, String username, Instant at) {
+        return insert(workpackId, workerId, hours, remarks, fileId, username, at).isPresent();
+    }
+
+    /** The same insert, answering the new assignment's id (BPA-13 needs it for the history row); empty when the Worker already holds the Work Pack. */
+    public Optional<UUID> insert(UUID workpackId, UUID workerId, BigDecimal hours, String remarks, UUID fileId, String username, Instant at) {
         Timestamp now = Timestamp.from(at);
         List<UUID> inserted = jdbc.queryForList("""
                 INSERT INTO bpa.worker_assignment (workpack_id, worker_id, estimated_hours, remarks, assignment_file_id,
@@ -83,7 +88,7 @@ public class WorkerAssignmentRepository {
                 ON CONFLICT (workpack_id, worker_id) DO NOTHING
                 RETURNING id""", UUID.class, workpackId, workerId, hours, remarks, fileId, now, username, now, username);
         if (inserted.isEmpty()) {
-            return false;
+            return Optional.empty();
         }
         UUID id = inserted.get(0);
         audit("worker_assignment", id, "workpack_id", null, workpackId.toString(), username, now);
@@ -93,7 +98,7 @@ public class WorkerAssignmentRepository {
             audit("worker_assignment", id, "remarks", null, remarks, username, now);
         }
         audit("worker_assignment", id, "assignment_file_id", null, fileId.toString(), username, now);
-        return true;
+        return Optional.of(id);
     }
 
     /** The row's own result, shown by the result screen (D49). */
