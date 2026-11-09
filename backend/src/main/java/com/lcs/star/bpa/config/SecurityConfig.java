@@ -44,7 +44,7 @@ public class SecurityConfig {
     static final String PRODUCTION_PLANNER = "production-planner";
     static final String PRODUCTION_TEAM = "production-team";
 
-    /** Reads the Project Hour Journal Lines with the PPC Team (BPA-14; groups ASSUMPTION in the story, 09 S6). */
+    /** Reads the Project Hour Journal Lines with the PPC Team (BPA-14) and alone the Digital Time sheets (BPA-15); groups ASSUMPTION in the stories, 09 S6. */
     static final String SUPERVISOR = "supervisor";
 
     @Bean
@@ -69,6 +69,9 @@ public class SecurityConfig {
                         // BPA-14 (D39): the Lines are read by the PPC Team and the Supervisor (groups ASSUMPTION in the story); the backend answers
                         // 403 for anyone else (09 S6). Every method, so a HEAD request cannot skip the rule (the BPA-10 lesson).
                         .requestMatchers("/api/v1/hour-journal-lines").hasAnyAuthority(PPC_TEAM, SUPERVISOR)
+                        // BPA-15: the Digital Time sheets are read by the Supervisor only (group ASSUMPTION in the story; no department or project
+                        // scope, BPA-44); 403 for anyone else (09 S6). Every method, so a HEAD request cannot skip the rule.
+                        .requestMatchers("/api/v1/digital-timesheets").hasAuthority(SUPERVISOR)
                         .anyRequest().authenticated())
                 // S26: token in the XSRF-TOKEN cookie (readable by React), sent back as X-XSRF-TOKEN on every state-changing call,
                 // the login included. The plain handler lets React send the cookie value unchanged.

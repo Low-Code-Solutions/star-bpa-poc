@@ -193,3 +193,28 @@ Stubs keep the classes compiling for the red run: a controller that returns an e
 
 ## Human-gap log
 - Local Maven build: map `subst S: "D:\LCS CLaude"` first (lost at reboot); JAVA_HOME per command; Docker Desktop must be running.
+
+## Build notes (9 Nov 2026, as built)
+- Built as planned, with these details:
+  - **Repository:** `persistence/DigitalTimesheetRepository.createFor` runs in one `@Transactional` method: it locks the Work Pack row, refuses a state other than Assigning or Assigned (`WRONG_STATE`) or a Work Pack with no Open Line
+    (`NO_LINES`), then inserts the time sheets with one `INSERT ... SELECT ... ON CONFLICT (worker_id, workpack_id) DO NOTHING RETURNING ...` over the Open Lines joined to the Work Pack, its activity, the WBS, the Worker and (left join) the
+    CBS assignment, writes the audit rows for the rows the insert returned (nine per time sheet, seven when the CBS code and cost centre are blank), and moves Assigning to Assigned with one audit row. The user is the Lines' `created_by`, the
+    uploader of the file (D63).
+  - **Worker:** `CreateDigitalTimesheetsWorker` completes with no variables; the two refusals fail the job with no retries and a message. It stays excluded in `ProcessTestApplication` (it needs the database).
+  - **Endpoint:** `DigitalTimesheetController` implements the generated `TimesheetsApi` (404 "Work Pack not found", 400 for a bad number, `[]` for a Work Pack without time sheets); `SecurityConfig` lets only `supervisor` through on every method.
+  - **Tests:** `DigitalTimesheetApiTest` has the 9 scenario tests and 8 more (the other personas and HEAD, anonymous, a trailing slash, the 400s, the empty list, the audit rows and their time, blank columns writing no audit row, the cost-centre snapshot,
+    the state refusal, scope).
+  - **Re-checked earlier tests:** `AssignmentFlow` gained `awaitEnd(Work)` (waits for EndEvent_WorkPackAssigned) and an activity parameter. In `AssignmentFileApiTest`, `WorkerAssignmentApiTest` and `HourJournalLineApiTest` every wait for "the instance at
+    ServiceTask_CreateDigitalTimesheets with the BPA-15 incident" became `awaitEnd`; `aRoutedInstanceStopsWithTheBpa15Incident` became `aRoutedInstanceRunsToWorkPackAssigned` (the end event completed, no incident, state Assigned).
+    `BPA22_acceptedRowSetsAssigning` now waits for the end and asserts BOTH audit rows (`AwaitingFile->Assigning` and `Assigning->Assigned`, both by production-team) and the final state Assigned: BPA-22's own transition is still proved, by its audit row,
+    but the test no longer sees the state rest at Assigning. The state-guard test waits for the end and sets the state back to Assigning by hand.
+  - **CI failure fixed here (said in the PR):** the `backend-tests` check of PR #35 (BPA-14) failed on BPA-22's `aRetriedJobChangesNothingAndAnswersTheSameCount` ("expected: 80 but was: 86"). It counted the whole `audit_log`, and BPA-14's worker
+    (six audit rows for one new Line) wrote its rows between the snapshot and the check. It passed locally by timing. This story re-checks that test anyway, so the fix is here: it waits for the end of the process and counts only the audit rows of
+    this Work Pack's `worker_assignment` rows. PR #35 was merged with that check red; until this PR merges, main carries the flaky test.
+- Red run (e9fe490): 29 of 69 failed for the expected reasons: the process never reached EndEvent_WorkPackAssigned (`timed out waiting for the instance ... at EndEvent_WorkPackAssigned`), the stub answered 200 where 404 and 400 were expected, and the
+  state-refusal message differed. One test passed against the stub, said in the PR: `aWorkPackWithoutTimesheetsYetAnswersAnEmptyList` (the stub returns an empty list).
+- Green: the four process classes, with one failure of my own making fixed (a count of E1021's time sheets over the whole class database, 9 instead of 2, now limited to the scenario's two Work Packs), and the full `./mvnw -B verify` 246 tests, 0 failures.
+- Local stack (rebuilt bpa-app, through the API with a real `.xlsx`): a Work Pack on A-2201 with E1021 (40), E1099 (60), E1150 (0.01) and a rejected E9999: three time sheets (PRJ-139, WBS 11031, A-2201, CBS-139-PIP-01, cost centre STRP01 for E1021 and
+  E1099, none for E1150, all Draft), none for E9999, no daily lines; supervisor 200, ppc-team and production-team 403, an unknown Work Pack 404; `assignment_state` Assigned with the audit trail `AwaitingFile->Assigning` then `Assigning->Assigned`; the
+  instance completed EndEvent_WorkPackAssigned with no incident. A Work Pack on A-2299 with E1150: one time sheet with Project ID and WBS and no CBS code or cost centre. Not checked in a browser (no portal change).
+- Size: about 3 points against the 2 on the story (see Risks).

@@ -133,8 +133,9 @@ class DigitalTimesheetApiTest {
 
         assertThat(sheetsOf(a, 1)).extracting(s -> s.path("employeeRef").asText() + "/" + s.path("workpackNumber").asText()).containsExactly("E1021/" + a.number());
         assertThat(sheetsOf(b, 1)).extracting(s -> s.path("employeeRef").asText() + "/" + s.path("workpackNumber").asText()).containsExactly("E1021/" + b.number());
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.digital_timesheet t JOIN bpa.worker w ON w.id = t.worker_id WHERE w.employee_ref = 'E1021'",
-                Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM bpa.digital_timesheet t JOIN bpa.worker w ON w.id = t.worker_id
+                WHERE w.employee_ref = 'E1021' AND t.workpack_id IN (?, ?)""", Integer.class, a.id(), b.id())).as("E1021 has one time sheet for each of the two Work Packs").isEqualTo(2);
     }
 
     @Test
