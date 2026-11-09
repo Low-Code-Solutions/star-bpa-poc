@@ -52,7 +52,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class WorkerAssignmentApiTest {
 
     static final String VALIDATE = "ServiceTask_ValidateWorkerAssignment";
-    static final String TIMESHEETS = "ServiceTask_CreateDigitalTimesheets";
     static final String GATEWAY = "Gateway_HasAssignedWorkers";
     static final String PENDING = "Pending";
 
@@ -111,7 +110,7 @@ class WorkerAssignmentApiTest {
                 String.class, wp.id())).as("created by the uploader (D63), from this file").containsExactly("production-team/" + upload.id());
         assertThat(flow.result(upload).path("rows")).as("the on-screen result (D49, D58)").extracting(r -> r.path("outcome").asText())
                 .containsExactly("Assigned", "Assigned");
-        atBpa15Incident(wp);
+        flow.awaitEnd(wp); // BPA-14 and BPA-15 run through: the process ends at EndEvent_WorkPackAssigned
     }
 
     @Test
@@ -264,11 +263,15 @@ class WorkerAssignmentApiTest {
                 AssignmentFileBuilder.assignment().row(wp.number(), "E1021", 40).row(wp.number(), "E9999", 20).build());
 
         assertThat(settled(upload)).containsExactly("Assigned", "Worker not in worker master data");
-        assertThat(flow.state(wp)).isEqualTo("Assigning");
+        // BPA-15 now takes the Work Pack on to Assigned within seconds, so BPA-22's own change is proved by its audit row (D64), and the end state
+        // by the next one: AwaitingFile -> Assigning by this step, then Assigning -> Assigned by BPA-15's.
+        flow.awaitEnd(wp);
         assertThat(jdbc.queryForList("""
                 SELECT old_value || '->' || new_value || ' by ' || username FROM bpa.audit_log
                 WHERE table_name = 'workpack' AND record_id = ? AND column_name = 'assignment_state' AND old_value IS NOT NULL
-                """, String.class, wp.id())).as("D64: one audit row for the state change").containsExactly("AwaitingFile->Assigning by production-team");
+                """, String.class, wp.id())).as("D64: BPA-22's state change, then BPA-15's")
+                .containsExactlyInAnyOrder("AwaitingFile->Assigning by production-team", "Assigning->Assigned by production-team");
+        assertThat(flow.state(wp)).isEqualTo("Assigned");
     }
 
     @Test
@@ -321,15 +324,18 @@ class WorkerAssignmentApiTest {
         Upload upload = flow.upload("production-team", "assign-retry.xlsx",
                 AssignmentFileBuilder.assignment().row(wp.number(), "E1021", 40).row(wp.number(), "E9999", 20).build());
         assertThat(settled(upload)).containsExactly("Assigned", "Worker not in worker master data");
-        int audit = auditRows();
+        // The real instance goes on to BPA-14 and BPA-15 and writes audit rows of its own, so wait for the end and count only this step's rows
+        // (a count of the whole audit_log moved between the snapshot and the check: the BPA-14 CI failure, 9 Nov).
+        flow.awaitEnd(wp);
+        int audit = assignmentAuditRows(wp);
         JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
 
         worker.handle(client, job(51L, wp.instance(), upload.id()));
 
         Mockito.verify(client.newCompleteCommand(51L)).variables(Map.of("assignedWorkerCount", 1));
         assertThat(assignments(wp)).containsExactly(Map.entry("E1021", "40"));
-        assertThat(auditRows()).as("the retry adds no audit row").isEqualTo(audit);
-        assertThat(flow.state(wp)).isEqualTo("Assigning");
+        assertThat(assignmentAuditRows(wp)).as("the retry adds no audit row").isEqualTo(audit);
+        assertThat(flow.state(wp)).as("and does not move the Work Pack on or back").isEqualTo("Assigned");
     }
 
     /** Rows still Pending on a Work Pack that is no longer AwaitingFile are not validated: an incident that says why, nothing saved (D61). */
@@ -338,7 +344,9 @@ class WorkerAssignmentApiTest {
         Work wp = flow.awaiting();
         Upload upload = flow.upload("production-team", "assign-guard.xlsx", AssignmentFileBuilder.assignment().row(wp.number(), "E1021", 40).build());
         assertThat(settled(upload)).containsExactly("Assigned");
+        flow.awaitEnd(wp); // the process has run on to the end (BPA-14, BPA-15); what follows is set by hand
         // by hand, since no process path reaches this: the Work Pack is Assigning and one row is Pending again
+        jdbc.update("UPDATE bpa.workpack SET assignment_state = 'Assigning' WHERE id = ?", wp.id());
         jdbc.update("UPDATE bpa.assignment_file_row SET outcome = 'Pending' WHERE assignment_file_id = ?::uuid", upload.id());
         jdbc.update("DELETE FROM bpa.worker_assignment WHERE workpack_id = ?", wp.id());
         JobClient client = Mockito.mock(JobClient.class, Mockito.RETURNS_DEEP_STUBS);
@@ -377,14 +385,6 @@ class WorkerAssignmentApiTest {
                 "the instance of " + wp.number() + " back at the catch event after " + times + " rejected file(s)");
     }
 
-    /** The instance has Assigned Workers and its Lines (BPA-14), so it stops at BPA-15's step with its incident. */
-    private void atBpa15Incident(Work wp) {
-        poll(() -> activeIds(wp), ids -> ids.contains(TIMESHEETS), "the instance of " + wp.number() + " at " + TIMESHEETS);
-        List<JsonNode> incidents = poll(() -> elements(IntegrationApp.admin.post("/v2/incidents/search",
-                        Map.of("filter", Map.of("processInstanceKey", Long.toString(wp.instance())))).body().path("items")),
-                list -> !list.isEmpty(), "an incident on the instance of " + wp.number());
-        assertThat(incidents.get(0).path("errorMessage").asText()).contains("built by BPA-15");
-    }
 
     /** The Work Pack's assignment_state changes made by BPA-22 (the first audit row, null to AwaitingFile, is the print's). */
     private List<String> stateChanges(Work wp) {
@@ -392,8 +392,11 @@ class WorkerAssignmentApiTest {
                 String.class, wp.id());
     }
 
-    private int auditRows() {
-        return jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log", Integer.class);
+    /** Audit rows of this Work Pack's assignments only: the Lines and time sheets of BPA-14 and BPA-15 write theirs at the same time. */
+    private int assignmentAuditRows(Work wp) {
+        return jdbc.queryForObject("""
+                SELECT count(*) FROM bpa.audit_log a JOIN bpa.worker_assignment w ON w.id = a.record_id
+                WHERE a.table_name = 'worker_assignment' AND w.workpack_id = ?""", Integer.class, wp.id());
     }
 
     private static ActivatedJob job(long key, long instance, String assignmentFileId) {

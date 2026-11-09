@@ -41,7 +41,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * {@code GET /api/v1/hour-journal-lines?workpackNumber=}. One test per Gherkin scenario, named as in the Jira DoD. Today is 30 Oct 2026
  * (Asia/Riyadh). "The assignment is saved" is the real path: a Work Pack at AwaitingFile (AssignmentFlow), an assignment file from the
  * AssignmentFileBuilder (never templates/demo; S18), BPA-22 validating its rows, and the instance moving on to this step. The next step,
- * ServiceTask_CreateDigitalTimesheets, is BPA-15: an instance whose Lines exist stops there with an incident "built by BPA-15". The
+ * ServiceTask_CreateDigitalTimesheets, is BPA-15 (it ends the process at EndEvent_WorkPackAssigned). The
  * readers, ppc-team and supervisor, are an ASSUMPTION in the story (09 S6); the empty list for a Work Pack without Lines is ours.
  */
 @Tag("integration")
@@ -52,7 +52,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class HourJournalLineApiTest {
 
     static final String CREATE_LINES = "ServiceTask_CreateHourJournalLines";
-    static final String TIMESHEETS = "ServiceTask_CreateDigitalTimesheets";
     static final String LINES = "/api/v1/hour-journal-lines?workpackNumber=";
 
     @Container
@@ -106,7 +105,7 @@ class HourJournalLineApiTest {
         assertThat(lines).extracting(l -> l.path("employeeRef").asText() + "/" + l.path("role").asText() + "/" + l.path("designation").asText()
                 + "/" + l.path("status").asText()).containsExactly("E1021/Welder/Grade 3/Open", "E1099/Fitter/Grade 2/Open");
         assertThat(hours(lines)).containsExactly("40", "60");
-        atBpa15Incident(wp);
+        flow.awaitEnd(wp); // BPA-15 runs through: the process ends at EndEvent_WorkPackAssigned
     }
 
     @Test
@@ -119,7 +118,7 @@ class HourJournalLineApiTest {
         List<JsonNode> lines = linesOf(wp, 1);
 
         assertThat(lines).extracting(l -> l.path("employeeRef").asText()).containsExactly("E1021");
-        atBpa15Incident(wp); // the step has finished, so a second Line could no longer arrive
+        flow.awaitEnd(wp); // the step has finished, so a second Line could no longer arrive
         assertThat(linesUnderHeader(wp)).as("one Line under the Header, none for E9999 (it is not in the Worker master, so it has no assignment)").isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.hour_journal_line l JOIN bpa.worker w ON w.id = l.worker_id WHERE w.employee_ref = 'E9999'",
                 Integer.class)).as("no Line exists for E9999").isZero();
@@ -211,8 +210,10 @@ class HourJournalLineApiTest {
         Work other = assigned(Map.of("E1099", 60));
         linesOf(mine, 1);
         linesOf(other, 1);
-        atBpa15Incident(other);
-        // by hand: the other Work Pack is assigned but has no Lines (as if its job had not run yet)
+        flow.awaitEnd(other);
+        // by hand: the other Work Pack is assigned but has no Lines (as if its job had not run yet); its time sheets (BPA-15) reference the Lines, so they go first
+        jdbc.update("DELETE FROM bpa.audit_log WHERE table_name = 'digital_timesheet' AND record_id IN (SELECT id FROM bpa.digital_timesheet WHERE workpack_id = ?)", other.id());
+        jdbc.update("DELETE FROM bpa.digital_timesheet WHERE workpack_id = ?", other.id());
         jdbc.update("DELETE FROM bpa.audit_log WHERE table_name = 'hour_journal_line' AND record_id IN (SELECT l.id FROM bpa.hour_journal_line l JOIN bpa.hour_journal_header h ON h.id = l.header_id WHERE h.workpack_id = ?)", other.id());
         jdbc.update("DELETE FROM bpa.hour_journal_line WHERE header_id IN (SELECT id FROM bpa.hour_journal_header WHERE workpack_id = ?)", other.id());
 
@@ -355,15 +356,6 @@ class HourJournalLineApiTest {
                 SELECT count(*) FROM bpa.audit_log a JOIN bpa.hour_journal_line l ON l.id = a.record_id
                 JOIN bpa.hour_journal_header h ON h.id = l.header_id WHERE a.table_name = 'hour_journal_line' AND h.workpack_id = ?""",
                 Integer.class, wp.id());
-    }
-
-    /** The instance has its Lines, so it passes this step and stops at BPA-15's step with its incident. */
-    private void atBpa15Incident(Work wp) {
-        poll(() -> activeIds(wp), ids -> ids.contains(TIMESHEETS), "the instance of " + wp.number() + " at " + TIMESHEETS);
-        List<JsonNode> incidents = poll(() -> elements(IntegrationApp.admin.post("/v2/incidents/search",
-                        Map.of("filter", Map.of("processInstanceKey", Long.toString(wp.instance())))).body().path("items")),
-                list -> !list.isEmpty(), "an incident on the instance of " + wp.number());
-        assertThat(incidents.get(0).path("errorMessage").asText()).contains("built by BPA-15");
     }
 
     private static ActivatedJob job(long key, long instance) {
