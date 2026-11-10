@@ -111,8 +111,9 @@ send the email):**
 3. **If the mail server is down**, the exception propagates and the Camunda default applies: 3 retries, immediate, then an
    incident (09 S7: no custom backoff).
 - `sent_at` comes from the injected `Clock`. `created_by` / `updated_by` is `bpa-service` (no user in context, D63).
-- Notification rows are POC workflow output and are not audited (they are themselves the record, as the result rows). This is
-  an ASSUMPTION and a question.
+- **Notification rows are audited** (changed at build: data model 6.1 puts the POC-mastered tables of domains B to E in audit scope, and
+  `notification` is domain E): one `audit_log` row per business column of each inserted row (workpack_id, drawing_ref, revision,
+  recipient_username, channel, sent_at), user `bpa-service`. The plan had assumed no audit; the data model decides it.
 - The from-address is `star-bpa@example.com` (ASSUMPTION, in config).
 
 ## Design: `GET /api/v1/me/notifications` (contract exists; `api/NotificationController`)
@@ -184,8 +185,9 @@ test that passes against a stub is named in the PR.
   - `pom.xml` (mail);
   - `application.yml` (mail).
 - Tests:
-  - new `DrawingRevisionApiTest`, `DrawingRevisionMailDownApiTest`, `Bpa16GroupReadChecksTest` (probe), a Mailpit test helper;
-  - `PersonaSyncTest`, if it asserts the exact permission set;
+  - new `DrawingRevisionApiTest`, `DrawingRevisionMailDownApiTest`, `Bpa16GroupReadChecksTest` (probe), `SendRevisionNoticeWorkerTest` (the
+    re-run, text and bad-input unit tests, no database), the helpers `Mailpit` and `RevisionFlow`;
+  - `PersonaSyncTest` (it asserts the exact permission set: GROUP READ added);
   - `ProcessTestApplication` (exclude the two DB/mail workers).
 - Repo: `docker-compose.yml` (Mailpit); `README.md` (Mailpit web on 8025).
 - Docs: `REVIEW.md`, this plan, `intent/README.md` (generated).
@@ -226,7 +228,7 @@ The probe recorded, `./mvnw -B verify` (red first, then green), the local-stack 
 - Q1: `bpa-service` gets GROUP READ on `workpack-owner` and `project-engineer` to find recipients (a change to the S25 set).
 - Q2: the `DrawingRevised` correlation key is `drawingRef/revision`, and the message is sent before the commit, so a failed send
   answers 503 and nothing is recorded.
-- Q3: notification rows are not audited; notices are listed newest first.
+- Q3: notices are listed newest first (notification rows are audited, per data model 6.1; no question).
 - Q4: the from-address `star-bpa@example.com`, and the plain-text body layout.
 - Q5: a recipient with no `app_user` row is skipped with a warning.
 - For Faraz: confirm on BPA-16 the 2 Nov re-approval that the DoR line records.
@@ -251,3 +253,16 @@ The probe recorded, `./mvnw -B verify` (red first, then green), the local-stack 
 - **Labels:** scenario texts say revision "C" in several scenarios; the tests use C, C3, C4, C5, C7, C11 so that each (drawing, revision) pair
   identifies one notice instance and its emails in the shared Camunda and Mailpit. Scenario 1 uses C as written.
 - **Mailpit image pinned:** `axllent/mailpit:v1.32.0` (22 Oct 2026, older than two weeks; `v1.33.x` is newer).
+- **Built (10 Nov 2026), departures from the plan above:**
+  - Notices are audited (see the worker section). Test `BPA16_noticesAreAudited` added.
+  - The two integration classes seed `app_user` from `personas.yaml` into their own database (`RevisionFlow.seedAppUsers`): the persona sync in
+    `IntegrationApp` writes the shared Camunda's database, not the class's. Without it the first run found the group members and skipped them
+    ("has no app_user row": no recipients). In the running app the local-profile sync writes the rows.
+  - The mail-down test counts the worker's own `send(SimpleMailMessage)` calls: the spy also records the sender's internal overloads (first run: 12, not 6).
+  - A job with incomplete variables fails with no retries (like the other workers), tested without a database.
+  - `Superseded revision Z9 not found for DWG-118` is logged by the service (WARN) and the endpoint answers 201.
+  - The 503 test mocks `CamundaProcessClient.correlate`; the real engine-down path (connection refused) maps to the same exception.
+  - The message is correlated with key `drawingRef/revision`; a `false` answer (an active instance holds the key) is treated as the engine not taking
+    the message: rollback and 503.
+  - Compose: `mailpit` (`axllent/mailpit`, `MAILPIT_VERSION` default v1.32.0, SMTP 1025, web 8025); `bpa-app` gets `SPRING_MAIL_HOST=mailpit`. Outside
+    compose the app uses localhost:1025. Config `bpa.mail.from` (ASSUMPTION).
