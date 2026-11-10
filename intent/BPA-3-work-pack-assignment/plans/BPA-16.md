@@ -234,3 +234,11 @@ The probe recorded, `./mvnw -B verify` (red first, then green), the local-stack 
 
 ## Human-gap log
 - Local Maven build: map `subst S: "D:\LCS CLaude"` first (lost at reboot); JAVA_HOME per command; Docker Desktop must be running.
+
+## Build notes
+- **Probe result (10 Nov 2026, `Bpa16GroupReadChecksTest`, Camunda 8.10.1):** `POST /v2/groups/{groupId}/users/search` as `bpa-service`
+  answers **200 with an empty list** when it has no GROUP READ (Camunda filters the search by authorization; it is not an error).
+  After GROUP READ on that group, and without USER READ, it returns the members (`{"items":[{"username":"workpack-owner"}]}`), a few
+  seconds after the permission is created. The plan holds: GROUP READ for the two groups only, no other permission needed.
+  Consequence for the worker: an empty answer cannot tell "no members" from "no permission", so the recipients worker logs a warning
+  when a group answers empty ("group X returned no members; check bpa-service GROUP READ").
