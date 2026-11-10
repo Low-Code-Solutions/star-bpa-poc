@@ -49,6 +49,10 @@ public class PersonaSync implements SmartInitializingSingleton {
         }
         permissions.put("MESSAGE:*", Set.of("CREATE"));
         permissions.put("RESOURCE:*", Set.of("CREATE"));
+        // BPA-16 (ASSUMPTION): read the members of the two groups that receive a drawing-revision notice, and only those. Without GROUP READ
+        // Camunda answers the member search with an empty list (probe, Bpa16GroupReadChecksTest), which would look like "nobody to notify".
+        permissions.put("GROUP:workpack-owner", Set.of("READ"));
+        permissions.put("GROUP:project-engineer", Set.of("READ"));
         SERVICE_PERMISSIONS = Map.copyOf(permissions);
     }
 

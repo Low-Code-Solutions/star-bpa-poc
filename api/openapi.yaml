@@ -700,10 +700,10 @@ paths:
         (S28). Records the revision in the read-only copy, marks `supersededRevision` as Superseded only when the event
         names it and it exists (D45, D53), and publishes DrawingRevised, which starts Process_PPC_DrawingRevisionNotice.
         The revision label is taken as given (D42). No CSRF token is needed: with no session there is nothing for CSRF
-        to protect, so BPA-16 exempts this path from the S26 check (x-assumption; today's SecurityConfig would answer
-        403). Source: BPA-16; 07 §10.
+        to protect, so BPA-16 exempts this one POST path from the S26 check in SecurityConfig (x-assumption). Source: BPA-16;
+        07 §10.
       x-assumption: true
-      x-assumption-note: CSRF-exempt; BPA-16 implements the exemption in SecurityConfig
+      x-assumption-note: CSRF-exempt (implemented in SecurityConfig by BPA-16)
       security: []
       requestBody:
         required: true

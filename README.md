@@ -21,7 +21,7 @@ are in the Jira space **BPA** (lowcodesol.atlassian.net), not in this repo.
 | Database | PostgreSQL 17 (15 or higher): databases `camunda` and `bpa`, schema `bpa` | [ADR 0001](docs/adr/0001-runtime-and-versions.md) |
 | Backend and job workers | Spring Boot 3.5 on Java 21, Flyway migrations, one `bpa-app` service | [ADR 0002](docs/adr/0002-application-stack.md) |
 | Portal | React (Vite, TypeScript, TanStack Query), API types generated from the contract | [ADR 0017](docs/adr/0017-frontend-architecture.md) |
-| Mocks | WireMock 3.9.1 for the systems the POC does not touch | [docs/03-sor-matrix.md](docs/03-sor-matrix.md) |
+| Mocks | WireMock 3.9.1 for the systems the POC does not touch; Mailpit for email | [docs/03-sor-matrix.md](docs/03-sor-matrix.md) |
 
 All decisions are in [docs/09-architecture-decisions.md](docs/09-architecture-decisions.md) and the [ADR index](docs/adr/README.md).
 
@@ -41,6 +41,7 @@ docker compose up -d        # first run builds bpa-app; add --build after pullin
 | BPA app (API and job workers) | http://localhost:8081 | health at `/actuator/health` |
 | Connectors | http://localhost:8086 | |
 | WireMock | http://localhost:8089 | mock partner systems |
+| Mailpit | http://localhost:8025 | mock SMTP inbox (backend sends to port 1025); drawing-revision emails arrive here |
 | PostgreSQL | localhost:5432 | user and passwords in `.env` |
 
 On start-up the app creates the **seeded personas** in Camunda and deploys the BPMN and DMN models from `models/`
