@@ -242,3 +242,12 @@ The probe recorded, `./mvnw -B verify` (red first, then green), the local-stack 
   seconds after the permission is created. The plan holds: GROUP READ for the two groups only, no other permission needed.
   Consequence for the worker: an empty answer cannot tell "no members" from "no permission", so the recipients worker logs a warning
   when a group answers empty ("group X returned no members; check bpa-service GROUP READ").
+- **Tests first (10 Nov 2026):** `DrawingRevisionApiTest` (11 scenarios plus CSRF, missing field, 503 and login checks) and
+  `DrawingRevisionMailDownApiTest` (scenario 12) written against compile-only stubs (`CamundaGroupClient` throws, the `spring-boot-starter-mail`
+  dependency, no endpoint, no workers). Run: 15 of 16 fail, all with **403** (the path is not yet exempt from CSRF and the endpoint does not
+  exist); that is the expected reason for every scenario. `BPA16_noticesNeedALogin` passes at once (401: every `/api` path needs a session
+  today); it guards the rule while the endpoint is built and is named in the PR. The `send-revision-notice` re-run test (mocked `JobClient`)
+  is written with the worker.
+- **Labels:** scenario texts say revision "C" in several scenarios; the tests use C, C3, C4, C5, C7, C11 so that each (drawing, revision) pair
+  identifies one notice instance and its emails in the shared Camunda and Mailpit. Scenario 1 uses C as written.
+- **Mailpit image pinned:** `axllent/mailpit:v1.32.0` (22 Oct 2026, older than two weeks; `v1.33.x` is newer).
