@@ -17,6 +17,10 @@ spring:
     # The contract leaves optional fields out rather than sending null (e.g. Task.confirmMessage, TaskSummary.workpackNumber:
     # "absent"), and the generated models carry no @JsonInclude (BPA-26 review). Values inside free-form maps are kept.
     default-property-inclusion: non_null
+  mail:
+    # Mock SMTP server Mailpit (09 S8; BPA-16). In Docker Compose the backend sets SPRING_MAIL_HOST=mailpit; outside it, the compose port 1025 on localhost.
+    host: localhost
+    port: 1025
   flyway:
     # V1 and the repeatable seed use schema-qualified names; the history table lives in bpa too (BPA-43 plan, Q1 of BPA-42).
     schemas: bpa
@@ -41,6 +45,9 @@ camunda:
       password: ${BPA_SERVICE_PASSWORD:}
 
 bpa:
+  mail:
+    # ASSUMPTION (BPA-16): the sender of the drawing-revision email; no source names one.
+    from: star-bpa@example.com
   camunda:
     # Camunda REST API for the login check and, with profile local or showcase, the S22 persona sync.
     rest-url: ${camunda.client.rest-address}

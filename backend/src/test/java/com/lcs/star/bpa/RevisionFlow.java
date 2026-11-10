@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.lcs.star.bpa.api.TestBrowser;
+import com.lcs.star.bpa.config.PersonaFile;
 import java.net.http.HttpResponse;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -36,6 +38,19 @@ final class RevisionFlow {
     RevisionFlow(int port, JdbcTemplate jdbc) {
         this.port = port;
         this.jdbc = jdbc;
+    }
+
+    /**
+     * The seven personas as app_user rows in this class's own database, as the S22 persona sync writes them at start-up of the local profile (the sync in
+     * IntegrationApp runs against the shared Camunda's database, not this one). The recipients are found by Camunda username and their email is read here (D63).
+     */
+    void seedAppUsers() {
+        for (PersonaFile.Persona persona : PersonaFile.load(new ClassPathResource("personas.yaml")).users()) {
+            jdbc.update("""
+                    INSERT INTO bpa.app_user (username, employee_ref, email, created_by, updated_by)
+                    VALUES (?, ?, ?, 'test', 'test') ON CONFLICT (username) DO NOTHING
+                    """, persona.username(), persona.employeeRef(), persona.email());
+        }
     }
 
     static Instant at(int hoursAfterFirst) {

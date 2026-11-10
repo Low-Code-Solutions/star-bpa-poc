@@ -85,6 +85,15 @@ services:
     networks: [star]
     restart: unless-stopped
 
+  # Mock SMTP server (09 S8; BPA-16): catch-only, the backend sends to mailpit:1025 and the inbox is at http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:${MAILPIT_VERSION:-v1.32.0}
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks: [star]
+    restart: unless-stopped
+
   # Spring Boot backend and job workers (ADR 0002). Build context is the repo root so models/ and templates/ are visible (BPA-43).
   # Profile local runs the S22 persona sync at start-up: as the Camunda admin (CAMUNDA_ADMIN_*) it creates the personas and
   # `bpa-service` (S25), then the app deploys the models and runs its workers as `bpa-service` (ADR 0005).
@@ -104,6 +113,8 @@ services:
       BPA_SERVICE_PASSWORD: ${BPA_SERVICE_PASSWORD:-}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-}
       WIREMOCK_BASE_URL: http://wiremock:8080
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: "1025"
     ports:
       - "8081:8080"
     depends_on:
@@ -112,6 +123,8 @@ services:
       camunda:
         condition: service_healthy
       wiremock:
+        condition: service_started
+      mailpit:
         condition: service_started
     networks: [star]
     restart: unless-stopped

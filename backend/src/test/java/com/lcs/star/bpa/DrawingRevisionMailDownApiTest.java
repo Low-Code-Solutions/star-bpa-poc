@@ -87,6 +87,7 @@ class DrawingRevisionMailDownApiTest {
         clock.set(AssignmentFileApiTest.TODAY);
         flow = new AssignmentFlow(port, jdbc);
         revisions = new RevisionFlow(port, jdbc);
+        revisions.seedAppUsers();
     }
 
     private static long incidents(long instance) {
@@ -94,8 +95,12 @@ class DrawingRevisionMailDownApiTest {
                 Map.of("filter", Map.of("processInstanceKey", Long.toString(instance), "state", "ACTIVE"))).body().path("items")).size();
     }
 
+    /** The worker's own calls, send(SimpleMailMessage): the spy also records the sender's internal calls to its array and MimeMessage overloads. */
     private int sendAttempts() {
-        return (int) Mockito.mockingDetails(mailSender).getInvocations().stream().filter(i -> "send".equals(i.getMethod().getName())).count();
+        return (int) Mockito.mockingDetails(mailSender).getInvocations().stream()
+                .filter(i -> "send".equals(i.getMethod().getName()) && i.getMethod().getParameterTypes().length == 1
+                        && i.getMethod().getParameterTypes()[0] == org.springframework.mail.SimpleMailMessage.class)
+                .count();
     }
 
     @Test

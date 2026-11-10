@@ -100,7 +100,7 @@ class PersonaSyncTest {
         assertThat(permissionsOf("bpa-service")).isEqualTo(permissionsBefore);
     }
 
-    /** BPA-25 comment 10420 (shown to work, not proven minimal), plus RESOURCE CREATE so the app can auto-deploy the models (ASSUMPTION). */
+    /** BPA-25 comment 10420 (shown to work, not proven minimal), plus RESOURCE CREATE so the app can auto-deploy the models (ASSUMPTION), plus GROUP READ on the two notified groups (BPA-16, ASSUMPTION). */
     static Map<String, Set<String>> expectedServicePermissions() {
         Set<String> process = Set.of("READ_USER_TASK", "UPDATE_USER_TASK", "COMPLETE_USER_TASK", "UPDATE_PROCESS_INSTANCE", "CREATE_PROCESS_INSTANCE");
         return Map.of(
@@ -108,7 +108,10 @@ class PersonaSyncTest {
                 "PROCESS_DEFINITION:Process_PPC_WorkerReassignment", process,
                 "PROCESS_DEFINITION:Process_PPC_DrawingRevisionNotice", process,
                 "MESSAGE:*", Set.of("CREATE"),
-                "RESOURCE:*", Set.of("CREATE"));
+                "RESOURCE:*", Set.of("CREATE"),
+                // BPA-16: reads the members of the two groups that receive a drawing-revision notice (probe: without it the search answers an empty list)
+                "GROUP:workpack-owner", Set.of("READ"),
+                "GROUP:project-engineer", Set.of("READ"));
     }
 
     /** Whichever password the shared bpa-service has: the sync's, or the one it had before the sync. */

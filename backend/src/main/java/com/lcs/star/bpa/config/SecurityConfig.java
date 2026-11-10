@@ -19,6 +19,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfToken;
@@ -47,11 +48,17 @@ public class SecurityConfig {
     /** Reads the Project Hour Journal Lines with the PPC Team (BPA-14) and alone the Digital Time sheets (BPA-15); groups ASSUMPTION in the stories, 09 S6. */
     static final String SUPERVISOR = "supervisor";
 
+    /** The mock D365 Document Control event (BPA-16; 09 S28): open, and exempt from the CSRF check. */
+    static final String DRAWING_REVISIONS = "/api/v1/drawing-revisions";
+
     @Bean
     SecurityFilterChain api(HttpSecurity http, ObjectMapper json) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                        // BPA-16 (09 S28; contract security: []): the mock D365 DrawingRevised event has no session, group or API key. Only the POST;
+                        // any other method on the path still needs a login.
+                        .requestMatchers(HttpMethod.POST, DRAWING_REVISIONS).permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         // Error dispatches keep their own status instead of turning into a 401 for anonymous callers.
                         .requestMatchers("/error").permitAll()
@@ -76,6 +83,8 @@ public class SecurityConfig {
                 // S26: token in the XSRF-TOKEN cookie (readable by React), sent back as X-XSRF-TOKEN on every state-changing call,
                 // the login included. The plain handler lets React send the cookie value unchanged.
                 .csrf(csrf -> csrf
+                        // BPA-16 (S28): with no session there is nothing for CSRF to protect; exempt this one POST path and no other.
+                        .ignoringRequestMatchers(PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, DRAWING_REVISIONS))
                         .csrfTokenRepository(csrfTokenRepository())
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
                 .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)

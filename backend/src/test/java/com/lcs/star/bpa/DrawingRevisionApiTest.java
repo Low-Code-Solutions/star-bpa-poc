@@ -113,6 +113,7 @@ class DrawingRevisionApiTest {
         clock.set(AssignmentFileApiTest.TODAY);
         flow = new AssignmentFlow(port, jdbc);
         revisions = new RevisionFlow(port, jdbc);
+        revisions.seedAppUsers();
         // DWG-130 as the Background of the scenarios that use it: revisions A (Superseded) and B (IFC, the latest) only
         jdbc.update("DELETE FROM bpa.drawing_revision WHERE drawing_ref = 'DWG-130' AND revision NOT IN ('A', 'B')");
     }
@@ -300,6 +301,25 @@ class DrawingRevisionApiTest {
     }
 
     // --- the contract and the security rule, not Gherkin scenarios ------------------------------------------------------
+
+    /** Data model 6.1: notification is POC-mastered (domain E), so every row written is audited per business column; no user is in context, so bpa-service. */
+    @Test
+    void BPA16_noticesAreAudited() {
+        flow.released();
+        assertThat(revisions.receive(DWG, "C12", "IFC", at(12), null).statusCode()).isEqualTo(201);
+        awaitMails(DWG, "C12", 2);
+        revisions.awaitEnd(revisions.awaitInstance(DWG, "C12"), END_NOTIFIED);
+
+        List<java.util.UUID> ids = jdbc.queryForList("SELECT id FROM bpa.notification WHERE revision = 'C12'", java.util.UUID.class);
+
+        assertThat(ids).isNotEmpty();
+        for (java.util.UUID id : ids) {
+            assertThat(jdbc.queryForList("SELECT column_name FROM bpa.audit_log WHERE table_name = 'notification' AND record_id = ?", String.class, id))
+                    .containsExactlyInAnyOrder("workpack_id", "drawing_ref", "revision", "recipient_username", "channel", "sent_at");
+            assertThat(jdbc.queryForList("SELECT DISTINCT username FROM bpa.audit_log WHERE table_name = 'notification' AND record_id = ?", String.class, id))
+                    .containsExactly("bpa-service");
+        }
+    }
 
     @Test
     void BPA16_postNeedsNoSessionAndNoCsrfTokenButOtherPostsStillDo() {
