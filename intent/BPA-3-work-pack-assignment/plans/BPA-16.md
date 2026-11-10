@@ -1,7 +1,7 @@
 # Plan: BPA-16 Production / Workpack Owner can be notified when a drawing linked to their Work Pack is revised
 Jira: BPA-16 (Story, epic BPA-3)
 Story last updated: 2026-11-10T11:15 (status moved to In Progress and assignee set; the content last changed 2 Nov 13:04)
-Status: Approved (Ahsan, Build Lead, 2026-11-10)
+Status: Closed (2026-11-10)
 Approver: Ahsan (Build Lead)
 Branch: BPA-16-drawing-revision-notice, from main 831155a
 
@@ -266,3 +266,7 @@ The probe recorded, `./mvnw -B verify` (red first, then green), the local-stack 
     the message: rollback and 503.
   - Compose: `mailpit` (`axllent/mailpit`, `MAILPIT_VERSION` default v1.32.0, SMTP 1025, web 8025); `bpa-app` gets `SPRING_MAIL_HOST=mailpit`. Outside
     compose the app uses localhost:1025. Config `bpa.mail.from` (ASSUMPTION).
+- **Review fixes (10 Nov 2026, qa-reviewer at d99e502; see REVIEW.md):** `management.health.mail.enabled: false` (with the mail server down the public health endpoint
+  answered 503; test `BPA16_appStaysHealthyWhileMailIsDown`, red first); DWG-118 revisions are reset in `@BeforeEach` so no test depends on order and scenario 3 asserts that
+  no revision is Superseded; the mail-down test cancels its instances in `finally`; contract text corrected (the exemption is implemented). The ASSUMPTIONs Q1 to Q5 go to Jira
+  as one comment on Ahsan's yes. Known and left: stale BPMN documentation on ServiceTask_FindRecipients (Khitaba and Faraz to change the model).

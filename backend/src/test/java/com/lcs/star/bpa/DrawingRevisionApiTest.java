@@ -116,6 +116,10 @@ class DrawingRevisionApiTest {
         revisions.seedAppUsers();
         // DWG-130 as the Background of the scenarios that use it: revisions A (Superseded) and B (IFC, the latest) only
         jdbc.update("DELETE FROM bpa.drawing_revision WHERE drawing_ref = 'DWG-130' AND revision NOT IN ('A', 'B')");
+        // DWG-118 likewise: only A (seed) and B (the Background's latest revision, inserted by scenario 1) stay, and B is IFC again, so no test
+        // depends on the order in which the others run (review finding)
+        jdbc.update("DELETE FROM bpa.drawing_revision WHERE drawing_ref = 'DWG-118' AND revision NOT IN ('A', 'B')");
+        jdbc.update("UPDATE bpa.drawing_revision SET status = 'IFC' WHERE drawing_ref = 'DWG-118' AND revision = 'B'");
     }
 
     private static String subject(String drawing, String revision) {
@@ -168,13 +172,13 @@ class DrawingRevisionApiTest {
 
     @Test
     void BPA16_supersededRevisionNotInCopyIsLogged(CapturedOutput output) {
-        List<String> superseded = revisions.supersededRevisions(DWG);
+        assertThat(revisions.supersededRevisions(DWG)).as("none before").isEmpty();
 
         HttpResponse<String> response = revisions.receive(DWG, "C3", "IFC", at(3), "Z9");
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(201);
         assertThat(revisions.latest(DWG)).isEqualTo("C3");
-        assertThat(revisions.supersededRevisions(DWG)).as("no revision of DWG-118 becomes Superseded").isEqualTo(superseded);
+        assertThat(revisions.supersededRevisions(DWG)).as("no revision of DWG-118 is marked Superseded").isEmpty();
         assertThat(output.getAll()).contains("Superseded revision Z9 not found for DWG-118");
     }
 

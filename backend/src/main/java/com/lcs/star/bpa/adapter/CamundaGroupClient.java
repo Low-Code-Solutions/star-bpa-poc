@@ -27,7 +27,7 @@ public class CamundaGroupClient {
                 .build();
     }
 
-    /** The usernames of the group's members (at most 1000), in the order Camunda returns them. */
+    /** The usernames of the group's members, in the order Camunda returns them. At most 1000 are read (one page; ample for the POC's seven personas). */
     public List<String> usernames(String groupId) {
         try {
             return rest.post().uri("/v2/groups/{groupId}/users/search", groupId)

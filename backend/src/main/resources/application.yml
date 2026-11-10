@@ -34,6 +34,12 @@ server:
         same-site: lax
         secure: ${BPA_SESSION_COOKIE_SECURE:false}
 
+management:
+  health:
+    mail:
+      # BPA-16: a mail server that is down must not take /actuator/health down (the app still serves; only the notice jobs get incidents, 09 S7).
+      enabled: false
+
 camunda:
   client:
     mode: self-managed

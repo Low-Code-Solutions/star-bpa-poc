@@ -450,3 +450,19 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Low: stale comment fixed (the ADR 0009 line left for its owner); the plan header refreshed; the probe now completes its leftover instances; a weak negative assertion strengthened; lock order made deterministic. Noted, not changed: the 404 always reads "already in progress", D73 blocks going back to an earlier
   file's exact bytes, the short window before the instance ends, result rows not audited.
 - Not verified by the reviewer: test runs, CI, the local-stack run, the browser, `coalesce(?, a.created_by)` with a null parameter (it works in the unchanged BPA-14 and BPA-15 tests).
+
+### BPA-16 at d99e502, 10 Nov 2026 (qa-reviewer)
+- Code: 0 High, 3 Medium, 8 Low. Reviewer read BPA-16 in Jira, the plan (header matched Jira `updated`), the AC (12 scenarios) and the diff; it ran no tests. Author's runs: probe of the group member read as `bpa-service` (200 with an empty list without GROUP READ, the member with it, no USER READ
+  needed); red (d2943ad) 15 of 16 failed with 403 (path not open, no endpoint), one passed at once (`BPA16_noticesNeedALogin`, 401, named in the PR); green after the build 16 of 16 and the mail-down class; first run found the test databases had no `app_user` rows (seeded from `personas.yaml`) and the mail
+  spy counted 12 sends for 6 attempts (counts only the worker's own `send(SimpleMailMessage)`); full `./mvnw -B verify` 302 tests; local stack: 201, 200 "Revision already received", 404, 400, two emails in Mailpit with the Riyadh time, own notices only (also with `?recipientUsername=`), instance
+  completed, and with Mailpit stopped 2 incidents on SendTask_NotifyRecipients with all in-system notices stored.
+- Checks passed: all 12 test names exist and each asserts its AC; the CSRF exemption and `permitAll` are limited to POST on `/api/v1/drawing-revisions` (another POST with a session still needs the token, GET still needs a login); the message is correlated inside the transaction (a failed send gives 503 and records
+  nothing; `ON CONFLICT DO NOTHING` serialises concurrent duplicates); `find-revision-recipients` is read-only; `send-revision-notice` is idempotent (unique key, `emailRecorded`); notice rows are audited once per inserted row by `bpa-service`; GROUP READ is on the two groups only; times use the injected zone.
+- Medium (3):
+  - The plan's ASSUMPTIONs (Q1 to Q5) are not yet in Jira: drafts shown to Ahsan, posted on his yes (CLAUDE.md write-back rules).
+  - `BPA16_supersededRevisionNotInCopyIsLogged` depended on test order (DWG-118 revisions of other tests, B left Superseded by scenario 1): `@BeforeEach` now keeps only A and B on DWG-118 and sets B to IFC, and the test asserts that no revision is Superseded, as the AC says.
+  - The mail starter adds a health indicator: with the mail server down `/actuator/health` (public) answered 503 (new test `BPA16_appStaysHealthyWhileMailIsDown`, red first); `management.health.mail.enabled: false`.
+- Low: stale contract text ("today's SecurityConfig would answer 403") corrected; comment on the one-page member read; the mail-down test cancels its instances in `finally`. Noted, not changed: the BPMN documentation of ServiceTask_FindRecipients is stale (department and project role; the story says groups), a model change for Khitaba and
+  Faraz; the unknown-status check reads the generated enum's message (`BPA16_unknownStatusIsRejected` would catch a change); `RevisionFlow.instancesFor` searches 1000 variables (works today); the correlation key `drawingRef/revision` is ambiguous if a part contains "/"; a commit failing after a successful send leaves an
+  instance with no recorded revision (D365's retry gets 503 until it ends); the open endpoint accepts any text for the revision label (S28).
+- Not verified by the reviewer: test runs, CI, the local-stack run, whether the mail-down incident text reads well in Operate.

@@ -105,6 +105,15 @@ class DrawingRevisionMailDownApiTest {
 
     @Test
     void BPA16_mailServerDown() {
+        try {
+            mailServerDown();
+        } finally {
+            // leave no instance with incidents in the shared Camunda, whether the asserts passed or not
+            revisions.instancesFor("DWG-118", "MD1").forEach(i -> IntegrationApp.admin.post("/v2/process-instances/" + i + "/cancellation", Map.of()));
+        }
+    }
+
+    private void mailServerDown() {
         Work wp = flow.released();
 
         HttpResponse<String> response = revisions.receive("DWG-118", "MD1", "IFC", RevisionFlow.at(1), null);
@@ -119,7 +128,13 @@ class DrawingRevisionMailDownApiTest {
         assertThat(sendAttempts()).as("3 tries for each of the 2 recipients").isEqualTo(6);
         assertThat(revisions.rows("DWG-118", "MD1", "Email")).as("nothing was sent").isZero();
         assertThat(incidents(instance)).isEqualTo(2);
-        List<Long> leftover = revisions.instancesFor("DWG-118", "MD1");
-        leftover.forEach(i -> IntegrationApp.admin.post("/v2/process-instances/" + i + "/cancellation", Map.of()));
+    }
+
+    /** Review finding: the mail starter adds a health indicator; a mail server that is down must not take /actuator/health (public, S28) down with it. */
+    @Test
+    void BPA16_appStaysHealthyWhileMailIsDown() {
+        var health = new com.lcs.star.bpa.api.TestBrowser(port).get("/actuator/health");
+
+        assertThat(health.statusCode()).as(health.body()).isEqualTo(200);
     }
 }
