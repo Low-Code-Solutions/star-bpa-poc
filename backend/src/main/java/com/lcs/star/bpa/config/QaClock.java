@@ -10,7 +10,8 @@ import java.time.temporal.ChronoUnit;
 /**
  * The QA business date (BPA-81; ADR 0013, 09 S9). Pure helpers for {@link ClockConfig}: reading {@code BPA_CLOCK_TODAY} and making a clock whose
  * business date, read in the business zone, is that date. The offset is whole days, worked out once from the base clock, so the time of day is kept
- * and keeps moving (audit timestamps stay ordered). After midnight in the zone the date rolls on like a real clock.
+ * and keeps moving (audit timestamps stay ordered). After midnight in the zone the date rolls on like a real clock. The offset is exact for a zone
+ * without daylight saving (Asia/Riyadh, 09 S9); in a zone with DST that changes between today and the target, the local time shifts by that hour.
  */
 final class QaClock {
 

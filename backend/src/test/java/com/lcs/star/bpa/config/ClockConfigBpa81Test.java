@@ -49,6 +49,16 @@ class ClockConfigBpa81Test {
         return LocalDate.now(context.getBean(Clock.class).withZone(context.getBean("businessZone", ZoneId.class)));
     }
 
+    /**
+     * The date is read a few milliseconds after start-up. If midnight in the zone fell in between, the clock has rolled on like a real one, and the next
+     * date is accepted (review finding: otherwise the tests could fail once a day at 21:00 UTC).
+     */
+    private static void assertBusinessDate(AssertableApplicationContext context, LocalDate expected) {
+        LocalDate actual = businessDate(context);
+        boolean justRolled = actual.equals(expected.plusDays(1)) && LocalTime.now(context.getBean("businessZone", ZoneId.class)).isBefore(LocalTime.of(0, 1));
+        assertThat(justRolled ? expected : actual).isEqualTo(expected);
+    }
+
     private static void assertIsTheSystemClock(AssertableApplicationContext context) {
         assertThat(context).hasNotFailed();
         assertThat(Duration.between(Instant.now(), context.getBean(Clock.class).instant()).abs()).isLessThan(Duration.ofSeconds(5));
@@ -68,7 +78,7 @@ class ClockConfigBpa81Test {
     void BPA81_qaWithADateGivesThatBusinessDateAndAnOrderedClock() {
         runner(QA, "BPA_CLOCK_TODAY=2026-12-01").run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(businessDate(context)).isEqualTo(DEC_1);
+            assertBusinessDate(context, DEC_1);
             Clock clock = context.getBean(Clock.class);
             Instant first = clock.instant();
             Instant second = clock.instant();
@@ -81,7 +91,7 @@ class ClockConfigBpa81Test {
     void BPA81_businessDateAcrossYearBoundaryAndLeapDay(String date) {
         runner(QA, "BPA_CLOCK_TODAY=" + date).run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(businessDate(context)).isEqualTo(LocalDate.parse(date));
+            assertBusinessDate(context, LocalDate.parse(date));
         });
     }
 
@@ -89,7 +99,7 @@ class ClockConfigBpa81Test {
     void BPA81_qaCombinesWithLocal() {
         runner(new String[] {"qa", "local"}, "BPA_CLOCK_TODAY=2026-12-01").run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(businessDate(context)).isEqualTo(DEC_1);
+            assertBusinessDate(context, DEC_1);
         });
     }
 
@@ -104,7 +114,7 @@ class ClockConfigBpa81Test {
     void BPA81_whitespaceAroundTheDateIsTrimmed() {
         runner(QA, "BPA_CLOCK_TODAY=  2026-12-01 ").run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(businessDate(context)).isEqualTo(DEC_1);
+            assertBusinessDate(context, DEC_1);
         });
     }
 
@@ -135,8 +145,21 @@ class ClockConfigBpa81Test {
         assertThat(kolkata).isEqualTo(Duration.ofDays(19));
         runner(QA, "BPA_CLOCK_TODAY=2026-12-01", "app.business-zone=Asia/Kolkata").run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(businessDate(context)).as("read in the configured zone").isEqualTo(DEC_1);
+            assertBusinessDate(context, DEC_1);
         });
+    }
+
+    @Test
+    void BPA81_theDateRollsOnAfterMidnightInTheZone() {
+        // the offset is set once at start-up: 23:59:59 in Riyadh (20:59:59Z) is still the target date, one second later it is the next day
+        Clock before = Clock.fixed(Instant.parse("2026-11-11T20:59:59Z"), ZoneOffset.UTC);
+        Duration offset = Duration.ofDays(QaClock.days(DEC_1, before, RIYADH));
+
+        Clock qaBefore = Clock.offset(before, offset);
+        Clock qaAfter = Clock.offset(Clock.fixed(Instant.parse("2026-11-11T21:00:00Z"), ZoneOffset.UTC), offset);
+
+        assertThat(LocalDate.ofInstant(qaBefore.instant(), RIYADH)).isEqualTo(DEC_1);
+        assertThat(LocalDate.ofInstant(qaAfter.instant(), RIYADH)).isEqualTo(DEC_1.plusDays(1));
     }
 
     @Test

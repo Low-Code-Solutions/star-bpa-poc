@@ -1,7 +1,7 @@
 # Plan: BPA-81 Settable business date for QA (BPA_CLOCK_TODAY, qa profile only)
 Jira: BPA-81 (task, epic BPA-3)
-Story last updated: 2026-11-11T12:05:49.452+0400
-Status: Approved (Ahsan, Build Lead, 2026-11-11)
+Story last updated: 2026-11-11T13:27:53.938+0400 (status moved to In Progress; description and comment 10517 unchanged since 12:05:49)
+Status: Closed (2026-11-11)
 Approver: Ahsan (Build Lead)
 Branch: BPA-81-qa-business-date, from main f285571
 
@@ -117,3 +117,23 @@ Red-then-green output of `ClockConfigBpa81Test`; `git diff --stat main` showing 
 - **Zain:** how to set the date: the two `.env` lines above and `docker compose up -d bpa-app`; changing the date means restarting `bpa-app`.
 - **Browser check (cannot be run here):** with the date set, the Create Work Pack screen's date checks (see the risk above).
 - Docker Desktop and the stack are not needed for the unit tests; the full `./mvnw -B verify` needs Docker (Testcontainers) and `subst S:` plus `JAVA_HOME` per the local build notes.
+
+## Proof (11 Nov 2026)
+- **Red first (commit 17a44f6):** `ClockConfigBpa81Test` against the unchanged `ClockConfig` and a compile-only `QaClock`: 21 tests, **20 failed for the expected reasons** (the business date stayed 2026-11-11 because the variable was ignored; no WARN; a malformed value did not stop start-up; the `QaClock` stub threw "not built yet"). One passed at once, `unsetOrEmptyVariableKeepsTheSystemClockWithoutAWarning`: it guards that nothing changes when the variable is unset.
+- **Green (eed6388):** 15 of 21 on the first run; the 6 failures were all the malformed-value test. Its root cause was the date parser's own text ("Invalid date 'FEBRUARY 30'"), which names neither the variable nor the value; the chained cause was dropped, so the root cause is the clear message. Then 21 of 21. After review, 22 of 22.
+- **Existing tests unchanged:** `git diff --stat main..HEAD` shows no change to any of the 14 clock-replacing classes or any other test file; full `./mvnw -B verify`: **324 tests, 0 failures, 0 errors** (before the review fixes, which touch only the new test class, a Javadoc and `.env.example`).
+- **Compose:** `docker compose config` with nothing set renders `SPRING_PROFILES_ACTIVE: local` and `BPA_CLOCK_TODAY: ""` (unchanged behaviour); with `BPA_PROFILES=local,qa BPA_CLOCK_TODAY=2026-12-01` it renders `local,qa` and the date. The stack was not launched (the manual check is in the human-gap log).
+
+## Build notes
+- Departures from the design above, all recorded here: `QaClock.days()` was added (the WARN and `offsetTo` share it); extra tests (whitespace, no profile at all, a malformed value without `qa` is ignored, the date rolling on after midnight); the parse error no longer chains the `DateTimeParseException`.
+- **Q1 (compose profile variable)** was built as recommended, as part of the approved plan: `SPRING_PROFILES_ACTIVE: ${BPA_PROFILES:-local}`.
+- The branch already existed at f285571 (no commits) and the first commit on it is the plan.
+- BPA-80's PR #39 was merged while its backend-tests were still running; they finished green (all six checks).
+
+## Review (qa-reviewer at eed6388, 11 Nov 2026) and what was done
+No Important finding. Fixed: the tests that read the real clock after start-up could fail once a day if Riyadh midnight (21:00 UTC) fell in the few milliseconds between start-up and the read (`assertBusinessDate` now accepts the rolled-on date within a minute after midnight); a test for "the date rolls on after midnight in the zone" (`BPA81_theDateRollsOnAfterMidnightInTheZone`); the Javadoc says the offset is exact only for a zone without DST (Riyadh); `.env.example` warns that a shell variable overrides `.env` and that `BPA_PROFILES=qa` alone drops `local`.
+Recorded, not changed:
+- A WARN for "qa active, no date set": the approved plan says an unset value is silent; harmless.
+- A QA stack running past midnight in the zone rolls past the date it was set to; restart to hold it (in `.env.example`).
+- Data written under one QA date and read after a restart with another can look out of order (a consequence of the offset).
+- The portal's browser-based "today" (Q6) and the README/ADR 0013 line (Q7) stay open decisions for the PO and Ahsan.
