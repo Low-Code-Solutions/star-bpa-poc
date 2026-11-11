@@ -119,3 +119,28 @@ against the "red" state first (no portal on :3000), then green.
 - A real browser check (I have none here): open http://localhost:3000, log in as a persona, see the task list, hard-reload a deep link such as /tasks/123. Ahsan or Zain.
 - Docker Desktop must be running; the scratch clone needs a few minutes for the first image builds (the backend image is built from source).
 - Hand-off to Zain after merge: `git pull` on main, `docker compose up -d --build`, open http://localhost:3000.
+
+## Proof (11 Nov 2026, evidence for the Done-when table)
+Red first: before any change `http://localhost:3000` was refused (curl 000) and `docker compose config --services` listed no `frontend`.
+Pinned: `node:24.22.1-alpine3.23` (21 Oct) and `nginx:1.31.7-alpine` (15 Oct), both older than two weeks.
+Image build context: 420 kB (frontend/ and api/openapi.yaml only, via `frontend/Dockerfile.dockerignore`); `vite build` ran inside the image.
+Proof script (kept outside the repo): `proof-bpa80.sh quick|full`, every call through http://localhost:3000.
+
+| # | Result |
+|---|---|
+| 1 | **Clean checkout.** `git clone` of the branch (commit 229c268, 0 modified files, no node_modules or dist), `.env` copied from `.env.example`, project `bpa80scratch`, `docker compose up -d --build`: all 7 services up; `GET :3000/` is 200 `text/html` from nginx/1.31.7; `/assets/index-*.js` is 200 `application/javascript` |
+| 2 | **7 personas**, each: `GET /api/v1/me` 401 (and the XSRF cookie) → login 200 → `/me` shows that username and its group → logout 204 → `/me` 401. All 7 rows identical in shape, on the clean stack and on the running stack |
+| 3 | **CSRF.** `POST /api/v1/workpacks` as `time-method-analyst`: with `X-XSRF-TOKEN` **201**; without it **403** ("Your groups do not allow this call, or the CSRF token is missing") |
+| 4 | **Deep link.** `GET /tasks/2251799813784803` and `/some/deep/link`: 200 `text/html` with the portal's root element. `GET /api/v1/nothing-here`: 401 `application/problem+json`, no `index.html` |
+| 5 | CI: see the PR (six checks, read from `gh pr view`) |
+| 6 | **Cookies.** The three `Set-Cookie` headers of a login (`XSRF-TOKEN; Path=/`, `JSESSIONID; Path=/; HttpOnly; SameSite=Lax`, `XSRF-TOKEN; Path=/`) are identical through :3000 and straight to :8081: no `Secure`, no domain, nothing rewritten |
+| 7 | **Uploads.** A 2 MB file through :3000 as `production-team`: **201** with the app's own file-level outcome ("File cannot be read"), not nginx's 413. An ordinary `.xlsx`: **201** with row outcomes ("Work Pack not found" on the empty scratch database) |
+| 8 | **Backend address change.** `bpa-app` was stopped, its address taken by a throwaway container, and it came back on **172.18.0.9** (was .7). `GET :3000/api/v1/me` answered 502 for about 10 s (the app starting) and then **401 JSON** with no `frontend` restart (its `StartedAt` unchanged). A first attempt got the same address back (.7), so it proved nothing; this one did |
+| 9 | **Vite workflow.** `git diff --stat main..HEAD`: no change to `vite.config.ts`, `package.json`, `package-lock.json` or `src/`. Only CLAUDE.md, README.md, docker-compose.yml, three new frontend files and this plan |
+
+## Build notes
+- **My mistake, recorded:** the branch already existed when I started (at 63d7b9c). `git switch -c` failed, my command chain went on, and the plan commit landed on local `main` (198df3b, not pushed). Ahsan stopped me; I cherry-picked it onto `BPA-80-portal-in-compose` (df55c24, the first commit of the branch) and set local `main` back to `origin/main` (63d7b9c). Nothing reached the remote. From then on each commit checks the branch name first.
+- `docker compose up -d --build frontend` also rebuilds `bpa-app` (it is a dependency), so the first run takes a few minutes.
+- The proof script's first run printed 000 for the ordinary `.xlsx` (a space in the path, my script); re-run correctly, 201.
+- The clean-checkout run needed the host ports of the running stack: its containers were **stopped** (volumes kept), the scratch project was removed with `down -v` (its own volumes only), and the stack was started again; the database still holds 29 Work Packs.
+- Checks before building (cookies, forward headers, hard-coded origins): none was true; confirmed at runtime by proof 2, 3 and 6. No backend or security change.
