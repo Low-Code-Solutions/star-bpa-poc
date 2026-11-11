@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@tests/test-utils';
+import { cleanup, render, screen, waitFor, within } from '@tests/test-utils';
 import userEvent from '@testing-library/user-event';
 import { apiClient } from '@/services/apiClient';
+import { todayInRiyadh } from '@/utils/dates';
 import { ConfirmWorkPack } from './ConfirmWorkPack';
 
 // BPA-23: the Confirm Workpack screen (09 S14; skill new-task-screen). One React test per screen condition; the save step
@@ -11,7 +12,8 @@ const TASK = '2251799813690140';
 
 type Call = { method: string; path: string; body: unknown };
 
-function fakeBackend(extra: Record<string, unknown> = {}) {
+// businessDate: what GET /api/v1/business-date answers (BPA-82); by default the Riyadh date of the faked browser clock.
+function fakeBackend(extra: Record<string, unknown> = {}, businessDate: string = todayInRiyadh()) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -48,6 +50,8 @@ function fakeBackend(extra: Record<string, unknown> = {}) {
           validationMessages: [],
           ...extra,
         });
+      case '/api/v1/business-date':
+        return businessDate === 'fail' ? json(500, {}) : json(200, { date: businessDate, zone: 'Asia/Riyadh' });
       case '/api/v1/activities':
         return json(200, [
           {
@@ -78,8 +82,8 @@ function fakeBackend(extra: Record<string, unknown> = {}) {
   return { fetchMock, completions };
 }
 
-async function renderScreen(extra: Record<string, unknown> = {}) {
-  const backend = fakeBackend(extra);
+async function renderScreen(extra: Record<string, unknown> = {}, businessDate?: string) {
+  const backend = fakeBackend(extra, businessDate);
   vi.stubGlobal('fetch', backend.fetchMock);
   const onDone = vi.fn();
   const user = userEvent.setup();
@@ -116,6 +120,17 @@ describe('ConfirmWorkPack', () => {
     cleanup();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it('BPA82_confirmWorkpackUsesTheBackendDate', async () => {
+    // The saved date to complete is 6 Nov 2026. The browser says 21 Oct, so it passes; the backend's business date (QA) is 1 Dec, so it is past.
+    const { user, completions } = await renderScreen({}, '2026-12-01');
+    await waitFor(() => expect(screen.getByLabelText('Date to complete')).toHaveAttribute('min', '2026-12-01'));
+
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+
+    expect(shownMessages()).toContain('Date to complete cannot be in the past');
+    expect(completions()).toHaveLength(0);
   });
 
   it('BPA23_correctManHoursRecalculatesHeader', async () => {

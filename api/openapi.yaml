@@ -30,6 +30,8 @@ tags:
     description: Login and logout (S5, ADR 0005; BPA-43)
   - name: me
     description: The logged-in user (S6; BPA-43)
+  - name: business-date
+    description: The business date the server uses, for screens that check dates (S9, ADR 0013; BPA-82)
   - name: workpacks
     description: Starting a Work Pack request from the portal (S2, S20, D52; BPA-6)
   - name: tasks
@@ -133,6 +135,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Me'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/business-date:
+    get:
+      tags: [business-date]
+      operationId: getBusinessDate
+      summary: The business date the server uses now
+      description: |
+        Today's date in the business zone (Asia/Riyadh, from `app.business-zone`), read from the server's injected clock, the same clock the
+        validators use (D20, D28; 09 S9, ADR 0013). The portal uses it for its date checks instead of the browser's clock, so the screen and the
+        server agree when QA sets a business date (BPA-81, BPA_CLOCK_TODAY). Without that setting it is the real date. Open to every logged-in
+        user (x-assumption). Source: BPA-82.
+      x-assumption: true
+      x-assumption-note: separate read rather than a field on /me; open to every logged-in user
+      responses:
+        '200':
+          description: The business date
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessDate'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /api/v1/workpacks:
@@ -923,6 +946,19 @@ components:
           description: Camunda group IDs, read once at login (S5, S6)
           items:
             type: string
+    BusinessDate:
+      type: object
+      required: [date, zone]
+      properties:
+        date:
+          type: string
+          format: date
+          description: Today in the business zone, yyyy-MM-dd
+          example: '2026-12-01'
+        zone:
+          type: string
+          description: The business zone (app.business-zone)
+          example: Asia/Riyadh
     StartWorkPackResponse:
       type: object
       description: The started process instance (x-assumption; BPA-6 does not state the response)
