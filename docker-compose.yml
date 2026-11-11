@@ -102,7 +102,10 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      # local is the default. For QA (BPA-81) set BPA_PROFILES=local,qa in .env; qa alone would lose the persona sync, which needs local.
+      SPRING_PROFILES_ACTIVE: ${BPA_PROFILES:-local}
+      # QA only (BPA-81): the business date, yyyy-MM-dd. Empty or absent means the system clock. Ignored (with a WARN) unless profile qa is active.
+      BPA_CLOCK_TODAY: ${BPA_CLOCK_TODAY:-}
       CAMUNDA_GRPC_ADDRESS: http://camunda:26500
       CAMUNDA_REST_ADDRESS: http://camunda:8080
       CAMUNDA_ADMIN_USER: ${CAMUNDA_ADMIN_USER:-demo}
