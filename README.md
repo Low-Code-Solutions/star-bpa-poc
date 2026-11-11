@@ -54,7 +54,8 @@ username equal to its group ID, and all share the password `DEMO_PASSWORD` from 
 They are defined in [backend/src/main/resources/personas.yaml](backend/src/main/resources/personas.yaml); access is by group
 only ([docs/04-conventions.md](docs/04-conventions.md)). Reference data (Workers, activities, drawings) is seeded by Flyway.
 
-Open the portal at **http://localhost:3000** and log in as a persona. For work on the portal itself, run the Vite dev server next to the stack:
+Open the portal at **http://localhost:3000** and log in as a persona. Use it from the same machine (`localhost`): it is plain http, and the
+session cookie is not marked `Secure` (09 S24, ADR 0005 S26). For a few seconds after a cold start the portal's `/api` calls answer 502 until the app is up; reload. For work on the portal itself, run the Vite dev server next to the stack:
 
 ```sh
 cd frontend

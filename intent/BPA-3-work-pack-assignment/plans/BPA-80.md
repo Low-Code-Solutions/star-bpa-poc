@@ -1,7 +1,7 @@
 # Plan: BPA-80 Serve the React portal in the compose stack (nginx, same-origin /api proxy)
 Jira: BPA-80 (task, epic BPA-3)
 Story last updated: 2026-11-11T12:30:09.088+0400
-Status: Approved (Ahsan, Build Lead, 2026-11-11)
+Status: Closed (2026-11-11)
 Approver: Ahsan (Build Lead)
 Branch: BPA-80-portal-in-compose, from main 63d7b9c
 
@@ -134,7 +134,7 @@ Proof script (kept outside the repo): `proof-bpa80.sh quick|full`, every call th
 | 4 | **Deep link.** `GET /tasks/2251799813784803` and `/some/deep/link`: 200 `text/html` with the portal's root element. `GET /api/v1/nothing-here`: 401 `application/problem+json`, no `index.html` |
 | 5 | CI: see the PR (six checks, read from `gh pr view`) |
 | 6 | **Cookies.** The three `Set-Cookie` headers of a login (`XSRF-TOKEN; Path=/`, `JSESSIONID; Path=/; HttpOnly; SameSite=Lax`, `XSRF-TOKEN; Path=/`) are identical through :3000 and straight to :8081: no `Secure`, no domain, nothing rewritten |
-| 7 | **Uploads.** A 2 MB file through :3000 as `production-team`: **201** with the app's own file-level outcome ("File cannot be read"), not nginx's 413. An ordinary `.xlsx`: **201** with row outcomes ("Work Pack not found" on the empty scratch database) |
+| 7 | **Uploads.** A 2 MB file through :3000 as `production-team`: **201** with the app's own file-level outcome ("File cannot be read"), not nginx's 413. An ordinary `.xlsx`: **201** with row outcomes ("Work Pack not found" on the empty scratch database). After the review fixes, on the running stack: **7 MB** gets the app's own **413** `application/problem+json` ("Maximum upload size exceeded"), **9 MB** gets nginx's 413 `text/html`: the limit works as intended; between 1 MB and 8 MB the app decides. These two were rejected before anything is stored |
 | 8 | **Backend address change.** `bpa-app` was stopped, its address taken by a throwaway container, and it came back on **172.18.0.9** (was .7). `GET :3000/api/v1/me` answered 502 for about 10 s (the app starting) and then **401 JSON** with no `frontend` restart (its `StartedAt` unchanged). A first attempt got the same address back (.7), so it proved nothing; this one did |
 | 9 | **Vite workflow.** `git diff --stat main..HEAD`: no change to `vite.config.ts`, `package.json`, `package-lock.json` or `src/`. Only CLAUDE.md, README.md, docker-compose.yml, three new frontend files and this plan |
 
@@ -144,3 +144,13 @@ Proof script (kept outside the repo): `proof-bpa80.sh quick|full`, every call th
 - The proof script's first run printed 000 for the ordinary `.xlsx` (a space in the path, my script); re-run correctly, 201.
 - The clean-checkout run needed the host ports of the running stack: its containers were **stopped** (volumes kept), the scratch project was removed with `down -v` (its own volumes only), and the stack was started again; the database still holds 29 Work Packs.
 - Checks before building (cookies, forward headers, hard-coded origins): none was true; confirmed at runtime by proof 2, 3 and 6. No backend or security change.
+
+## Review (qa-reviewer at bdb3181, 11 Nov 2026) and what was done
+No finding blocks the PR. Fixed in this branch: `server_tokens off` (the Server header no longer shows the version; checked), `proxy_set_header Connection ""` for HTTP/1.1 to the app, the upload-limit comment now says what was proved (7 MB and 9 MB checked above), "BuildKit required" in `Dockerfile.dockerignore`, and the README says to use the portal from `localhost` (plain http, session cookie not `Secure`) and that `/api` answers 502 for a few seconds on a cold start. Re-run after the fixes: 7 personas, deep links, `/api` not index.html, uploads, all as before.
+Recorded, not changed (decisions for the PO, not for this Task):
+- **Cost to every developer.** `frontend` is now part of plain `docker compose up -d --build`, so a failed npm or Docker Hub pull in the portal build stops the whole stack coming up, including backend-only work, and `up -d --build frontend` also rebuilds `bpa-app`. A compose profile or a CI image build would remove it (Q7, and Q8 below).
+- **Q8 (new):** the port is published on all interfaces like the others. Binding `127.0.0.1:3000:80` would match 09 S24 and S26 but stops another machine (a QA machine on the LAN) reaching it. PO decision; not done.
+- No security headers (CSP, X-Frame-Options) on a local-only plain-http stack: accepted.
+- `location /api` is a prefix match (`/apifoo` also goes to the app): behaviour is right for real paths, accepted. `try_files` serves `index.html` for a missing static file (normal for a SPA).
+- Tags are exact but not digest-pinned: accepted.
+Questions Q1 to Q5 and Q7 were not answered in the session; they go to the PR description for Ahsan, Faraz and Khitaba. Q6 was done as written (stop, not remove; the plan was approved with that step).

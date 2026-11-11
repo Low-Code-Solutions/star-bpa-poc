@@ -1,4 +1,5 @@
-# Read by BuildKit in place of the root .dockerignore for frontend/Dockerfile (BPA-80). The context is the repo root; send only what
+# Read by BuildKit in place of the root .dockerignore for frontend/Dockerfile (BPA-80). BuildKit is required (the default in Docker
+# Compose v2 and Docker Desktop); the classic builder (DOCKER_BUILDKIT=0) ignores this file and would use the root .dockerignore. The context is the repo root; send only what
 # the portal build needs: frontend/ and api/openapi.yaml (gen:api reads it). Later lines override earlier ones.
 *
 !frontend/
