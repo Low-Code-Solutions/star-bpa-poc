@@ -48,5 +48,6 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-8](BPA-3-work-pack-assignment/plans/BPA-8.md) | Time & Method Analyst can confirm a Work Pack only when materials are reserved and the drawing is approved | Closed (2026-11-05) |
 | [BPA-80](BPA-3-work-pack-assignment/plans/BPA-80.md) | Serve the React portal in the compose stack (nginx, same-origin /api proxy) | Closed (2026-11-11) |
 | [BPA-81](BPA-3-work-pack-assignment/plans/BPA-81.md) | Settable business date for QA (BPA_CLOCK_TODAY, qa profile only) | Closed (2026-11-11) |
+| [BPA-82](BPA-3-work-pack-assignment/plans/BPA-82.md) | Portal date checks follow the QA business date set by BPA_CLOCK_TODAY | Closed (11 Nov 2026) |
 | [BPA-9](BPA-3-work-pack-assignment/plans/BPA-9.md) | Project Engineer can sign off a Work Pack release | Closed (2026-11-05) |
 
