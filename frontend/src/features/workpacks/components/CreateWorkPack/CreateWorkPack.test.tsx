@@ -298,7 +298,8 @@ describe('CreateWorkPack', () => {
   it('BPA82_screenFallsBackToTheBrowserDateWhenTheCallFails', async () => {
     const { user, completions } = await renderScreen('fail');
     await fillValid(user);
-    expect(dateMin()).toHaveAttribute('min', '2026-10-21');
+    // no minimum while the call is pending; the browser's date once it has failed
+    await waitFor(() => expect(dateMin()).toHaveAttribute('min', '2026-10-21'));
 
     setDate('2026-10-20');
     await user.click(screen.getByRole('button', { name: 'Complete task' }));
