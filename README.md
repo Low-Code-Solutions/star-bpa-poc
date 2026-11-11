@@ -32,11 +32,12 @@ You need Docker with Compose v2. The backend and frontend builds are described i
 
 ```sh
 cp .env.example .env        # placeholders for a synthetic, local-only stack; change them if you like
-docker compose up -d        # first run builds bpa-app; add --build after pulling changes
+docker compose up -d        # first run builds bpa-app and the portal; add --build after pulling changes
 ```
 
 | Service | URL | Notes |
 |---|---|---|
+| **Portal (React)** | http://localhost:3000 | nginx serves the built portal and proxies `/api` to the app, so both are one origin (BPA-80) |
 | Camunda (Operate, Tasklist, Admin, REST API) | http://localhost:8080 | log in as `demo` / `demo` |
 | BPA app (API and job workers) | http://localhost:8081 | health at `/actuator/health` |
 | Connectors | http://localhost:8086 | |
@@ -53,7 +54,8 @@ username equal to its group ID, and all share the password `DEMO_PASSWORD` from 
 They are defined in [backend/src/main/resources/personas.yaml](backend/src/main/resources/personas.yaml); access is by group
 only ([docs/04-conventions.md](docs/04-conventions.md)). Reference data (Workers, activities, drawings) is seeded by Flyway.
 
-Start the portal next to the stack:
+Open the portal at **http://localhost:3000** and log in as a persona. Use it from the same machine (`localhost`): it is plain http, and the
+session cookie is not marked `Secure` (09 S24, ADR 0005 S26). For a few seconds after a cold start the portal's `/api` calls answer 502 until the app is up; reload. For work on the portal itself, run the Vite dev server next to the stack:
 
 ```sh
 cd frontend
@@ -61,7 +63,7 @@ npm ci
 npm run dev                 # http://localhost:5173, proxies /api to the app on :8081
 ```
 
-Log in as a persona. To start again from empty data, run `docker compose down -v`.
+To start again from empty data, run `docker compose down -v`.
 
 Tests: `./mvnw -B verify` in `backend/` (needs Docker for Testcontainers) and `npm test` in `frontend/`.
 

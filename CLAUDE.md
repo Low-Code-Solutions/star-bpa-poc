@@ -12,7 +12,8 @@ branch, PR and write-back rules as everyone else's.
 
 ## Stack and layout
 - `docker compose up -d` (copy `.env.example` to `.env` first): Camunda 8.10 on :8080 (demo/demo),
-  Connectors :8086, PostgreSQL :5432 (databases `camunda` and `bpa`, schema `bpa`), WireMock :8089.
+  Connectors :8086, PostgreSQL :5432 (databases `camunda` and `bpa`, schema `bpa`), WireMock :8089,
+  the React portal on http://localhost:3000 (nginx; proxies `/api` to `bpa-app`, one origin).
 - Layout (09 L1, ADR 0015). All paths, here and in docs/04, are from the repo root:
   - `models/bpmn/`, `models/dmn/`: process and decision models (deployed from here; never copy them
     into `backend/`). `api/openapi.yaml`: the API contract. `templates/`: files users download.

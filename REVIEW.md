@@ -466,3 +466,16 @@ Newest last. One entry per review; the full report goes in the PR description.
   Faraz; the unknown-status check reads the generated enum's message (`BPA16_unknownStatusIsRejected` would catch a change); `RevisionFlow.instancesFor` searches 1000 variables (works today); the correlation key `drawingRef/revision` is ambiguous if a part contains "/"; a commit failing after a successful send leaves an
   instance with no recorded revision (D365's retry gets 503 until it ends); the open endpoint accepts any text for the revision label (S28).
 - Not verified by the reviewer: test runs, CI, the local-stack run, whether the mail-down incident text reads well in Operate.
+
+### BPA-80 at bdb3181, 11 Nov 2026 (qa-reviewer)
+- Code: 0 High, 3 Medium, 10 Low. Reviewer read BPA-80 in Jira (and comment 10516), the plan, the whole diff, the root `.dockerignore`, `application.yml` and the BPA-43 plan; it ran no Docker and took the proof from the plan. Author's runs: red first (nothing on :3000, no `frontend` service); image build (context 420 kB, vite build inside); a fresh clone of the branch with `.env` from `.env.example`, project `bpa80scratch`,
+  `docker compose up -d --build`; the proof script through :3000 only: 7 personas (401, login 200, `/me` shows the user, logout 204, 401), CSRF 201 with the token and 403 without, deep links 200 `index.html`, `/api` paths never `index.html`, `Set-Cookie` identical to the app's own, uploads (2 MB, an ordinary .xlsx); `bpa-app` moved to a new container address (.7 to .9) and nginx followed with no restart
+  (a first attempt got the same address back and proved nothing). The mistake with the branch is in the plan's build notes.
+- Checks passed: location precedence (`/api`, `/assets/`, `/`), the resolver variable passes the URI unchanged, header and cookie pass-through, the Dockerfile-specific ignore file, `main` equal to `origin/main`, four commits on the branch with the plan first, no change to Vite, `package.json`, `src/` or the backend.
+- Medium (3):
+  - CI is not yet proven (no PR at review time) and CI does not build the image: the PR is read for its checks before I say green; Q7 left for the PO.
+  - Plan questions Q1 to Q7 open (Q3: no image tag or registry, against comment 10516; Q4: BPA-43 plan Q11 says no compose frontend until the showcase): recorded in the plan and carried to the PR.
+  - `frontend` now builds with plain `docker compose up -d --build`: a failed portal build stops the whole stack for backend-only work. Recorded with the options (compose profile, CI build); not changed.
+- Low, fixed: `server_tokens off`; `Connection ""` upstream; the upload-limit comment overstated what was proved (now 7 MB and 9 MB tested); "BuildKit required" note; README says use `localhost` and warns of the cold-start 502. Recorded, not changed: published on all interfaces (new Q8: `127.0.0.1:3000:80` is a PO decision), no security headers, prefix match on `/api`, SPA fallback for missing files,
+  tags not digest-pinned, `COPY frontend/` re-runs the build when `nginx.conf` changes, the README line "first run builds bpa-app and the portal" (`up --build frontend` also rebuilds `bpa-app`).
+- Not verified by the reviewer: Docker runs, the exact tags, CI, a browser.

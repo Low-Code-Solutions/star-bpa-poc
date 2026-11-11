@@ -46,5 +46,6 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-6](BPA-3-work-pack-assignment/plans/BPA-6.md) | Time & Method Analyst can create a Work Pack with estimates | Closed (2026-11-04) |
 | [BPA-7](BPA-3-work-pack-assignment/plans/BPA-7.md) | PPC Team can track a Work Pack's estimated man hours in a Project Hour Journal Header | Closed (2026-11-04) |
 | [BPA-8](BPA-3-work-pack-assignment/plans/BPA-8.md) | Time & Method Analyst can confirm a Work Pack only when materials are reserved and the drawing is approved | Closed (2026-11-05) |
+| [BPA-80](BPA-3-work-pack-assignment/plans/BPA-80.md) | Serve the React portal in the compose stack (nginx, same-origin /api proxy) | Closed (2026-11-11) |
 | [BPA-9](BPA-3-work-pack-assignment/plans/BPA-9.md) | Project Engineer can sign off a Work Pack release | Closed (2026-11-05) |
 
