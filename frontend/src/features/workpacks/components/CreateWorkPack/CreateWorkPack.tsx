@@ -12,7 +12,7 @@ export { fieldMessages };
  * allow-list (BPA-26). After a rejected save the task comes back with what was entered (prefill).
  */
 export function CreateWorkPack({ api, taskKey, onDone }: TaskScreenProps) {
-  const state = useWorkPackForm();
+  const state = useWorkPackForm(api);
   return (
     <TaskScreenShell
       api={api}

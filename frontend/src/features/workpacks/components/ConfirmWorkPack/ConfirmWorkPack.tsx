@@ -12,7 +12,7 @@ import { WorkPackFields } from '../WorkPackFields';
  * Field spec: docs/form-specs/Form_ConfirmWorkPack.form; variable names: the bpa.tasks write allow-list (BPA-26).
  */
 export function ConfirmWorkPack({ api, taskKey, onDone }: TaskScreenProps) {
-  const state = useWorkPackForm();
+  const state = useWorkPackForm(api);
   const [workpackNumber, setWorkpackNumber] = useState('');
   const [returnReason, setReturnReason] = useState<string | null>(null);
 
