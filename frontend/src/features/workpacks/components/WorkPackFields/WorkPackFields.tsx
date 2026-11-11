@@ -12,7 +12,7 @@ import {
 } from '@/features/reference-data';
 import type { Api } from '@/services/apiClient';
 import { PHASES } from '@/utils/constants';
-import { showDate, todayInRiyadh } from '@/utils/dates';
+import { showDate } from '@/utils/dates';
 import type { WorkPackFormState } from '../../hooks/useWorkPackForm';
 import type { MaterialRow, PhaseRow } from '../../workpacks.types';
 
@@ -130,12 +130,7 @@ export function WorkPackFields({ api, state }: { api: Api; state: WorkPackFormSt
       </Field>
 
       <Field label="Date to complete">
-        <input
-          type="date"
-          value={form.completionDate}
-          min={todayInRiyadh()}
-          onChange={(e) => setCompletionDate(e.target.value)}
-        />
+        <input type="date" value={form.completionDate} min={state.today} onChange={(e) => setCompletionDate(e.target.value)} />
       </Field>
     </>
   );

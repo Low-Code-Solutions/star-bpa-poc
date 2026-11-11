@@ -1,14 +1,18 @@
 import { useState } from 'react';
+import { useBusinessDate } from '@/features/reference-data';
 import type { Task } from '@/features/tasks/tasks.types';
+import type { Api } from '@/services/apiClient';
 import { fieldMessages } from '../fieldMessages';
 import type { CreateWorkPackForm, MaterialRow, PhaseRow } from '../workpacks.types';
 
 /**
  * The Work Pack form shared by the Create Work Pack (BPA-6) and Confirm Workpack (BPA-23) screens: its state, the prefill from
  * the task's variables (read allow-list, BPA-26), the screen's field checks and the variables to complete the task with
- * (write allow-list). A saved material line keeps its id, so a correction updates it in place (data model A4, F13).
+ * (write allow-list). A saved material line keeps its id, so a correction updates it in place (data model A4, F13). The date checks use the
+ * server's business date, read once per screen (BPA-82).
  */
-export function useWorkPackForm() {
+export function useWorkPackForm(api: Api) {
+  const today = useBusinessDate(api);
   const [activityRef, setActivityRef] = useState('');
   const [drawingRef, setDrawingRef] = useState('');
   const [departmentRef, setDepartmentRef] = useState('');
@@ -65,7 +69,8 @@ export function useWorkPackForm() {
     setPhases,
     setMaterials,
     prefill,
-    check: () => fieldMessages(form),
+    today,
+    check: () => fieldMessages(form, today),
     variables,
   };
 }

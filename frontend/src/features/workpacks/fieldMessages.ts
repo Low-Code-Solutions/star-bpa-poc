@@ -1,11 +1,12 @@
-import { todayInRiyadh } from '@/utils/dates';
 import type { CreateWorkPackForm } from './workpacks.types';
 
 /**
  * The Create Work Pack screen's field checks (09 S14, D56): required, man hours > 0 / 2 decimals / 99,999.99, no past date.
  * The save step re-checks all of these and the cross-field rules (duplicate phase or material) and returns its own messages.
+ * {@code today} is the business date (Riyadh) from the server, so the check agrees with the save step (BPA-82); undefined while it is not yet
+ * known: the past-date check is skipped and the save step decides.
  */
-export function fieldMessages(form: CreateWorkPackForm): string[] {
+export function fieldMessages(form: CreateWorkPackForm, today?: string): string[] {
   const messages: string[] = [];
   const add = (m: string) => {
     if (!messages.includes(m)) {
@@ -31,6 +32,6 @@ export function fieldMessages(form: CreateWorkPackForm): string[] {
   }
   if (form.phases.some((p) => !p.phase)) add('Select a phase for each man-hour line');
   if (form.materials.some((m) => !m.materialRef)) add('Select a material for each material line');
-  if (form.completionDate && form.completionDate < todayInRiyadh()) add('Date to complete cannot be in the past');
+  if (today && form.completionDate && form.completionDate < today) add('Date to complete cannot be in the past');
   return messages;
 }

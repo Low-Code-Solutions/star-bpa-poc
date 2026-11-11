@@ -21,3 +21,9 @@ export async function listDepartments(api: Api): Promise<Department[]> {
   const { data } = await api.GET('/api/v1/departments');
   return data ?? [];
 }
+
+/** GET /api/v1/business-date (BPA-82): today in the business zone as the server sees it, or null when the call fails. */
+export async function getBusinessDate(api: Api): Promise<string | null> {
+  const { data } = await api.GET('/api/v1/business-date');
+  return data?.date ?? null;
+}

@@ -68,7 +68,7 @@ To start again from empty data, run `docker compose down -v`.
 **Setting the business date for QA (BPA-81).** Scenarios that start "Given today is … (Asia/Riyadh)" need a date other than today. In `.env` set
 `BPA_PROFILES=local,qa` and `BPA_CLOCK_TODAY=2026-12-01` (yyyy-MM-dd), then run `docker compose up -d bpa-app`; the log shows a WARN "QA business date is …".
 Time keeps moving and the date rolls on after midnight in Asia/Riyadh; restart `bpa-app` to hold it. Remove both lines and restart to go back to the real date.
-The portal's own date checks use the browser's date, and database and Camunda times stay real. QA only, never for a shared environment.
+The Create and Confirm Work Pack date checks use the server's business date (`GET /api/v1/business-date`, BPA-82), so the screen and the save step agree. Database and Camunda times stay real. QA only, never for a shared environment.
 
 Tests: `./mvnw -B verify` in `backend/` (needs Docker for Testcontainers) and `npm test` in `frontend/`.
 

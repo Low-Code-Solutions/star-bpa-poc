@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@tests/test-utils';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@tests/test-utils';
 import userEvent from '@testing-library/user-event';
 import { apiClient } from '@/services/apiClient';
+import { todayInRiyadh } from '@/utils/dates';
 import { CreateWorkPack } from './CreateWorkPack';
 
 // BPA-6: the Create Work Pack screen (09 S14: React checks field rules before submission; the save step re-checks them,
@@ -11,7 +12,9 @@ const TASK = '2251799813685612';
 
 type Call = { method: string; path: string; body: unknown };
 
-function fakeBackend() {
+// businessDate: what GET /api/v1/business-date answers (BPA-82); by default the Riyadh date of the faked browser clock, as a backend
+// without a QA date would; 'fail' makes the call answer 500.
+function fakeBackend(businessDate: string = todayInRiyadh()) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -36,6 +39,8 @@ function fakeBackend() {
           variables: {},
           validationMessages: [],
         });
+      case '/api/v1/business-date':
+        return businessDate === 'fail' ? json(500, {}) : json(200, { date: businessDate, zone: 'Asia/Riyadh' });
       case '/api/v1/activities':
         return json(200, [
           {
@@ -81,8 +86,8 @@ function fakeBackend() {
 
 type User = ReturnType<typeof userEvent.setup>;
 
-async function renderScreen() {
-  const backend = fakeBackend();
+async function renderScreen(businessDate?: string) {
+  const backend = fakeBackend(businessDate);
   vi.stubGlobal('fetch', backend.fetchMock);
   const onDone = vi.fn();
   const user = userEvent.setup();
@@ -256,6 +261,54 @@ describe('CreateWorkPack', () => {
     await late.user.click(screen.getByRole('button', { name: 'Complete task' }));
     expect(shownMessages()).toContain('Date to complete cannot be in the past');
     expect(late.completions()).toHaveLength(1);
+  });
+
+  // BPA-82 (ASSUMPTION: scenarios are the plan's, the Jira task has none): the screen's "today" is the backend's business date, so it
+  // agrees with the save step's re-check when QA has set a date (BPA-81). The browser's clock here says 21 Oct 2026.
+  const dateMin = () => screen.getByLabelText('Date to complete');
+
+  it('BPA82_screenUsesTheBackendDateWhenItIsLater', async () => {
+    const { user, completions } = await renderScreen('2026-12-01');
+    await fillValid(user);
+    await waitFor(() => expect(dateMin()).toHaveAttribute('min', '2026-12-01'));
+
+    setDate('2026-11-30');
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+    expect(shownMessages()).toContain('Date to complete cannot be in the past');
+    expect(completions()).toHaveLength(0);
+
+    setDate('2026-12-01');
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+    expect(shownMessages()).not.toContain('Date to complete cannot be in the past');
+    expect(completions()).toHaveLength(1);
+  });
+
+  it('BPA82_screenUsesTheBackendDateWhenItIsEarlier', async () => {
+    const { user, completions } = await renderScreen('2026-10-15');
+    await fillValid(user);
+    await waitFor(() => expect(dateMin()).toHaveAttribute('min', '2026-10-15'));
+
+    // 16 Oct is past by the browser's clock (21 Oct) but not by the backend's date
+    setDate('2026-10-16');
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+    expect(shownMessages()).not.toContain('Date to complete cannot be in the past');
+    expect(completions()).toHaveLength(1);
+  });
+
+  it('BPA82_screenFallsBackToTheBrowserDateWhenTheCallFails', async () => {
+    const { user, completions } = await renderScreen('fail');
+    await fillValid(user);
+    // no minimum while the call is pending; the browser's date once it has failed
+    await waitFor(() => expect(dateMin()).toHaveAttribute('min', '2026-10-21'));
+
+    setDate('2026-10-20');
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+    expect(shownMessages()).toContain('Date to complete cannot be in the past');
+    expect(completions()).toHaveLength(0);
+
+    setDate('2026-10-21');
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+    expect(completions()).toHaveLength(1);
   });
 
   it('BPA6_manHoursBoundary', async () => {
