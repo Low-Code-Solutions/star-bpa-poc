@@ -129,16 +129,20 @@ services:
     networks: [star]
     restart: unless-stopped
 
-  # Uncomment once the React app is scaffolded in ./frontend.
-  # frontend:
-  #   image: node:22-alpine
-  #   working_dir: /app
-  #   command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
-  #   ports:
-  #     - "3000:3000"
-  #   volumes:
-  #     - ./frontend:/app
-  #   networks: [star]
+  # The React portal (BPA-80; ADR 0004, ADR 0005 S26): built in the image, served by nginx at http://localhost:3000, which also proxies
+  # /api to bpa-app:8080, so the portal and the API are one origin and the session and XSRF-TOKEN cookies work as under `npm run dev`
+  # (Vite on :5173, unchanged). Build context is the repo root, like bpa-app: the build reads api/openapi.yaml.
+  # bpa-app has no healthcheck, so for a few seconds after a cold start the portal's /api calls answer 502 until the app is up.
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - bpa-app
+    networks: [star]
+    restart: unless-stopped
 
 volumes:
   pgdata:
