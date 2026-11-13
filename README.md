@@ -44,6 +44,7 @@ docker compose up -d        # first run builds bpa-app and the portal; add --bui
 | WireMock | http://localhost:8089 | mock partner systems |
 | Mailpit | http://localhost:8025 | mock SMTP inbox (backend sends to port 1025); drawing-revision emails arrive here |
 | PostgreSQL | localhost:5432 | user and passwords in `.env` |
+| pgAdmin (optional) | http://localhost:5050 | browse the POC database; not started by default: `docker compose --profile tools up -d pgadmin`. The server is pre-registered; it asks once for `POSTGRES_PASSWORD` (default `postgres`), databases `bpa` (schema `bpa`) and `camunda` |
 
 On start-up the app creates the **seeded personas** in Camunda and deploys the BPMN and DMN models from `models/`
 ([ADR 0005](docs/adr/0005-identity-and-authorisation.md)). There are exactly seven, one per Camunda group, each with the

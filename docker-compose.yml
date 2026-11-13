@@ -94,6 +94,28 @@ services:
     networks: [star]
     restart: unless-stopped
 
+  # pgAdmin to browse the POC database (local tool, not part of the product; profile "tools", so a plain `docker compose up -d` does not
+  # pull it): `docker compose --profile tools up -d pgadmin`, then http://localhost:5050 (no login: single-user mode, bound to this machine only).
+  # The server "STAR POC PostgreSQL" is pre-registered from backend/postgres/pgadmin/servers.json; pgAdmin asks for the password once
+  # (POSTGRES_PASSWORD in .env; default postgres). Settings are not kept across `down`, nothing here is data.
+  pgadmin:
+    image: dpage/pgadmin4:${PGADMIN_VERSION:-9.10}
+    profiles: ["tools"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: pgadmin@example.com
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-pgadmin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "127.0.0.1:5050:80"
+    volumes:
+      - ./backend/postgres/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [star]
+    restart: unless-stopped
+
   # Spring Boot backend and job workers (ADR 0002). Build context is the repo root so models/ and templates/ are visible (BPA-43).
   # Profile local runs the S22 persona sync at start-up: as the Camunda admin (CAMUNDA_ADMIN_*) it creates the personas and
   # `bpa-service` (S25), then the app deploys the models and runs its workers as `bpa-service` (ADR 0005).
