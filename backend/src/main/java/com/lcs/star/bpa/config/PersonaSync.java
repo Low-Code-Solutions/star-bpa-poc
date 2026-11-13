@@ -131,8 +131,16 @@ public class PersonaSync implements SmartInitializingSingleton {
                 """, persona.username(), persona.employeeRef(), persona.email());
     }
 
-    /** Adds the persona's projects to user_project; a row that is there is left alone. It only adds, like the rest of the sync. */
+    /**
+     * Gives a persona its projects from personas.yaml, but only while the user has no user_project row. Once the PPC Team has changed a
+     * user's projects in the portal (BPA-76), a restart must not bring a removed project back, so the sync seeds a user and then leaves it
+     * alone. If every project of a user was removed, the next start seeds them again (documented in ADR 0005).
+     */
     private void syncUserProjects(PersonaFile.Persona persona) {
+        Integer existing = jdbc.queryForObject("SELECT count(*) FROM bpa.user_project WHERE username = ?", Integer.class, persona.username());
+        if (existing != null && existing > 0) {
+            return;
+        }
         for (String projectRef : persona.projects()) {
             jdbc.update("""
                     INSERT INTO bpa.user_project (username, project_ref, created_by, updated_by)

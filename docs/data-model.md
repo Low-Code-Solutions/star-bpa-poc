@@ -26,10 +26,10 @@ The v0.7 delta rev. 2 (SORs approved by Khitaba for the PO and DDL approved by A
 | 20 new tables: Hours (5), Progress (8), cost reference copies (3), `variance_alert`, `cbs_review`, `user_project`, `worker_leave`; 30 → 50 tables | §2, §13 |
 | `worker` gets `employee_id` (NOT NULL, UNIQUE, backfilled as `'EMP-' \|\| employee_ref`) and five more HR fields from FRD-5-2 §5.2.6.2 | §13.1A |
 | `digital_timesheet_line` gets status, submission, file and FMS-export links, remarks; `hours >= 0`; one line per Worker, date and phase, ignoring Rejected lines | §13.1 |
-| Seed: activity A-2301, `cbs_forecast`, `cbs_actual_cost`, `cbs_block`, `worker_leave`, the six Worker HR fields | §13.8, §11 |
-| Test users: eleven personas; project scope returns as `user_project` (project only) | §13.A, ADR 0005 |
+| Seed: activity A-2301, `cbs_forecast`, `cbs_actual_cost`, `cbs_block`, `worker_leave`, the six Worker HR fields | §13.6, §11 |
+| Test users: eleven personas; project scope returns as `user_project` (project only) | §13.7, ADR 0005 |
 | Parked, not in V2: `hours_approval`, `hours_submission.approval_route`, `cbs_reopen_request` | §13 |
-| Q-DM16 to Q-DM26 decided | §13.Q |
+| Q-DM16 to Q-DM24 decided; Q-DM25 and Q-DM26 applied by BPA-48, to be confirmed in its PR | §13.Q |
 
 ### v0.6 (2 Nov 2026, PO decision; Jira BPA-44)
 
@@ -182,6 +182,7 @@ Every field has exactly one SOR. The SOR column names:
 | `D365 F&O Product Information Management` | material master |
 | `D365 F&O PPC` | material reservation (Traceability Number) |
 | `D365 F&O Cost Control Report` | CBS code |
+| `D365 F&O Finance` | actual cost per CBS and month (`cbs_actual_cost.actual_cost`; v0.7) |
 | `D365 F&O Project Control (PCON)` | Look-Ahead plan dates |
 | `D365 F&O Organisation` | department |
 | `FMS` | Job Code, cutting sheet |
@@ -209,7 +210,7 @@ All of these throw `WORKPACK_INVALID` or `SCHEDULE_INVALID` from the save worker
 
 ### 1.6 Group names
 
-The seven Camunda groups (09 S6, BPA-25): `time-method-analyst`, `project-engineer`, `production-planner`, `workpack-owner`, `ppc-team`, `supervisor`, `production-team`.
+The seven Camunda groups (09 S6, BPA-25): `time-method-analyst`, `project-engineer`, `production-planner`, `workpack-owner`, `ppc-team`, `supervisor`, `production-team`. **From v0.7 eleven:** the same seven plus `timekeeper`, `production-supervisor`, `cost-controller`, `project-manager` (E2-D1; §13).
 
 ---
 
@@ -1085,7 +1086,7 @@ family, bank, salary, contract and medical fields stay out of the POC.
 - Badge No is the existing `worker.employee_ref` column (UNIQUE in V1); it stays the key.
 - V2 adds `employee_id` in three steps so existing rows stay valid: add it NULL; fill existing rows with
   `'EMP-' || employee_ref`; then `SET NOT NULL`. The repeatable seed (`R__`, runs after V2) then sets the
-  named synthetic values **(A, Ahsan to confirm)**.
+  named synthetic values **(A: synthetic, marked in the seed header)**.
 - Column comments carry the myPeople SOR (S17).
 
 ### 13.2 New: Hours domain (D)
@@ -1203,7 +1204,7 @@ Never updated once its period is Locked (FRD-21 §21.9.1 "stored weeks are never
 #### 13.5.1 New: `cbs_review` (domain H)
 `id`; `progress_period_id` uuid NOT NULL FK; `cbs_code_ref` text NOT NULL (D365 F&O Cost Control Report); `remark` text NULL CHECK (char_length(remark) <= 500) **(A)**; `reviewed_by` text NOT NULL (Camunda identity); `reviewed_at` timestamptz NOT NULL; UNIQUE (progress_period_id, cbs_code_ref). SOR: POC database (Cost Controller review of the week, FRD-22 §22.4, §22.5.6.5 "Remarks"). Added for E2-14.
 
-### 13.8 Seed additions (named rows)
+### 13.6 Seed additions (named rows)
 - `cbs_forecast`: CBS-139-PIP-01 (current_forecast_mh 1000.00, revised_budget_cost 250000.00) — values synthetic.
 - `cbs_actual_cost`: CBS-139-PIP-01, 2026-11-01, 180000.00 — synthetic.
 - One CBS with no forecast row, to prove "no forecast, no alert".
@@ -1213,16 +1214,18 @@ Never updated once its period is Locked (FRD-21 §21.9.1 "stored weeks are never
 - `worker_leave`: one seeded worker on approved leave for a named date range in the demo month, for BPA-75's "on leave" scenario **(A)**.
 - Personas: `timekeeper` E9008, `production-supervisor` E9009, `cost-controller` E9010, `project-manager` E9011 (synthetic, L8).
 
-### 13.A Addendum 10 Nov 2026 (BPA-60 review)
+### 13.7 Addenda to the delta
+
+#### Addendum 10 Nov 2026 (BPA-60 review)
 - `workpack_progress.override_remark` text NULL, ≤ 250 characters; required by the API when approved_pct <> reported_pct. SOR: POC database. FRD-21 §21.7, §21.9.1.
 - `progress_retraction.approved_pct` numeric(5,2) NOT NULL: the % the retraction was requested and approved for; an approval applies only when the newly approved % equals it (BPA-61 review). SOR: POC database.
 - Seed (§8): activity `A-2301` (P6 via D365 PMS) with budgeted units 1200 and no Work Packs, for the end-to-end demo (BPA-68), so its Earned man-hours are not mixed with seeded Work Packs on A-2201 (BPA-62 roll-up).
 
-### 13.A Addendum 2 (S4, S5; 10 Nov 2026)
+#### Addendum 2 (S4, S5; 10 Nov 2026)
 - `fms_hours_export`: add `period_month` date NOT NULL (first day of the month); unique key becomes (`progress_period_id`, `period_month`) (S5). Add `fms_rejected_at` timestamptz NULL and `fms_rejected_reason` text NULL (S4; CHECK both null or both set). SOR: POC database.
 - No new column for S2/S3: Employment Type comes from `worker.agency_flag` (myPeople), CBS Cost Centre from `workpack.department_ref` (D365 F&O).
 
-### 13.A Addendum 3 (FRD options, 10 Nov 2026)
+#### Addendum 3 (FRD options, 10 Nov 2026)
 - (PARKED with BPA-71, D2: not in V2) `hours_approval` (E2-22): `id`; `hours_submission_id` uuid NOT NULL FK (was written `timesheet_submission_id`; the table is `hours_submission`, §2.1); `stage` text NOT NULL CHECK (LineManager, HrManager); `decision` text NOT NULL CHECK (Approved, Returned, Rejected); `reason` text NULL (required for Returned/Rejected); `decided_by`, `decided_at`; audit columns. UNIQUE (submission, stage, round). SOR: POC database.
 - (PARKED, D2) `hours_submission.approval_route` text NOT NULL DEFAULT 'Production' CHECK (Production, HR) (route fixed at send).
 - `digital_timesheet_line.reported_completion_pct` numeric(5,2) NULL CHECK 0-100 (C-E2-10, information only).
@@ -1230,11 +1233,11 @@ Never updated once its period is Locked (FRD-21 §21.9.1 "stored weeks are never
 - `hours_month_lock` (S5): `id` uuid PK; `month` date NOT NULL UNIQUE (first day); `locked_at` timestamptz NOT NULL; `lock_day` smallint NOT NULL CHECK (lock_day IN (1, 16)); audit columns. SOR: POC database. (Rev. 2: `id` PK added and `month` made UNIQUE, to follow the `id uuid` convention of every other table.)
 - Settings (application.yaml): progress.basis, progress.source, hours.monthLockDay, alerts.pconManagerEmail (hours.approvalRoute dropped, D2).
 
-### 13.A Addendum 4 (DoR decision D5, 10 Nov 2026)
+#### Addendum 4 (DoR decision D5, 10 Nov 2026)
 - `cbs_manhour_snapshot`: `id`; `month` date NOT NULL (first day); `cbs_code_ref` text NOT NULL (SOR D365 F&O CCR); `activity_ref` text NOT NULL (SOR P6 via D365 PMS); `approved_manhours` numeric(10,2) NOT NULL; `frozen_at` timestamptz NOT NULL; audit columns. UNIQUE (month, cbs_code_ref, activity_ref). Written once at the month lock; never updated (FRD-22 §22.8.1). SOR of the row: POC database.
 
-### 13.A Addendum 5 (11 Nov 2026: access scope and leave; BPA-48 item 11)
-Business need decided in Jira (BPA-76 to BPA-79 bring back project scope; BPA-75 blocks hours for a Worker on approved leave). Column design proposed by Claude for Ahsan's approval; open points are Q-DM23 and Q-DM24.
+#### Addendum 5 (11 Nov 2026: access scope and leave; BPA-48 item 11)
+Business need decided in Jira (BPA-76 to BPA-79 bring back project scope; BPA-75 blocks hours for a Worker on approved leave). Column design approved by Ahsan on 11 Nov 2026; Q-DM23 and Q-DM24 decided (§13.Q).
 
 #### `user_project` (domain: Access scope)
 | Column | Type | Null | Constraint | SOR | Source |

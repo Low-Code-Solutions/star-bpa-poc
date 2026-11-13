@@ -113,7 +113,9 @@ tests and in the showcase.
   form:** the table `user_project` (username, project_ref; POC database, ASSUMPTION; data model v0.7 section 13) holds which projects a
   user sees (BPA-76 to BPA-79). It is written by this S22 sync from a `projects:` list per persona in `personas.yaml` (it has a foreign key to
   `app_user`, so a SQL seed cannot write it), and by the PPC Team through the portal (BPA-76). There is still no department or role
-  scope and no `user_role_scope` table.
+  scope and no `user_role_scope` table. **Restart behaviour (ASSUMPTION):** the sync gives a persona its projects only while that user has no
+  `user_project` row, so a project the PPC Team removed in the portal is not brought back by a restart; if every project of a user was removed,
+  the next start seeds that user again.
 
 ## Sources
 

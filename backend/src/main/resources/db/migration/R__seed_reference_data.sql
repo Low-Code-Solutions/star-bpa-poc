@@ -277,11 +277,11 @@ ON CONFLICT (cbs_code_ref, block_type) DO UPDATE
 
 -- -----------------------------------------------------------------------------------------------------
 -- worker_leave. SOR: myPeople (ASSUMPTION, delta addendum 5). One Worker on approved leave in the demo month, for BPA-75
--- "on leave". Which Worker and which dates are an ASSUMPTION: E1021, 23 to 26 Nov 2026. No UNIQUE key, so insert when the row is not there.
+-- "on leave". Which Worker and which dates are an ASSUMPTION: E1203, 23 to 26 Nov 2026 (not E1021, the main Epic 1 named Worker). No UNIQUE key, so insert when the row is not there.
 -- -----------------------------------------------------------------------------------------------------
 INSERT INTO bpa.worker_leave (worker_id, leave_from, leave_to, created_by, updated_by)
 SELECT w.id, DATE '2026-11-23', DATE '2026-11-26', 'seed', 'seed'
 FROM bpa.worker w
-WHERE w.employee_ref = 'E1021'
+WHERE w.employee_ref = 'E1203'
   AND NOT EXISTS (SELECT 1 FROM bpa.worker_leave l
                   WHERE l.worker_id = w.id AND l.leave_from = DATE '2026-11-23' AND l.leave_to = DATE '2026-11-26');

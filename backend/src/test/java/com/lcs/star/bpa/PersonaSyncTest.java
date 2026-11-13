@@ -19,7 +19,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** BPA-43 Part B: the S22 persona sync against the integration Camunda (ADR 0005, L2, L9; Q4, Q5); BPA-44: seven personas, no scope. */
+/** BPA-43 Part B: the S22 persona sync against the integration Camunda (ADR 0005, L2, L9; Q4, Q5); BPA-44: seven personas, no scope; BPA-48: eleven, with project rows. */
 @Tag("integration")
 @TestMethodOrder(OrderAnnotation.class)
 class PersonaSyncTest {
@@ -105,6 +105,19 @@ class PersonaSyncTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.user_project", Integer.class)).as("project rows are upserted, not doubled").isEqualTo(5);
         assertThat(admin.authorizations("bpa-service")).hasSize(authorizationsBefore);
         assertThat(permissionsOf("bpa-service")).isEqualTo(permissionsBefore);
+    }
+
+    @Test
+    @Order(4)
+    void BPA48_personaSyncDoesNotBringBackAProjectRemovedInThePortal() {
+        sync().sync();
+        jdbc.update("DELETE FROM bpa.user_project WHERE username = 'project-manager' AND project_ref = 'PRJ-140'"); // as BPA-76 will, in the portal
+
+        sync().sync();
+
+        assertThat(jdbc.queryForList("SELECT project_ref FROM bpa.user_project WHERE username = 'project-manager'", String.class))
+                .as("a user that already has project rows is left alone").containsExactly("PRJ-139");
+        jdbc.update("INSERT INTO bpa.user_project (username, project_ref, created_by, updated_by) VALUES ('project-manager', 'PRJ-140', 'test', 'test')");
     }
 
     /** BPA-25 comment 10420 (shown to work, not proven minimal), plus RESOURCE CREATE so the app can auto-deploy the models (ASSUMPTION), plus GROUP READ on the two notified groups (BPA-16, ASSUMPTION). */

@@ -157,13 +157,13 @@ Taken as the recommended answer to each question; each is open to challenge by F
 | 2 | data-model.md v0.7 status "Approved 11 Nov 2026"; Q-DM16–24 **Decided**; the delta header says it is merged |
 | 3 | intent.md and spec.md status lines **not touched**: acceptance stays Faraz's to confirm |
 | 4 | Confirmed: no BPA-48 proof depends on the BPA-49 change |
-| 5 | **Partial unique index** `UNIQUE (digital_timesheet_id, work_date, phase) WHERE status <> 'Rejected'` (spec A5, Khitaba 10 Nov, E2-06 c). **Departs from the DDL approved 11 Nov (plain UNIQUE)**: the plain key would make E2-06 impossible and cannot be changed in V2 later. Flagged in the PR for Ahsan; Faraz/Khitaba to confirm |
-| 6 | The S22 persona sync writes `user_project` from a `projects:` list per persona in `personas.yaml`. **ASSUMPTION** assignments: timekeeper PRJ-139; production-supervisor PRJ-139; cost-controller PRJ-140; project-manager PRJ-139 and PRJ-140 (the one with both). `PersonaSync.GROUPS` grows from 7 to 11. Camunda permissions for the two new processes are not added: no story starts them yet |
+| 5 | **Partial unique index** `UNIQUE (digital_timesheet_id, work_date, phase) WHERE status <> 'Rejected'` (spec A5, Khitaba 10 Nov, E2-06 c). **Departs from the DDL approved 11 Nov (plain UNIQUE)**: the plain key would make E2-06 (re-booking after a rejection) impossible. It could be changed later only by a V3 on a server that already ran V2. Flagged in the PR for Ahsan; Khitaba and Faraz to confirm before merge. Covered by `BPA48_oneLinePerWorkerDatePhaseIgnoresRejectedLines` |
+| 6 | The S22 persona sync writes `user_project` from a `projects:` list per persona in `personas.yaml`, **only while the user has no `user_project` row** (so a project removed in the portal, BPA-76, is not brought back by a restart). **ASSUMPTION** assignments: timekeeper PRJ-139; production-supervisor PRJ-139; cost-controller PRJ-140; project-manager PRJ-139 and PRJ-140 (the one with both). `PersonaSync.GROUPS` grows from 7 to 11. Camunda permissions for the two new processes are not added: no story starts them yet |
 | 7 | Jira test names kept (`E2_00_*`) |
 | 8 | spec.md left to Khitaba (not touched) |
 | 9 | Keys under `bpa:` (`bpa.progress.basis`, `bpa.progress.source`, `bpa.hours.month-lock-day`, `bpa.alerts.pcon-manager-email`): Spring relaxed binding, kebab-case as in the file |
 | 10 | Synthetic values chosen and marked ASSUMPTION in the seed header |
-| 11 | `cbs_activity` not changed; CBS-139-PIP-99 stays for BPA-69 to map |
+| 11 | CBS-139-PIP-99 maps to no activity: left for BPA-69. (Separate from this: A-2301 is mapped to CBS-139-PIP-01 in `cbs_activity`, an ASSUMPTION so its time sheets carry the CBS that has a forecast and an actual cost) |
 | 12 | Both processes deploy now, as item 8 says; the weekly timer's orphan jobs are accepted until its workers land (R4) |
 
 ## Departures from the plan (recorded while building, 13 Nov 2026)
@@ -172,12 +172,16 @@ Taken as the recommended answer to each question; each is open to challenge by F
 - **Persona test order.** `PersonaSyncTest` compares the `app_user` names without order: the database collation sorts `timekeeper` before `time-method-analyst`, Java does not.
 - **Delta file.** Its status line says MERGED and names the one departure (Q-DM25); the data model section 13 is now the master.
 - **Data model.** Merged as a new section 13 (with Q-DM16 to Q-DM26) and a v0.7 change-log entry, not woven into sections 3 to 5: the v0.6 sections stay as they were so the Epic 1 history is unchanged.
-- **Seed values chosen (ASSUMPTION, Q10):** A-2301 "Synthetic end-to-end demo module M-04" on WBS 11031, 16 Nov to 31 Dec 2026, mapped to CBS-139-PIP-01 in `cbs_activity`; Worker HR values (department Fabrication, Painting or Assembly; Yard A or B; grades G1 to G3; Aramco IDs on three Workers); no forecast for CBS-139-PIP-02; E1021 on leave 23 to 26 Nov 2026.
+- **Seed values chosen (ASSUMPTION, Q10):** A-2301 "Synthetic end-to-end demo module M-04" on WBS 11031, 16 Nov to 31 Dec 2026, mapped to CBS-139-PIP-01 in `cbs_activity`; Worker HR values (department Fabrication, Painting or Assembly; Yard A or B; grades G1 to G3; Aramco IDs on three Workers); no forecast for CBS-139-PIP-02; E1203 on leave 23 to 26 Nov 2026 (not E1021, the main Epic 1 Worker, whom the leave would block).
+
+- **Tests the review (qa-reviewer, 13 Nov) asked for or the scope needed, not in the table above:** `ModelResourcesTest` (it lists the deployed models; the Epic 2 inputs commit added two processes and four decisions); the second test in `FlywayBaselineTest` (`BPA48_seedCarriesTheEpic2ReferenceRows`); in `Bpa48MigrationTest`: `BPA48_oneLinePerWorkerDatePhaseIgnoresRejectedLines`, `BPA48_hoursCannotBeNegativeAndEmployeeIdIsUnique`, `BPA48_seedCanBeRunAgainOnAMigratedDatabaseWithoutChangingIt`; in `PersonaSyncTest`: `BPA48_personaSyncDoesNotBringBackAProjectRemovedInThePortal`. These were written after the code they test, so they were not shown red first.
+- **docs/09** is amended in place for S6, S22 and L9 and with a dated line (the review found it still said seven personas), as BPA-44 did.
+- **Not done on purpose:** a 0 to 100 CHECK on `progress_retraction.approved_pct` (the delta does not state one; the API will validate it); the `E2_00_*` test names stay (Jira Definition of Done names them).
 
 ## Human-gap log
 - Epic 2 inputs staged from SharePoint by Ahsan via Claude (commit 0a61a4b) before the plan commit, a departure from ADR 0015 plan-first.
 - The DMN tables were never executed in the design session (spec, human gap 2); BPA-48 runs them for the first time.
 - Faraz to confirm intent/spec acceptance and move BPA-48 to Ready (it is In Progress without Ready).
 - Khitaba to update the Jira description (items 6, 7 history) and spec.md if Q1/Q8 say so.
-- The Epic-1-data Flyway check is a Testcontainers test (V1, Epic 1 rows by hand, then V2), not the QA server itself, which is Zain's.
+- The Epic-1-data Flyway check is a Testcontainers test (V1, Epic 1 rows by hand, then V2 and the seed), not the QA server itself, which is Zain's. No test replays the old seed's checksum history: the seed is run a second time on the migrated database instead.
 - Resolution 5 (partial unique index) differs from the DDL Ahsan approved on 11 Nov; Ahsan to confirm in review.

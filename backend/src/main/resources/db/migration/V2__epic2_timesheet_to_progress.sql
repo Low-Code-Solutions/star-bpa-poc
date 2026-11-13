@@ -358,7 +358,6 @@ ALTER TABLE bpa.digital_timesheet_line
 -- this departs from it on purpose, see the BPA-48 plan (Resolutions, Q5).
 CREATE UNIQUE INDEX digital_timesheet_line_one_per_worker_date_phase
     ON bpa.digital_timesheet_line (digital_timesheet_id, work_date, phase) WHERE status <> 'Rejected';
-COMMENT ON COLUMN bpa.digital_timesheet_line.hours_submission_id IS 'POC database';
 
 -- =====================================================================================================
 -- Domain A, cost reference copies (data model 4), seeded by R__seed_reference_data.sql
