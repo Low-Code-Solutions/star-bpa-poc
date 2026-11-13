@@ -63,8 +63,11 @@ Project and Claude Code use identical names. All file paths below are from the r
   e.g. BPA14_validNearMissStartsIncidentProcess
 
 ## Test users (personas)
-- Exactly seven, one per Camunda group, username equal to the group ID: time-method-analyst, project-engineer,
-  production-planner, production-team, ppc-team, supervisor, workpack-owner (PO decision 2 Nov 2026, BPA-44).
+- Exactly eleven, one per Camunda group, username equal to the group ID. The seven of Epic 1: time-method-analyst,
+  project-engineer, production-planner, production-team, ppc-team, supervisor, workpack-owner (PO decision 2 Nov 2026,
+  BPA-44). The four of Epic 2: timekeeper, production-supervisor, cost-controller, project-manager (E2-D1, Khitaba for the
+  PO, 10 Nov 2026; BPA-48). line-manager and hr-manager are not users: the HR route is parked with BPA-71 (11 Nov 2026).
 - Stories, Gherkin and tests use these usernames. Do not invent extra users (such as U-11 or pe.139); a story that
   genuinely needs a second user in one group raises it with the PO first.
-- No department or project scope: access is by group only.
+- No department scope: access to a task is by group only. The one scope is the project, held in `user_project`
+  (BPA-76 to BPA-79; data model v0.7 section 13): a user sees the projects assigned to them.

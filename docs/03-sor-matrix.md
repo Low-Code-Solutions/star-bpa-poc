@@ -2,6 +2,7 @@
 
 Status: **ACTIVE, 28 Oct 2026 (Epic 1 rows; updated for 09-architecture-decisions, D58, D59, and PO decision P1 on WBS of 28 Oct).** Applied under PO delegation (D55, confirmed by Khitaba); open to PO challenge.
 Amended 2 Nov 2026 (PO decision 2 Nov 2026, BPA-44): `user_role_scope` removed; test users are the seven personas, access by group only.
+Amended 13 Nov 2026 (BPA-48; Epic 2, data model v0.7, SORs approved by Khitaba for the PO on 11 Nov 2026): nine rows added below the Epic 1 slice entities; eleven personas; project scope returns as `user_project`.
 Owner: Faraz. Decision references (C, D) are in claude/06-epic1-decisions-draft.md; P1–P4 in claude/11-data-model.md §0.
 Column-level detail (types, constraints, SOR per column) is in claude/11-data-model.md (repo docs/data-model.md, 09 S16).
 
@@ -37,6 +38,15 @@ This matrix labels each **entity**. Column-level labels (including foreign-key c
 | System user identity and email | app_user.employee_ref, email | myPeople (identity); corporate email system (email, ASSUMPTION) | Reference (seeded copy) | n/a | D19 |
 | System user login, group membership (role) | Camunda username, Camunda group | Camunda identity (POC; OIDC later) | Seeded from personas.yaml at start-up (S22) | n/a | 09 S5, S6, S22 |
 | Work Pack, incl. phases, man hours, materials, status, assignment_state | workpack_number | FMS in production (copied to D365 via Int-4.1); **mastered in the POC database** | Write | Batch/file (partner-side) | C2, D47 |
+| Current Forecast MH, Revised Budget cost per CBS (Epic 2) | cbs_code_ref | D365 F&O Cost Control Report | Reference (seeded copy) | Real-time (internal D365) | E2 delta §4.1 |
+| Actual cost per CBS and month (Epic 2) | cbs_code_ref, period_month | D365 F&O Finance (new label) | Reference (seeded copy) | Internal D365 integration (FRD-22 §22.8) | E2 delta §4.2 |
+| FMS completion report: completion %, actual hours (Epic 2) | workpack_number | FMS | Upload by PPC (file) | Batch/file, partner-side | E2 delta §3.3 |
+| Approved hours file to FMS (Epic 2) | fms_hours_export | POC database (the file); FMS receives | Download by PPC (file) | Batch/file, partner-side (Int-7 or #8, C-E2-4) | E2 delta §3.2 |
+| Hours submission, decisions, time sheet lines, progress, Earned MH, alerts (Epic 2) | hours_submission, hours_decision, digital_timesheet_line, workpack_progress, activity_progress, variance_alert | POC database (real: D365 timesheet and D365 PMS) | Write | n/a | E2 delta §1-§5 |
+| Worker HR fields: Employee ID, Department, Category, Work Location, Grade, Aramco ID (Epic 2) | worker.employee_id and five more | myPeople (FRD-5-2 names D365 HR, C14) | Reference (seeded copy, synthetic) | n/a in POC | E2 delta §1A |
+| Worker approved leave (Epic 2) | worker_leave | myPeople **(ASSUMPTION)** | Reference (seeded copy, synthetic) | n/a in POC | E2 delta Add. 5 |
+| User-to-project assignment (Epic 2) | user_project | POC database **(ASSUMPTION)**: no STAR system holds portal access scope | Write (PPC Team, BPA-76); seeded by the persona sync | n/a | E2 delta Add. 5 |
+| CBS open/closed block per type (Epic 2) | cbs_block | POC master data (real: D365 F&O Cost Control Report) | Reference (seeded) | Real-time (internal D365) | E2 delta §4.3 |
 
 ## POC-mastered data
 | Entity | Why no existing system holds it in the POC | What happens at end of POC |
@@ -51,6 +61,10 @@ This matrix labels each **entity**. Column-level labels (including foreign-key c
 | digital_timesheet, digital_timesheet_line | Simulates the D365 timesheet / digital tab (D36) | Discarded |
 | notification | Output of the drawing-revision notice (D44) | Discarded |
 | audit_log | Audit trail of POC-mastered data (FRD-7 §7.3.3, D64) | Discarded |
+| hours_submission, hours_decision, timesheet_file, timesheet_file_row, hours_month_lock | Epic 2 hours approval records and intake log; simulate the D365 timesheet approval workflow (FRD-5-12 §5.12.5.5) | Discarded |
+| progress_period, fms_hours_export, completion_report, completion_report_row, workpack_progress, progress_retraction, activity_progress, cbs_manhour_snapshot, cbs_review | Epic 2 weekly progress records; simulate D365 PMS (FRD-21, FRD-22) | Discarded |
+| variance_alert | Output of the man-hour and cost variance alerts (FRD-22 §22.10) | Discarded |
+| user_project | Which portal user may see which project (BPA-76 to BPA-79) | Discarded |
 
 ## Mocks
 | System | Mock type | Location in repo |
@@ -60,4 +74,4 @@ This matrix labels each **entity**. Column-level labels (including foreign-key c
 | D365 Document Control (drawing revisions) | In-app endpoint POST /api/v1/drawing-revisions publishing DrawingRevised (D41) | backend (API) |
 | Corporate email | Mailpit (catch-only; SMTP 1025, web 8025) (09 S8) | docker compose |
 | D365, P6, FMS master data | Repeatable Flyway seed R__seed_reference_data.sql; SOR per table via COMMENT ON TABLE (09 S16, S17); schema V1__baseline_schema.sql from docs/data-model.md | backend/src/main/resources/db/migration/ (09 L1) |
-| myPeople / identity for test users | personas.yaml → Camunda users and groups + app_user; seven personas, username = group ID (09 S22; BPA-44) | backend config |
+| myPeople / identity for test users | personas.yaml → Camunda users and groups + app_user (+ user_project); eleven personas, username = group ID (09 S22; BPA-44, BPA-48) | backend config |

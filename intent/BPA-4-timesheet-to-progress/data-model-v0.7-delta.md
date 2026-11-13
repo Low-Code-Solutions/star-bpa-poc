@@ -1,6 +1,6 @@
 # Data model v0.7 delta: Epic 2 (Timesheet to Progress)
 
-Status: **DRAFT 11 Nov 2026 (rev. 2)**, against `docs/data-model.md` v0.6 (main 831155a). Prepared by Claude for
+Status: **MERGED 13 Nov 2026 into `docs/data-model.md` v0.7, section 13 (BPA-48); this file is now history and the data model is the master.** SORs approved by Khitaba for the PO and DDL approved by Ahsan, 11 Nov 2026 (BPA-48 comment 10530); Q-DM16 to Q-DM24 decided. One departure from this rev. 2: the unique key of `digital_timesheet_line` ignores Rejected lines (Q-DM25). Was: DRAFT 11 Nov 2026 (rev. 2), against `docs/data-model.md` v0.6 (main 831155a). Prepared by Claude for
 Khitaba (SOR check, deciding for the PO) and Ahsan (DDL approval; Usama left on 2 Nov).
 Only changes are listed; everything in v0.6 stays. Conventions, audit columns (§1.2), SOR labels (§1.3)
 and markers (§1.4) as in v0.6: **(A)** = ASSUMPTION; **worker-checked** = enforced by a job worker or the

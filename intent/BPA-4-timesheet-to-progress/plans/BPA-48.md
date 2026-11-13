@@ -149,9 +149,35 @@ not just its output. Input values are boundary picks from the DMN text, not busi
 11. **CBS-139-PIP-99** (closed for FmsTimesheet) is mapped to no activity in `cbs_activity`, so no time sheet can carry it. BPA-69 needs one. Add a `cbs_activity` row now (which activity?) or leave it to BPA-69?
 12. **Weekly timer (R4).** Deploy `Process_PPC_WeeklyProgressPeriod` now as item 8 says, accepting weekly orphan instances until its workers exist, or deploy it with BPA-49/later?
 
+### Resolutions (Ahsan, 13 Nov 2026: "do everything yourself as per your recommended approach")
+Taken as the recommended answer to each question; each is open to challenge by Faraz or Khitaba in the PR.
+| Q | Applied |
+|---|---|
+| 1 | `bpa.alerts.pcon-manager-email: pcon-manager@example.com` **(ASSUMPTION: synthetic)**; `hours.approvalRoute` not added |
+| 2 | data-model.md v0.7 status "Approved 11 Nov 2026"; Q-DM16–24 **Decided**; the delta header says it is merged |
+| 3 | intent.md and spec.md status lines **not touched**: acceptance stays Faraz's to confirm |
+| 4 | Confirmed: no BPA-48 proof depends on the BPA-49 change |
+| 5 | **Partial unique index** `UNIQUE (digital_timesheet_id, work_date, phase) WHERE status <> 'Rejected'` (spec A5, Khitaba 10 Nov, E2-06 c). **Departs from the DDL approved 11 Nov (plain UNIQUE)**: the plain key would make E2-06 impossible and cannot be changed in V2 later. Flagged in the PR for Ahsan; Faraz/Khitaba to confirm |
+| 6 | The S22 persona sync writes `user_project` from a `projects:` list per persona in `personas.yaml`. **ASSUMPTION** assignments: timekeeper PRJ-139; production-supervisor PRJ-139; cost-controller PRJ-140; project-manager PRJ-139 and PRJ-140 (the one with both). `PersonaSync.GROUPS` grows from 7 to 11. Camunda permissions for the two new processes are not added: no story starts them yet |
+| 7 | Jira test names kept (`E2_00_*`) |
+| 8 | spec.md left to Khitaba (not touched) |
+| 9 | Keys under `bpa:` (`bpa.progress.basis`, `bpa.progress.source`, `bpa.hours.month-lock-day`, `bpa.alerts.pcon-manager-email`): Spring relaxed binding, kebab-case as in the file |
+| 10 | Synthetic values chosen and marked ASSUMPTION in the seed header |
+| 11 | `cbs_activity` not changed; CBS-139-PIP-99 stays for BPA-69 to map |
+| 12 | Both processes deploy now, as item 8 says; the weekly timer's orphan jobs are accepted until its workers land (R4) |
+
+## Departures from the plan (recorded while building, 13 Nov 2026)
+- **Migration test.** The proof "V2 on a DB with Epic 1 data" is the new `Bpa48MigrationTest` (Flyway alone: V1, Epic 1 rows by hand, then V2), not a local compose run. Flyway runs repeatable migrations whatever the target, so the V1-only step gives the repeatable prefix a value that matches nothing, otherwise the new seed fails on the V1 schema.
+- **PersonaSync code.** `PersonaFile.Persona` gets `projects`, `PersonaSync.GROUPS` has eleven entries and `syncUserProjects` writes `user_project` (Resolution 6). Not in the original "Files that change" table.
+- **Persona test order.** `PersonaSyncTest` compares the `app_user` names without order: the database collation sorts `timekeeper` before `time-method-analyst`, Java does not.
+- **Delta file.** Its status line says MERGED and names the one departure (Q-DM25); the data model section 13 is now the master.
+- **Data model.** Merged as a new section 13 (with Q-DM16 to Q-DM26) and a v0.7 change-log entry, not woven into sections 3 to 5: the v0.6 sections stay as they were so the Epic 1 history is unchanged.
+- **Seed values chosen (ASSUMPTION, Q10):** A-2301 "Synthetic end-to-end demo module M-04" on WBS 11031, 16 Nov to 31 Dec 2026, mapped to CBS-139-PIP-01 in `cbs_activity`; Worker HR values (department Fabrication, Painting or Assembly; Yard A or B; grades G1 to G3; Aramco IDs on three Workers); no forecast for CBS-139-PIP-02; E1021 on leave 23 to 26 Nov 2026.
+
 ## Human-gap log
 - Epic 2 inputs staged from SharePoint by Ahsan via Claude (commit 0a61a4b) before the plan commit, a departure from ADR 0015 plan-first.
 - The DMN tables were never executed in the design session (spec, human gap 2); BPA-48 runs them for the first time.
 - Faraz to confirm intent/spec acceptance and move BPA-48 to Ready (it is In Progress without Ready).
 - Khitaba to update the Jira description (items 6, 7 history) and spec.md if Q1/Q8 say so.
-- The Epic-1-data Flyway check needs a running stack and an Epic 1 run; done by me locally, but the QA server itself is Zain's.
+- The Epic-1-data Flyway check is a Testcontainers test (V1, Epic 1 rows by hand, then V2), not the QA server itself, which is Zain's.
+- Resolution 5 (partial unique index) differs from the DDL Ahsan approved on 11 Nov; Ahsan to confirm in review.
