@@ -43,7 +43,8 @@ class ModelDeployTest {
                     .map(d -> d.getProcessDefinitionId())
                     .collect(Collectors.toSet());
             assertThat(processes).contains(
-                    "Process_PPC_WorkPackAssignment", "Process_PPC_WorkerReassignment", "Process_PPC_DrawingRevisionNotice");
+                    "Process_PPC_WorkPackAssignment", "Process_PPC_WorkerReassignment", "Process_PPC_DrawingRevisionNotice",
+                    "Process_PPC_TimesheetToProgress", "Process_PPC_WeeklyProgressPeriod"); // BPA-48: the two Epic 2 processes
         });
     }
 

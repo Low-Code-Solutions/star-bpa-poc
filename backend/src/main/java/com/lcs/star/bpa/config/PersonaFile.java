@@ -12,10 +12,11 @@ import org.springframework.core.io.Resource;
 /** The contents of {@code personas.yaml} (S22, L9). */
 public record PersonaFile(List<Persona> users) {
 
-    public record Persona(String username, String name, String employeeRef, String email, List<String> groups) {
+    public record Persona(String username, String name, String employeeRef, String email, List<String> groups, List<String> projects) {
 
         public Persona {
             groups = groups == null ? List.of() : List.copyOf(groups);
+            projects = projects == null ? List.of() : List.copyOf(projects); // BPA-48: project_ref values for bpa.user_project
         }
     }
 

@@ -7,8 +7,9 @@
 --     whole row (every non-key column is part of the match, so there is nothing for an UPDATE to change);
 --   * nothing is deleted; drawing_revision rows written at runtime from DrawingRevised events are never touched
 --     (only the (drawing_ref, revision) pairs below are written).
--- Not seeded here: app_user (S22 job, L2), Work Pack, assignment, hours, notification and audit
--- tables, scenario data (A6, A7, B7). Named rows come from data model section 11.
+-- Not seeded here: app_user and user_project (S22 job, L2; user_project has a foreign key to app_user), Work Pack, assignment, hours,
+-- notification and audit tables, scenario data (A6, A7, B7). Named rows come from data model section 11 and, for Epic 2, section 8 of
+-- the v0.7 delta (BPA-48). Values for Epic 2 that no source names are synthetic and marked ASSUMPTION where they appear.
 
 -- -----------------------------------------------------------------------------------------------------
 -- department. SOR: D365 F&O Organisation (financial dimension). 3 rows (L8).
@@ -44,7 +45,7 @@ ON CONFLICT (wbs_ref) DO UPDATE
     WHERE bpa.wbs.project_ref IS DISTINCT FROM EXCLUDED.project_ref;
 
 -- -----------------------------------------------------------------------------------------------------
--- activity. SOR: P6 via D365 PMS (wbs_ref is D365 F&O Project Management). 10 rows (L8: about 10).
+-- activity. SOR: P6 via D365 PMS (wbs_ref is D365 F&O Project Management). 11 rows (L8: about 10; A-2301 added by BPA-48).
 -- A-2201 is the named row (section 11); A-2299 has no plan data (BPA-6).
 -- -----------------------------------------------------------------------------------------------------
 INSERT INTO bpa.activity (activity_ref, activity_name, wbs_ref, fac_crpo, fac_type, fac_name, discipline,
@@ -68,7 +69,11 @@ VALUES ('A-2201', 'Synthetic piping module M-01',  '11031', '139', 'Module', 'M-
        ('A-2209', 'Synthetic tie-in T-01',         '11031', '139', 'Module', 'T-01', 'Piping',
         DATE '2026-12-15', DATE '2027-01-20',  410.00, 'seed', 'seed'),
        ('A-2299', 'Synthetic activity without plan data', '11031', NULL, NULL, NULL, NULL,
-        NULL, NULL, NULL, 'seed', 'seed')
+        NULL, NULL, NULL, 'seed', 'seed'),
+       -- BPA-48 (comment 10481): budgeted units 1200 and no Work Packs, for the end-to-end demo (BPA-68). Name, WBS and dates are an
+       -- ASSUMPTION: no source names them.
+       ('A-2301', 'Synthetic end-to-end demo module M-04', '11031', '139', 'Module', 'M-04', 'Piping',
+        DATE '2026-11-16', DATE '2026-12-31', 1200.00, 'seed', 'seed')
 ON CONFLICT (activity_ref) DO UPDATE
     SET activity_name = EXCLUDED.activity_name, wbs_ref = EXCLUDED.wbs_ref, fac_crpo = EXCLUDED.fac_crpo,
         fac_type = EXCLUDED.fac_type, fac_name = EXCLUDED.fac_name, discipline = EXCLUDED.discipline,
@@ -83,14 +88,16 @@ ON CONFLICT (activity_ref) DO UPDATE
 
 -- -----------------------------------------------------------------------------------------------------
 -- cbs_activity. SOR: P6 via D365 PMS (activity_ref); cbs_code_ref is D365 F&O Cost Control Report.
--- At most one row per activity; A-2206 to A-2209 and A-2299 have none (BPA-15: blank CBS).
+-- At most one row per activity; A-2206 to A-2209 and A-2299 have none (BPA-15: blank CBS). CBS-139-PIP-99 below maps to no activity yet (BPA-69).
 -- -----------------------------------------------------------------------------------------------------
 INSERT INTO bpa.cbs_activity (activity_ref, cbs_code_ref, created_by, updated_by)
 VALUES ('A-2201', 'CBS-139-PIP-01', 'seed', 'seed'),
        ('A-2202', 'CBS-139-PIP-02', 'seed', 'seed'),
        ('A-2203', 'CBS-139-STR-01', 'seed', 'seed'),
        ('A-2204', 'CBS-139-STR-02', 'seed', 'seed'),
-       ('A-2205', 'CBS-139-MEC-01', 'seed', 'seed')
+       ('A-2205', 'CBS-139-MEC-01', 'seed', 'seed'),
+       -- BPA-48 (ASSUMPTION): the demo activity shares CBS-139-PIP-01 with A-2201, the CBS that has a forecast and an actual cost below.
+       ('A-2301', 'CBS-139-PIP-01', 'seed', 'seed')
 ON CONFLICT (activity_ref) DO UPDATE
     SET cbs_code_ref = EXCLUDED.cbs_code_ref, updated_at = now(), updated_by = 'seed'
     WHERE bpa.cbs_activity.cbs_code_ref IS DISTINCT FROM EXCLUDED.cbs_code_ref;
@@ -206,25 +213,75 @@ ON CONFLICT (design_dwg_ref) DO UPDATE
 -- Named rows: E1021, E1099, E1150 (no cost centre), E2001 (agency); E9999 must not exist.
 -- "Inactive" is an ordinary worker and "another department" cannot be seeded (section 11, Q-DM5, ASSUMPTION).
 -- agency_flag: field name and values are an ASSUMPTION (C11).
+-- BPA-48 (comment 10518; data model 1A): the six HR fields of FRD-5-2 5.2.6.2. employee_id is EMP-<badge> (delta section 8); one Worker
+-- of each category at least (E2001, the agency Worker, is a Contractor); aramco_id is NULL where not applicable. department_ref,
+-- work_location, grade and aramco_id values are synthetic ASSUMPTIONs: no source names them.
 -- -----------------------------------------------------------------------------------------------------
-INSERT INTO bpa.worker (employee_ref, name, role, designation, agency_flag, cost_centre_ref, created_by, updated_by)
-VALUES ('E1021', 'Worker E1021', 'Welder', 'Grade 3', false, 'STRP01', 'seed', 'seed'),
-       ('E1099', 'Worker E1099', 'Fitter', 'Grade 2', false, 'STRP01', 'seed', 'seed'),
-       ('E1150', 'Worker E1150', 'Rigger', 'Grade 1', false, NULL,     'seed', 'seed'),
-       ('E2001', 'Worker E2001', 'Helper', 'Grade 1', true,  'STRP02', 'seed', 'seed'),
-       ('E1201', 'Worker E1201', 'Welder', 'Grade 2', false, 'STRP01', 'seed', 'seed'),
-       ('E1202', 'Worker E1202', 'Fitter', 'Grade 3', false, 'STRP01', 'seed', 'seed'),
-       ('E1203', 'Worker E1203', 'Welder', 'Grade 1', false, 'STRP02', 'seed', 'seed'),
-       ('E1204', 'Worker E1204', 'Painter', 'Grade 2', false, 'STRP02', 'seed', 'seed'),
-       ('E1205', 'Worker E1205', 'Fitter', 'Grade 1', false, 'STRP01', 'seed', 'seed'),
-       ('E1206', 'Worker E1206', 'Rigger', 'Grade 2', false, 'STRP02', 'seed', 'seed'),
-       ('E1207', 'Worker E1207', 'Welder', 'Grade 3', false, 'STRP01', 'seed', 'seed'),
-       ('E1208', 'Worker E1208', 'Painter', 'Grade 1', false, 'STRP02', 'seed', 'seed')
+INSERT INTO bpa.worker (employee_ref, employee_id, name, role, designation, agency_flag, cost_centre_ref,
+                       department_ref, employee_category, work_location, grade, aramco_id, created_by, updated_by)
+VALUES ('E1021', 'EMP-E1021', 'Worker E1021', 'Welder',  'Grade 3', false, 'STRP01', 'Fabrication', 'Worker',     'Yard A', 'G3', 'AR-70021', 'seed', 'seed'),
+       ('E1099', 'EMP-E1099', 'Worker E1099', 'Fitter',  'Grade 2', false, 'STRP01', 'Fabrication', 'Worker',     'Yard A', 'G2', NULL,       'seed', 'seed'),
+       ('E1150', 'EMP-E1150', 'Worker E1150', 'Rigger',  'Grade 1', false, NULL,     'Assembly',    'Worker',     'Yard B', 'G1', NULL,       'seed', 'seed'),
+       ('E2001', 'EMP-E2001', 'Worker E2001', 'Helper',  'Grade 1', true,  'STRP02', 'Assembly',    'Contractor', 'Yard B', 'G1', NULL,       'seed', 'seed'),
+       ('E1201', 'EMP-E1201', 'Worker E1201', 'Welder',  'Grade 2', false, 'STRP01', 'Fabrication', 'Worker',     'Yard A', 'G2', NULL,       'seed', 'seed'),
+       ('E1202', 'EMP-E1202', 'Worker E1202', 'Fitter',  'Grade 3', false, 'STRP01', 'Fabrication', 'Staff',      'Yard A', 'G3', 'AR-70202', 'seed', 'seed'),
+       ('E1203', 'EMP-E1203', 'Worker E1203', 'Welder',  'Grade 1', false, 'STRP02', 'Painting',    'Worker',     'Yard B', 'G1', NULL,       'seed', 'seed'),
+       ('E1204', 'EMP-E1204', 'Worker E1204', 'Painter', 'Grade 2', false, 'STRP02', 'Painting',    'Worker',     'Yard B', 'G2', NULL,       'seed', 'seed'),
+       ('E1205', 'EMP-E1205', 'Worker E1205', 'Fitter',  'Grade 1', false, 'STRP01', 'Fabrication', 'Worker',     'Yard A', 'G1', NULL,       'seed', 'seed'),
+       ('E1206', 'EMP-E1206', 'Worker E1206', 'Rigger',  'Grade 2', false, 'STRP02', 'Assembly',    'Contractor', 'Yard B', 'G2', NULL,       'seed', 'seed'),
+       ('E1207', 'EMP-E1207', 'Worker E1207', 'Welder',  'Grade 3', false, 'STRP01', 'Fabrication', 'Staff',      'Yard A', 'G3', 'AR-70207', 'seed', 'seed'),
+       ('E1208', 'EMP-E1208', 'Worker E1208', 'Painter', 'Grade 1', false, 'STRP02', 'Painting',    'Worker',     'Yard B', 'G1', NULL,       'seed', 'seed')
 ON CONFLICT (employee_ref) DO UPDATE
-    SET name = EXCLUDED.name, role = EXCLUDED.role, designation = EXCLUDED.designation,
-        agency_flag = EXCLUDED.agency_flag, cost_centre_ref = EXCLUDED.cost_centre_ref,
-        updated_at = now(), updated_by = 'seed'
-    WHERE (bpa.worker.name, bpa.worker.role, bpa.worker.designation, bpa.worker.agency_flag,
-           bpa.worker.cost_centre_ref)
+    SET employee_id = EXCLUDED.employee_id, name = EXCLUDED.name, role = EXCLUDED.role, designation = EXCLUDED.designation,
+        agency_flag = EXCLUDED.agency_flag, cost_centre_ref = EXCLUDED.cost_centre_ref, department_ref = EXCLUDED.department_ref,
+        employee_category = EXCLUDED.employee_category, work_location = EXCLUDED.work_location, grade = EXCLUDED.grade,
+        aramco_id = EXCLUDED.aramco_id, updated_at = now(), updated_by = 'seed'
+    WHERE (bpa.worker.employee_id, bpa.worker.name, bpa.worker.role, bpa.worker.designation, bpa.worker.agency_flag,
+           bpa.worker.cost_centre_ref, bpa.worker.department_ref, bpa.worker.employee_category, bpa.worker.work_location,
+           bpa.worker.grade, bpa.worker.aramco_id)
           IS DISTINCT FROM
-          (EXCLUDED.name, EXCLUDED.role, EXCLUDED.designation, EXCLUDED.agency_flag, EXCLUDED.cost_centre_ref);
+          (EXCLUDED.employee_id, EXCLUDED.name, EXCLUDED.role, EXCLUDED.designation, EXCLUDED.agency_flag, EXCLUDED.cost_centre_ref,
+           EXCLUDED.department_ref, EXCLUDED.employee_category, EXCLUDED.work_location, EXCLUDED.grade, EXCLUDED.aramco_id);
+
+-- -----------------------------------------------------------------------------------------------------
+-- cbs_forecast. SOR: D365 F&O Cost Control Report (BPA-48; delta section 8; values synthetic).
+-- CBS-139-PIP-01 has a forecast; CBS-139-PIP-02 has none, to prove "no forecast, no alert" (ASSUMPTION: the delta does not name the CBS).
+-- -----------------------------------------------------------------------------------------------------
+INSERT INTO bpa.cbs_forecast (cbs_code_ref, current_forecast_mh, revised_budget_cost, created_by, updated_by)
+VALUES ('CBS-139-PIP-01', 1000.00, 250000.00, 'seed', 'seed')
+ON CONFLICT (cbs_code_ref) DO UPDATE
+    SET current_forecast_mh = EXCLUDED.current_forecast_mh, revised_budget_cost = EXCLUDED.revised_budget_cost,
+        updated_at = now(), updated_by = 'seed'
+    WHERE (bpa.cbs_forecast.current_forecast_mh, bpa.cbs_forecast.revised_budget_cost)
+          IS DISTINCT FROM (EXCLUDED.current_forecast_mh, EXCLUDED.revised_budget_cost);
+
+-- -----------------------------------------------------------------------------------------------------
+-- cbs_actual_cost. SOR: D365 F&O Finance for the amount (FRD-22 5.3.1); the table is labelled D365 F&O Cost Control Report.
+-- -----------------------------------------------------------------------------------------------------
+INSERT INTO bpa.cbs_actual_cost (cbs_code_ref, period_month, actual_cost, created_by, updated_by)
+VALUES ('CBS-139-PIP-01', DATE '2026-11-01', 180000.00, 'seed', 'seed')
+ON CONFLICT (cbs_code_ref, period_month) DO UPDATE
+    SET actual_cost = EXCLUDED.actual_cost, updated_at = now(), updated_by = 'seed'
+    WHERE bpa.cbs_actual_cost.actual_cost IS DISTINCT FROM EXCLUDED.actual_cost;
+
+-- -----------------------------------------------------------------------------------------------------
+-- cbs_block. POC master data, real SOR D365 F&O Cost Control Report (delta 4.3; comments 10487, 10508).
+-- No row means open. CBS-139-PIP-99 is closed for FmsTimesheet, for BPA-69; no activity maps to it yet.
+-- -----------------------------------------------------------------------------------------------------
+INSERT INTO bpa.cbs_block (cbs_code_ref, block_type, is_closed, created_by, updated_by)
+VALUES ('CBS-139-PIP-01', 'FmsTimesheet', false, 'seed', 'seed'),
+       ('CBS-139-PIP-99', 'FmsTimesheet', true,  'seed', 'seed')
+ON CONFLICT (cbs_code_ref, block_type) DO UPDATE
+    SET is_closed = EXCLUDED.is_closed, updated_at = now(), updated_by = 'seed'
+    WHERE bpa.cbs_block.is_closed IS DISTINCT FROM EXCLUDED.is_closed;
+
+-- -----------------------------------------------------------------------------------------------------
+-- worker_leave. SOR: myPeople (ASSUMPTION, delta addendum 5). One Worker on approved leave in the demo month, for BPA-75
+-- "on leave". Which Worker and which dates are an ASSUMPTION: E1021, 23 to 26 Nov 2026. No UNIQUE key, so insert when the row is not there.
+-- -----------------------------------------------------------------------------------------------------
+INSERT INTO bpa.worker_leave (worker_id, leave_from, leave_to, created_by, updated_by)
+SELECT w.id, DATE '2026-11-23', DATE '2026-11-26', 'seed', 'seed'
+FROM bpa.worker w
+WHERE w.employee_ref = 'E1021'
+  AND NOT EXISTS (SELECT 1 FROM bpa.worker_leave l
+                  WHERE l.worker_id = w.id AND l.leave_from = DATE '2026-11-23' AND l.leave_to = DATE '2026-11-26');

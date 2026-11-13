@@ -64,6 +64,17 @@ bpa:
     file: classpath:personas.yaml
     demo-password: ${DEMO_PASSWORD:}
     service-password: ${BPA_SERVICE_PASSWORD:}
+  # BPA-48 (Epic 2 settings; Jira description item 6, comment 10498; the keys under bpa: are an ASSUMPTION, plan Q9). Nothing reads them yet:
+  # the stories that do are BPA-58 (month lock), BPA-59 and BPA-62 (progress source), BPA-60 (progress basis), BPA-64 and BPA-65 (alerts).
+  # hours.approvalRoute is not here: the HR route is parked with BPA-71 (D2).
+  progress:
+    basis: Physical # Physical | Hours (C-E2-2); the default follows FRD-21
+    source: FMS # FMS | PMS (C-E2-3); the default follows FRD-21
+  hours:
+    month-lock-day: 1 # 1 (FRD-5-3 5.3.3.3) or 16 (FRD-5-3 5.3.8.1), S5
+  alerts:
+    # D3: the PCON Manager has no login; both variance alerts go to this address as email (FRD-22 22.10). The address is an ASSUMPTION (synthetic).
+    pcon-manager-email: pcon-manager@example.com
   # Backend task API (09 S14, ADR 0004; BPA-26): the per-task variable allow-lists, keyed by BPMN element ID (brackets keep
   # the key as written). write: the only names a completion may carry (400 otherwise); names from the CompleteTaskRequest
   # description in api/openapi.yaml. read: what GET /api/v1/tasks/{key} returns in `variables`; equal to write for prefill

@@ -66,12 +66,14 @@ class PersonaSyncTest {
 
     @Test
     @Order(2)
-    void BPA44_personaSyncCreatesSevenPersonasInTheirGroups() {
+    void BPA48_personaSyncCreatesElevenPersonasInTheirGroups() {
         sync().sync();
 
-        // PO decision 2 Nov 2026: seven personas, username == Camunda group ID, access by group only (BPA-44).
+        // PO decision 2 Nov 2026 (BPA-44): username == Camunda group ID, access by group only. E2-D1 (BPA-48): four more, eleven in all;
+        // line-manager and hr-manager are parked with BPA-71.
         List<String> groupIds = List.of("time-method-analyst", "project-engineer", "production-planner", "production-team", "ppc-team",
-                "supervisor", "workpack-owner");
+                "supervisor", "workpack-owner", "timekeeper", "production-supervisor", "cost-controller", "project-manager");
+        assertThat(groupIds).hasSize(11);
         assertThat(personas.users()).extracting(PersonaFile.Persona::username).containsExactlyInAnyOrderElementsOf(groupIds);
         for (PersonaFile.Persona persona : personas.users()) {
             var user = identity.verify(persona.username(), DEMO_PASSWORD);
@@ -80,9 +82,13 @@ class PersonaSyncTest {
         }
 
         assertThat(jdbc.queryForList("SELECT username FROM bpa.app_user ORDER BY username", String.class))
-                .containsExactlyElementsOf(groupIds.stream().sorted().toList());
+                .containsExactlyInAnyOrderElementsOf(groupIds); // not ordered: the database collation sorts timekeeper before time-method-analyst
         assertThat(jdbc.queryForList("SELECT table_name FROM information_schema.tables WHERE table_schema = 'bpa' AND table_name LIKE '%scope%'",
                 String.class)).as("no scope table").isEmpty();
+        // BPA-48 (ASSUMPTION, plan Q6): project access for the project-scoped personas, written by the sync from personas.yaml
+        assertThat(jdbc.queryForList("SELECT username || ' ' || project_ref FROM bpa.user_project ORDER BY username, project_ref", String.class))
+                .containsExactly("cost-controller PRJ-140", "production-supervisor PRJ-139", "project-manager PRJ-139", "project-manager PRJ-140",
+                        "timekeeper PRJ-139");
     }
 
     @Test
@@ -95,7 +101,8 @@ class PersonaSyncTest {
         sync().sync();
         sync().sync();
 
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.app_user", Integer.class)).isEqualTo(7);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.app_user", Integer.class)).isEqualTo(11);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.user_project", Integer.class)).as("project rows are upserted, not doubled").isEqualTo(5);
         assertThat(admin.authorizations("bpa-service")).hasSize(authorizationsBefore);
         assertThat(permissionsOf("bpa-service")).isEqualTo(permissionsBefore);
     }

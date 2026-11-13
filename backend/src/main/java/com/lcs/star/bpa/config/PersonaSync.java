@@ -16,7 +16,8 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 
 /**
  * S22 persona sync (ADR 0005, L2, L9; BPA-43 Q4, Q5; BPA-44). The only runtime writer of Camunda users and groups and of
- * {@code app_user}. Access is by Camunda group only: there is no department or project scope. Idempotent: existing groups, users and
+ * {@code app_user} and {@code user_project} (BPA-48: the project scope of BPA-76 to BPA-79; no department or role scope). Access to
+ * a task is by Camunda group only. Idempotent: existing groups, users and
  * memberships are kept, missing permissions are added. It only adds: removing a persona or one of its groups from
  * {@code personas.yaml} needs a manual step in Camunda Admin.
  *
@@ -29,9 +30,9 @@ public class PersonaSync implements SmartInitializingSingleton {
 
     static final String SERVICE_USER = "bpa-service";
 
-    /** The seven S6 groups. */
+    /** The eleven S6 groups: the seven of Epic 1, and the four of Epic 2 (E2-D1, BPA-48). */
     static final List<String> GROUPS = List.of("time-method-analyst", "project-engineer", "production-planner", "workpack-owner",
-            "ppc-team", "supervisor", "production-team");
+            "ppc-team", "supervisor", "production-team", "timekeeper", "production-supervisor", "cost-controller", "project-manager");
 
     private static final Set<String> PROCESS_PERMISSIONS = Set.of("READ_USER_TASK", "UPDATE_USER_TASK", "COMPLETE_USER_TASK",
             "UPDATE_PROCESS_INSTANCE", "CREATE_PROCESS_INSTANCE");
@@ -83,7 +84,10 @@ public class PersonaSync implements SmartInitializingSingleton {
         for (PersonaFile.Persona persona : personas.users()) {
             syncCamundaUser(persona);
         }
-        transaction.executeWithoutResult(status -> personas.users().forEach(this::syncAppUser));
+        transaction.executeWithoutResult(status -> {
+            personas.users().forEach(this::syncAppUser);
+            personas.users().forEach(this::syncUserProjects);
+        });
         LOG.info("Persona sync done: {} personas, {} groups, {}", personas.users().size(), GROUPS.size(), SERVICE_USER);
     }
 
@@ -125,6 +129,17 @@ public class PersonaSync implements SmartInitializingSingleton {
                     SET employee_ref = EXCLUDED.employee_ref, email = EXCLUDED.email, updated_at = now(), updated_by = 'persona-sync'
                     WHERE (bpa.app_user.employee_ref, bpa.app_user.email) IS DISTINCT FROM (EXCLUDED.employee_ref, EXCLUDED.email)
                 """, persona.username(), persona.employeeRef(), persona.email());
+    }
+
+    /** Adds the persona's projects to user_project; a row that is there is left alone. It only adds, like the rest of the sync. */
+    private void syncUserProjects(PersonaFile.Persona persona) {
+        for (String projectRef : persona.projects()) {
+            jdbc.update("""
+                    INSERT INTO bpa.user_project (username, project_ref, created_by, updated_by)
+                    VALUES (?, ?, 'persona-sync', 'persona-sync')
+                    ON CONFLICT (username, project_ref) DO NOTHING
+                    """, persona.username(), projectRef);
+        }
     }
 
     private static String required(String value, String name) {

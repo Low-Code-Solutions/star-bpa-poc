@@ -1,8 +1,12 @@
-# S22 personas (ADR 0005, 09 L9; PO decision 2 Nov 2026, BPA-44): seven test users, one per S6 group, each with a
-# username equal to its Camunda group ID. Access is by group only: no department or project scope.
+# S22 personas (ADR 0005, 09 L9; PO decision 2 Nov 2026, BPA-44; E2-D1, BPA-48): eleven test users, one per S6 group, each with a
+# username equal to its Camunda group ID. Access is by group only. The only scope is `projects` (below, BPA-76 to BPA-79).
+# line-manager and hr-manager are not here: the HR route is parked with BPA-71 (D2, 11 Nov 2026).
 # Read only by the S22 persona sync, profiles local and showcase.
 # No passwords here: every persona uses DEMO_PASSWORD from .env.
 # ASSUMPTION (BPA-43 Q5): the names, employeeRef values and emails are synthetic and named in no source (L8).
+# ASSUMPTION (BPA-48, plan Q6): `projects` lists the project_ref values the sync writes to bpa.user_project for a persona. Which personas
+# are project-scoped, and that project-manager has both projects, is not named in any source; the delta (section 8) asks for an in-scope
+# and an out-of-scope case for BPA-77 to BPA-79. user_project cannot be seeded by SQL: its foreign key is to app_user, which this sync writes.
 users:
   - username: time-method-analyst
     name: Synthetic Time and Method Analyst
@@ -39,3 +43,27 @@ users:
     employeeRef: E9007
     email: workpack-owner@example.com
     groups: [workpack-owner]
+  - username: timekeeper
+    name: Synthetic Timekeeper
+    employeeRef: E9008
+    email: timekeeper@example.com
+    groups: [timekeeper]
+    projects: [PRJ-139]
+  - username: production-supervisor
+    name: Synthetic Production Supervisor
+    employeeRef: E9009
+    email: production-supervisor@example.com
+    groups: [production-supervisor]
+    projects: [PRJ-139]
+  - username: cost-controller
+    name: Synthetic Cost Controller
+    employeeRef: E9010
+    email: cost-controller@example.com
+    groups: [cost-controller]
+    projects: [PRJ-140]
+  - username: project-manager
+    name: Synthetic Project Manager
+    employeeRef: E9011
+    email: project-manager@example.com
+    groups: [project-manager]
+    projects: [PRJ-139, PRJ-140]
