@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_CostVariance" name="Cost variance" namespace="http://lowcodesol.com/star-bpa-poc" exporter="LCS generator (Claude)" exporterVersion="0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.1">
+  <decision id="Decision_CostVariance" name="Cost variance">
+    <description>E2-15. Per CBS code per week. FRD-22 §22.10: 'Cost variance &gt; 10% against Revised Budget for any CBS' -&gt; PCON Manager + PM (POC: project-manager). Variance % = (actual cost - revised budget cost) / revised budget cost x 100. Over-run only and exactly 10% = no alert are ASSUMPTIONS. No revised budget (null or 0) gives no alert.</description>
+    <decisionTable id="DecisionTable_CostVariance" hitPolicy="FIRST">
+      <input id="Input_RevisedBudgetCost" label="Revised Operative Budget cost">
+        <inputExpression id="InputExpression_RevisedBudgetCost" typeRef="number">
+          <text>revisedBudgetCost</text>
+        </inputExpression>
+      </input>
+      <input id="Input_CostVariancePct" label="Variance %">
+        <inputExpression id="InputExpression_CostVariancePct" typeRef="number">
+          <text>if revisedBudgetCost != null and revisedBudgetCost &gt; 0 then (actualCost - revisedBudgetCost) / revisedBudgetCost * 100 else null</text>
+        </inputExpression>
+      </input>
+      <output id="Output_CostAlert" label="Alert" name="costAlert" typeRef="boolean" />
+      <output id="Output_CostResult" label="Result" name="costResult" typeRef="string" />
+      <rule id="Rule_NoBudget">
+        <description>Rule 1: no revised budget</description>
+        <inputEntry id="UnaryTests_R1_1"><text>null, &lt;= 0</text></inputEntry>
+        <inputEntry id="UnaryTests_R1_2"><text>-</text></inputEntry>
+        <outputEntry id="Literal_R1_1"><text>false</text></outputEntry>
+        <outputEntry id="Literal_R1_2"><text>"NO_BUDGET"</text></outputEntry>
+      </rule>
+      <rule id="Rule_OverTen">
+        <description>Rule 2: more than 10% over revised budget</description>
+        <inputEntry id="UnaryTests_R2_1"><text>-</text></inputEntry>
+        <inputEntry id="UnaryTests_R2_2"><text>&gt; 10</text></inputEntry>
+        <outputEntry id="Literal_R2_1"><text>true</text></outputEntry>
+        <outputEntry id="Literal_R2_2"><text>"OVER_10_PCT"</text></outputEntry>
+      </rule>
+      <rule id="Rule_Within">
+        <description>Rule 3: within tolerance</description>
+        <inputEntry id="UnaryTests_R3_1"><text>-</text></inputEntry>
+        <inputEntry id="UnaryTests_R3_2"><text>-</text></inputEntry>
+        <outputEntry id="Literal_R3_1"><text>false</text></outputEntry>
+        <outputEntry id="Literal_R3_2"><text>"WITHIN"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="DMNDiagram_CostVariance">
+      <dmndi:DMNShape id="DMNShape_CostVariance" dmnElementRef="Decision_CostVariance">
+        <dc:Bounds height="80" width="180" x="160" y="100" />
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

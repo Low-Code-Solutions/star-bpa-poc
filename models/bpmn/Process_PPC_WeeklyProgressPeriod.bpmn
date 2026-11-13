@@ -1,0 +1,630 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_WeeklyProgressPeriod" targetNamespace="http://lowcodesol.com/star-bpa-poc" exporter="LCS generator (Claude)" exporterVersion="0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.1">
+  <bpmn:collaboration id="Collaboration_WeeklyProgressPeriod">
+    <bpmn:participant id="Participant_PPC_WeeklyProgressPeriod" name="Weekly Progress Period (Epic 2), one instance per week" processRef="Process_PPC_WeeklyProgressPeriod" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_PPC_WeeklyProgressPeriod" name="Weekly Progress Period" isExecutable="true">
+    <bpmn:documentation>Epic 2 (BPA-4). One instance per reporting week, started at the weekly cut-off. FMS hours export, FMS completion report, completion % approval, progress rule, Earned man-hours, Work Pack completion, variance alerts, Cost Controller review, period lock. DRAFT 10 Nov 2026, not reviewed.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_WeeklyProgressPeriod">
+      <bpmn:lane id="Lane_PpcTeam" name="PPC Team">
+        <bpmn:flowNodeRef>UserTask_SendHoursToFms</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_MergeReport</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_UploadCompletionReport</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_MergeApproval</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_ApproveCompletion</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_ProjectManager" name="Project Manager">
+        <bpmn:flowNodeRef>UserTask_ApproveRetraction</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_ApproveWeeklyProgress</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_CostController" name="Cost Controller">
+        <bpmn:flowNodeRef>Gateway_MergeReview</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_ReviewActualManhours</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_System" name="System (POC workers)">
+        <bpmn:flowNodeRef>StartEvent_WeeklyCutOff</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_OpenProgressPeriod</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_GenerateFmsHoursFile</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_ReadCompletionReport</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_MergeProgressCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_PrepareProgressCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BusinessRuleTask_CheckProgressRule</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ProgressOutcome</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_RecordRetractionDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_IsRetractionApproved</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_CalculateEarnedManhours</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_CompleteWorkPacks</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_PrepareVarianceCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BusinessRuleTask_CheckManhourVariance</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BusinessRuleTask_CheckCostVariance</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_SendVarianceAlerts</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_IsWeekApproved</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_LockProgressPeriod</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_PeriodLocked</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BoundaryEvent_ReportInvalid</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="StartEvent_WeeklyCutOff" name="Weekly cut-off">
+      <bpmn:documentation>E2-16. Thursday 23:59 Asia/Riyadh = 20:59 UTC (ASSUMPTION: no source names the day; FRD-21 §21.9.1 fixes the period by the cut-off date). Zeebe cron, UTC.</bpmn:documentation>
+      <bpmn:outgoing>Flow_ToOpenPeriod</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_WeeklyCutOff">
+        <bpmn:timeCycle xsi:type="bpmn:tFormalExpression">0 59 20 * * THU</bpmn:timeCycle>
+      </bpmn:timerEventDefinition>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="ServiceTask_OpenProgressPeriod" name="Open progress period">
+      <bpmn:documentation>E2-16. Creates progress_period (week_ending = cut-off date, status CutOff); from now on hours dated on or before week_ending cannot be added or changed. Outputs progressPeriodId, weekEnding. Re-run key: process instance key.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="open-progress-period" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToOpenPeriod</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToGenerateFmsFile</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="ServiceTask_GenerateFmsHoursFile" name="Generate FMS hours file">
+      <bpmn:documentation>E2-08. Approved lines not yet exported -&gt; Excel in the FRD-10-1 §10.1.3.3 layout (Type, Date, Badge No., Project, Activity, Cost Centre, CBS, CBS Cost Centre, Hrs); stored in fms_hours_export; lines stamped exported. Batch/file, partner-side (project rule).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="generate-fms-hours-file" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToGenerateFmsFile</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToSendHoursToFms</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="UserTask_SendHoursToFms" name="Send hours to FMS">
+      <bpmn:documentation>E2-08. PPC downloads the file (GET /api/v1/fms-hours-exports/{id}/file) and uploads it to FMS by hand (MOM-2026-10-01: ERP Excel download as the alternative to manual FMS upload). Completing the task records the hand-off.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="ppc-team" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToSendHoursToFms</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToMergeReport</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gateway_MergeReport" name="Merge">
+      <bpmn:documentation>E2-09.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToMergeReport</bpmn:incoming>
+      <bpmn:incoming>Flow_ReportInvalid</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToUploadReport</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="UserTask_UploadCompletionReport" name="Upload FMS completion report">
+      <bpmn:documentation>E2-09. Upload through POST /api/v1/completion-reports (FRD-21 §21.6 step 4; FRD-22 §22.6.2 step 5). Task output completionReportId.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="ppc-team" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToUploadReport</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToReadReport</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="ServiceTask_ReadCompletionReport" name="Read completion report">
+      <bpmn:documentation>E2-09. Parses rows (Workpack number, completion %, actual hours), logs each row with an outcome. Throws REPORT_INVALID with validationMessages when nothing usable.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="read-completion-report" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToReadReport</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToMergeApproval</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_MergeApproval" name="Merge">
+      <bpmn:documentation>E2-10.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToMergeApproval</bpmn:incoming>
+      <bpmn:incoming>Flow_ProgressBlocked</bpmn:incoming>
+      <bpmn:incoming>Flow_RetractionDeclined</bpmn:incoming>
+      <bpmn:incoming>Flow_WeekChangesRequested</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToApproveCompletion</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="UserTask_ApproveCompletion" name="Approve completion %">
+      <bpmn:documentation>E2-10. FRD-21 §21.6 steps 3-4: PPC approves the Work Pack physical completion %. May ask for a retraction (reason required) where a % goes down.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="ppc-team" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToApproveCompletion</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToMergeProgressCheck</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gateway_MergeProgressCheck" name="Merge">
+      <bpmn:documentation>E2-11, E2-12.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToMergeProgressCheck</bpmn:incoming>
+      <bpmn:incoming>Flow_RetractionApproved</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToPrepareProgressCheck</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="ServiceTask_PrepareProgressCheck" name="Prepare progress check">
+      <bpmn:documentation>E2-11. Builds progressChecks (one per Work Pack: workpackNumber, newPct, previousPct, retractionApproved).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="prepare-progress-check" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToPrepareProgressCheck</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToCheckProgressRule</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:businessRuleTask id="BusinessRuleTask_CheckProgressRule" name="Check progress rule">
+      <bpmn:documentation>E2-11. Decision_ProgressRule per Work Pack (FIRST). FRD-21 §21.9.1.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:calledDecision decisionId="Decision_ProgressRule" resultVariable="progressCheck" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToCheckProgressRule</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToProgressOutcome</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics>
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=progressChecks" inputElement="progressCheck" outputCollection="progressCheckResults" outputElement="=progressCheck" />
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="Gateway_ProgressOutcome" name="Progress outcome?" default="Flow_ProgressAccepted">
+      <bpmn:documentation>E2-11. Blocked wins over NeedsRetraction; both win over Accepted.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToProgressOutcome</bpmn:incoming>
+      <bpmn:outgoing>Flow_ProgressBlocked</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NeedsRetraction</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ProgressAccepted</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="UserTask_ApproveRetraction" name="Approve progress retraction">
+      <bpmn:documentation>E2-12. FRD-21 §21.9.1 (decrease only with an approved retraction); §21.7 reverse a closed week: Project Manager, documented justification. retractionDecision Approved | Declined.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="project-manager" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_NeedsRetraction</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRecordRetraction</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="ServiceTask_RecordRetractionDecision" name="Record retraction decision">
+      <bpmn:documentation>E2-12. Writes progress_retraction.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="record-retraction-decision" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToRecordRetraction</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToIsRetractionApproved</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_IsRetractionApproved" name="Retraction approved?" default="Flow_RetractionDeclined">
+      <bpmn:documentation>E2-12.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToIsRetractionApproved</bpmn:incoming>
+      <bpmn:outgoing>Flow_RetractionApproved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_RetractionDeclined</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="ServiceTask_CalculateEarnedManhours" name="Calculate Earned man-hours">
+      <bpmn:documentation>E2-13. Activity % from the approved Work Pack % (roll-up ASSUMPTION, spec); Earned MH = activity % x latest budgeted units (FRD-21 §21.5.2.1 #3, §21.9.1); not editable; stored per week, never overwritten.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="calculate-earned-manhours" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ProgressAccepted</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToPrepareVariance</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="ServiceTask_CompleteWorkPacks" name="Complete Work Packs">
+      <bpmn:documentation>E2-16. Work Packs approved at 100% -&gt; status Completed (FRD-7 status list); publishes WorkPackCompleted (key workpackNumber) to close their time sheet instance.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="complete-workpacks" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_WeekApproved</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToLockPeriod</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="ServiceTask_PrepareVarianceCheck" name="Prepare variance check">
+      <bpmn:documentation>E2-14, E2-15. Builds varianceChecks per CBS code: actualManhours (approved hours, POC), currentForecastManhours and revisedBudgetCost (seeded, D365 F&amp;O Cost Control Report), actualCost (seeded, D365 F&amp;O Finance).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="prepare-variance-check" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToPrepareVariance</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToManhourVariance</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:businessRuleTask id="BusinessRuleTask_CheckManhourVariance" name="Check man-hour variance">
+      <bpmn:documentation>E2-14. Decision_ManhourVariance per CBS (FRD-22 §22.10: &gt; 15% against Current Forecast).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:calledDecision decisionId="Decision_ManhourVariance" resultVariable="manhourCheck" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToManhourVariance</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToCostVariance</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics>
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=varianceChecks" inputElement="varianceCheck" outputCollection="manhourCheckResults" outputElement="=manhourCheck" />
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:businessRuleTask>
+    <bpmn:businessRuleTask id="BusinessRuleTask_CheckCostVariance" name="Check cost variance">
+      <bpmn:documentation>E2-15. Decision_CostVariance per CBS (FRD-22 §22.10: &gt; 10% against Revised Budget).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:calledDecision decisionId="Decision_CostVariance" resultVariable="costCheck" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToCostVariance</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToSendAlerts</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics>
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=varianceChecks" inputElement="varianceCheck" outputCollection="costCheckResults" outputElement="=costCheck" />
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:businessRuleTask>
+    <bpmn:serviceTask id="ServiceTask_SendVarianceAlerts" name="Send variance alerts">
+      <bpmn:documentation>E2-14, E2-15. Email (Mailpit, 09 S8) and in-system alert per CBS that alerts; man-hour alert to cost-controller, cost alert to project-manager. Idempotent on (period, CBS, alert type, recipient).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-variance-alerts" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToSendAlerts</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToMergeReview</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_MergeReview" name="Merge">
+      <bpmn:documentation>E2-19 (b): the PM can send the week back to the Cost Controller.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToMergeReview</bpmn:incoming>
+      <bpmn:incoming>Flow_WeekCostReviewRequested</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToReviewManhours</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="UserTask_ReviewActualManhours" name="Review actual man-hours">
+      <bpmn:documentation>E2-14, E2-15. FRD-22 §22.4: Cost Controller reviews actual vs budget variances, man-hours and cost (cost read-only). Remark required for every CBS with an alert, optional otherwise.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="cost-controller" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToReviewManhours</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToApproveWeek</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="UserTask_ApproveWeeklyProgress" name="Approve weekly progress">
+      <bpmn:documentation>E2-19. FRD-21 §21.7 and FRD-10 §10.10: the Project Manager approves weekly progress / period close; variance beyond tolerance is escalated to the PM. weekDecision Approved | ChangesRequested (reason required) with weekChangeTarget Progress | CostReview (options ASSUMPTION). The PM must not be the PPC user who approved the % (FRD-21 §21.8.1).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="project-manager" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToApproveWeek</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToIsWeekApproved</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gateway_IsWeekApproved" name="Week approved?" default="Flow_WeekChangesRequested">
+      <bpmn:documentation>E2-19.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToIsWeekApproved</bpmn:incoming>
+      <bpmn:outgoing>Flow_WeekApproved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_WeekChangesRequested</bpmn:outgoing>
+      <bpmn:outgoing>Flow_WeekCostReviewRequested</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="ServiceTask_LockProgressPeriod" name="Lock progress period">
+      <bpmn:documentation>E2-16, E2-19. After the Project Manager approves the week. progress_period status Locked; approved % and Earned MH of the week can no longer change (FRD-21 §21.9.1; reopening is out of scope).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="lock-progress-period" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToLockPeriod</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToPeriodLocked</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="EndEvent_PeriodLocked" name="Period locked">
+      <bpmn:documentation>E2-16.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToPeriodLocked</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:boundaryEvent id="BoundaryEvent_ReportInvalid" name="Report invalid" attachedToRef="ServiceTask_ReadCompletionReport">
+      <bpmn:documentation>REPORT_INVALID; variables validationMessages (file unreadable, no rows, layout not recognised).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=validationMessages" target="validationMessages" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:outgoing>Flow_ReportInvalid</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_ReportInvalid" errorRef="Error_ReportInvalid" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_ToOpenPeriod" sourceRef="StartEvent_WeeklyCutOff" targetRef="ServiceTask_OpenProgressPeriod" />
+    <bpmn:sequenceFlow id="Flow_ToGenerateFmsFile" sourceRef="ServiceTask_OpenProgressPeriod" targetRef="ServiceTask_GenerateFmsHoursFile" />
+    <bpmn:sequenceFlow id="Flow_ToSendHoursToFms" sourceRef="ServiceTask_GenerateFmsHoursFile" targetRef="UserTask_SendHoursToFms" />
+    <bpmn:sequenceFlow id="Flow_ToMergeReport" sourceRef="UserTask_SendHoursToFms" targetRef="Gateway_MergeReport" />
+    <bpmn:sequenceFlow id="Flow_ToUploadReport" sourceRef="Gateway_MergeReport" targetRef="UserTask_UploadCompletionReport" />
+    <bpmn:sequenceFlow id="Flow_ToReadReport" sourceRef="UserTask_UploadCompletionReport" targetRef="ServiceTask_ReadCompletionReport" />
+    <bpmn:sequenceFlow id="Flow_ToMergeApproval" sourceRef="ServiceTask_ReadCompletionReport" targetRef="Gateway_MergeApproval" />
+    <bpmn:sequenceFlow id="Flow_ToApproveCompletion" sourceRef="Gateway_MergeApproval" targetRef="UserTask_ApproveCompletion" />
+    <bpmn:sequenceFlow id="Flow_ToMergeProgressCheck" sourceRef="UserTask_ApproveCompletion" targetRef="Gateway_MergeProgressCheck" />
+    <bpmn:sequenceFlow id="Flow_ToPrepareProgressCheck" sourceRef="Gateway_MergeProgressCheck" targetRef="ServiceTask_PrepareProgressCheck" />
+    <bpmn:sequenceFlow id="Flow_ToCheckProgressRule" sourceRef="ServiceTask_PrepareProgressCheck" targetRef="BusinessRuleTask_CheckProgressRule" />
+    <bpmn:sequenceFlow id="Flow_ToProgressOutcome" sourceRef="BusinessRuleTask_CheckProgressRule" targetRef="Gateway_ProgressOutcome" />
+    <bpmn:sequenceFlow id="Flow_ProgressBlocked" name="Blocked" sourceRef="Gateway_ProgressOutcome" targetRef="Gateway_MergeApproval">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=some r in progressCheckResults satisfies r.progressResult = "Blocked"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NeedsRetraction" name="Needs retraction" sourceRef="Gateway_ProgressOutcome" targetRef="UserTask_ApproveRetraction">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=(every r in progressCheckResults satisfies r.progressResult != "Blocked") and (some r in progressCheckResults satisfies r.progressResult = "NeedsRetraction")</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ProgressAccepted" name="Accepted" sourceRef="Gateway_ProgressOutcome" targetRef="ServiceTask_CalculateEarnedManhours" />
+    <bpmn:sequenceFlow id="Flow_ToRecordRetraction" sourceRef="UserTask_ApproveRetraction" targetRef="ServiceTask_RecordRetractionDecision" />
+    <bpmn:sequenceFlow id="Flow_ToIsRetractionApproved" sourceRef="ServiceTask_RecordRetractionDecision" targetRef="Gateway_IsRetractionApproved" />
+    <bpmn:sequenceFlow id="Flow_RetractionApproved" name="Approved" sourceRef="Gateway_IsRetractionApproved" targetRef="Gateway_MergeProgressCheck">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=retractionDecision = "Approved"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_RetractionDeclined" name="Declined" sourceRef="Gateway_IsRetractionApproved" targetRef="Gateway_MergeApproval" />
+    <bpmn:sequenceFlow id="Flow_ToPrepareVariance" sourceRef="ServiceTask_CalculateEarnedManhours" targetRef="ServiceTask_PrepareVarianceCheck" />
+    <bpmn:sequenceFlow id="Flow_ToManhourVariance" sourceRef="ServiceTask_PrepareVarianceCheck" targetRef="BusinessRuleTask_CheckManhourVariance" />
+    <bpmn:sequenceFlow id="Flow_ToCostVariance" sourceRef="BusinessRuleTask_CheckManhourVariance" targetRef="BusinessRuleTask_CheckCostVariance" />
+    <bpmn:sequenceFlow id="Flow_ToSendAlerts" sourceRef="BusinessRuleTask_CheckCostVariance" targetRef="ServiceTask_SendVarianceAlerts" />
+    <bpmn:sequenceFlow id="Flow_ToMergeReview" sourceRef="ServiceTask_SendVarianceAlerts" targetRef="Gateway_MergeReview" />
+    <bpmn:sequenceFlow id="Flow_ToReviewManhours" sourceRef="Gateway_MergeReview" targetRef="UserTask_ReviewActualManhours" />
+    <bpmn:sequenceFlow id="Flow_ToApproveWeek" sourceRef="UserTask_ReviewActualManhours" targetRef="UserTask_ApproveWeeklyProgress" />
+    <bpmn:sequenceFlow id="Flow_ToIsWeekApproved" sourceRef="UserTask_ApproveWeeklyProgress" targetRef="Gateway_IsWeekApproved" />
+    <bpmn:sequenceFlow id="Flow_WeekApproved" name="Approved" sourceRef="Gateway_IsWeekApproved" targetRef="ServiceTask_CompleteWorkPacks">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=weekDecision = "Approved"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToLockPeriod" sourceRef="ServiceTask_CompleteWorkPacks" targetRef="ServiceTask_LockProgressPeriod" />
+    <bpmn:sequenceFlow id="Flow_WeekChangesRequested" name="Changes requested: progress" sourceRef="Gateway_IsWeekApproved" targetRef="Gateway_MergeApproval" />
+    <bpmn:sequenceFlow id="Flow_WeekCostReviewRequested" name="Changes requested: cost review" sourceRef="Gateway_IsWeekApproved" targetRef="Gateway_MergeReview">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=weekDecision = "ChangesRequested" and weekChangeTarget = "CostReview"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToPeriodLocked" sourceRef="ServiceTask_LockProgressPeriod" targetRef="EndEvent_PeriodLocked" />
+    <bpmn:sequenceFlow id="Flow_ReportInvalid" sourceRef="BoundaryEvent_ReportInvalid" targetRef="Gateway_MergeReport" />
+  </bpmn:process>
+  <bpmn:error id="Error_ReportInvalid" name="Completion report invalid" errorCode="REPORT_INVALID" />
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Process_PPC_WeeklyProgressPeriod">
+    <bpmndi:BPMNPlane id="BPMNPlane_Process_PPC_WeeklyProgressPeriod" bpmnElement="Collaboration_WeeklyProgressPeriod">
+      <bpmndi:BPMNShape id="Participant_PPC_WeeklyProgressPeriod_di" bpmnElement="Participant_PPC_WeeklyProgressPeriod" isHorizontal="true">
+        <dc:Bounds x="160" y="60" width="4570" height="800" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_PpcTeam_di" bpmnElement="Lane_PpcTeam" isHorizontal="true">
+        <dc:Bounds x="190" y="60" width="4540" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ProjectManager_di" bpmnElement="Lane_ProjectManager" isHorizontal="true">
+        <dc:Bounds x="190" y="260" width="4540" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_CostController_di" bpmnElement="Lane_CostController" isHorizontal="true">
+        <dc:Bounds x="190" y="460" width="4540" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_System_di" bpmnElement="Lane_System" isHorizontal="true">
+        <dc:Bounds x="190" y="660" width="4540" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_WeeklyCutOff_di" bpmnElement="StartEvent_WeeklyCutOff">
+        <dc:Bounds x="292" y="742" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="260" y="783" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_OpenProgressPeriod_di" bpmnElement="ServiceTask_OpenProgressPeriod">
+        <dc:Bounds x="410" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_GenerateFmsHoursFile_di" bpmnElement="ServiceTask_GenerateFmsHoursFile">
+        <dc:Bounds x="560" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_SendHoursToFms_di" bpmnElement="UserTask_SendHoursToFms">
+        <dc:Bounds x="710" y="120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_MergeReport_di" bpmnElement="Gateway_MergeReport" isMarkerVisible="true">
+        <dc:Bounds x="885" y="135" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="860" y="190" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_UploadCompletionReport_di" bpmnElement="UserTask_UploadCompletionReport">
+        <dc:Bounds x="1010" y="120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_ReadCompletionReport_di" bpmnElement="ServiceTask_ReadCompletionReport">
+        <dc:Bounds x="1160" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_MergeApproval_di" bpmnElement="Gateway_MergeApproval" isMarkerVisible="true">
+        <dc:Bounds x="1335" y="135" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1310" y="190" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_ApproveCompletion_di" bpmnElement="UserTask_ApproveCompletion">
+        <dc:Bounds x="1460" y="120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_MergeProgressCheck_di" bpmnElement="Gateway_MergeProgressCheck" isMarkerVisible="true">
+        <dc:Bounds x="1635" y="735" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1610" y="790" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_PrepareProgressCheck_di" bpmnElement="ServiceTask_PrepareProgressCheck">
+        <dc:Bounds x="1760" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BusinessRuleTask_CheckProgressRule_di" bpmnElement="BusinessRuleTask_CheckProgressRule">
+        <dc:Bounds x="1910" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_ProgressOutcome_di" bpmnElement="Gateway_ProgressOutcome" isMarkerVisible="true">
+        <dc:Bounds x="2085" y="735" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2060" y="790" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_ApproveRetraction_di" bpmnElement="UserTask_ApproveRetraction">
+        <dc:Bounds x="2210" y="320" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_RecordRetractionDecision_di" bpmnElement="ServiceTask_RecordRetractionDecision">
+        <dc:Bounds x="2360" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_IsRetractionApproved_di" bpmnElement="Gateway_IsRetractionApproved" isMarkerVisible="true">
+        <dc:Bounds x="2535" y="735" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2510" y="790" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_CalculateEarnedManhours_di" bpmnElement="ServiceTask_CalculateEarnedManhours">
+        <dc:Bounds x="2660" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_CompleteWorkPacks_di" bpmnElement="ServiceTask_CompleteWorkPacks">
+        <dc:Bounds x="4160" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_PrepareVarianceCheck_di" bpmnElement="ServiceTask_PrepareVarianceCheck">
+        <dc:Bounds x="2960" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BusinessRuleTask_CheckManhourVariance_di" bpmnElement="BusinessRuleTask_CheckManhourVariance">
+        <dc:Bounds x="3110" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BusinessRuleTask_CheckCostVariance_di" bpmnElement="BusinessRuleTask_CheckCostVariance">
+        <dc:Bounds x="3260" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_SendVarianceAlerts_di" bpmnElement="ServiceTask_SendVarianceAlerts">
+        <dc:Bounds x="3410" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_MergeReview_di" bpmnElement="Gateway_MergeReview" isMarkerVisible="true">
+        <dc:Bounds x="3585" y="535" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3560" y="590" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_ReviewActualManhours_di" bpmnElement="UserTask_ReviewActualManhours">
+        <dc:Bounds x="3710" y="520" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_ApproveWeeklyProgress_di" bpmnElement="UserTask_ApproveWeeklyProgress">
+        <dc:Bounds x="3860" y="320" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_IsWeekApproved_di" bpmnElement="Gateway_IsWeekApproved" isMarkerVisible="true">
+        <dc:Bounds x="4035" y="735" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4010" y="790" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_LockProgressPeriod_di" bpmnElement="ServiceTask_LockProgressPeriod">
+        <dc:Bounds x="4310" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_PeriodLocked_di" bpmnElement="EndEvent_PeriodLocked">
+        <dc:Bounds x="4492" y="742" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4460" y="783" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BoundaryEvent_ReportInvalid_di" bpmnElement="BoundaryEvent_ReportInvalid">
+        <dc:Bounds x="1232" y="782" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1200" y="820" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_ToOpenPeriod_di" bpmnElement="Flow_ToOpenPeriod">
+        <di:waypoint x="328" y="760" />
+        <di:waypoint x="410" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToGenerateFmsFile_di" bpmnElement="Flow_ToGenerateFmsFile">
+        <di:waypoint x="510" y="760" />
+        <di:waypoint x="560" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToSendHoursToFms_di" bpmnElement="Flow_ToSendHoursToFms">
+        <di:waypoint x="660" y="760" />
+        <di:waypoint x="685" y="760" />
+        <di:waypoint x="685" y="160" />
+        <di:waypoint x="710" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToMergeReport_di" bpmnElement="Flow_ToMergeReport">
+        <di:waypoint x="810" y="160" />
+        <di:waypoint x="885" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToUploadReport_di" bpmnElement="Flow_ToUploadReport">
+        <di:waypoint x="935" y="160" />
+        <di:waypoint x="1010" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToReadReport_di" bpmnElement="Flow_ToReadReport">
+        <di:waypoint x="1110" y="160" />
+        <di:waypoint x="1135" y="160" />
+        <di:waypoint x="1135" y="760" />
+        <di:waypoint x="1160" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToMergeApproval_di" bpmnElement="Flow_ToMergeApproval">
+        <di:waypoint x="1260" y="760" />
+        <di:waypoint x="1297" y="760" />
+        <di:waypoint x="1297" y="160" />
+        <di:waypoint x="1335" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToApproveCompletion_di" bpmnElement="Flow_ToApproveCompletion">
+        <di:waypoint x="1385" y="160" />
+        <di:waypoint x="1460" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToMergeProgressCheck_di" bpmnElement="Flow_ToMergeProgressCheck">
+        <di:waypoint x="1560" y="160" />
+        <di:waypoint x="1597" y="160" />
+        <di:waypoint x="1597" y="760" />
+        <di:waypoint x="1635" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToPrepareProgressCheck_di" bpmnElement="Flow_ToPrepareProgressCheck">
+        <di:waypoint x="1685" y="760" />
+        <di:waypoint x="1760" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToCheckProgressRule_di" bpmnElement="Flow_ToCheckProgressRule">
+        <di:waypoint x="1860" y="760" />
+        <di:waypoint x="1910" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToProgressOutcome_di" bpmnElement="Flow_ToProgressOutcome">
+        <di:waypoint x="2010" y="760" />
+        <di:waypoint x="2085" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ProgressBlocked_di" bpmnElement="Flow_ProgressBlocked">
+        <di:waypoint x="2110" y="735" />
+        <di:waypoint x="2110" y="110" />
+        <di:waypoint x="1360" y="110" />
+        <di:waypoint x="1360" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NeedsRetraction_di" bpmnElement="Flow_NeedsRetraction">
+        <di:waypoint x="2135" y="760" />
+        <di:waypoint x="2172" y="760" />
+        <di:waypoint x="2172" y="360" />
+        <di:waypoint x="2210" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ProgressAccepted_di" bpmnElement="Flow_ProgressAccepted">
+        <di:waypoint x="2135" y="760" />
+        <di:waypoint x="2660" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToRecordRetraction_di" bpmnElement="Flow_ToRecordRetraction">
+        <di:waypoint x="2310" y="360" />
+        <di:waypoint x="2335" y="360" />
+        <di:waypoint x="2335" y="760" />
+        <di:waypoint x="2360" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToIsRetractionApproved_di" bpmnElement="Flow_ToIsRetractionApproved">
+        <di:waypoint x="2460" y="760" />
+        <di:waypoint x="2535" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RetractionApproved_di" bpmnElement="Flow_RetractionApproved">
+        <di:waypoint x="2560" y="735" />
+        <di:waypoint x="2560" y="710" />
+        <di:waypoint x="1660" y="710" />
+        <di:waypoint x="1660" y="735" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RetractionDeclined_di" bpmnElement="Flow_RetractionDeclined">
+        <di:waypoint x="2560" y="735" />
+        <di:waypoint x="2560" y="110" />
+        <di:waypoint x="1360" y="110" />
+        <di:waypoint x="1360" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToPrepareVariance_di" bpmnElement="Flow_ToPrepareVariance">
+        <di:waypoint x="2760" y="760" />
+        <di:waypoint x="2960" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToManhourVariance_di" bpmnElement="Flow_ToManhourVariance">
+        <di:waypoint x="3060" y="760" />
+        <di:waypoint x="3110" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToCostVariance_di" bpmnElement="Flow_ToCostVariance">
+        <di:waypoint x="3210" y="760" />
+        <di:waypoint x="3260" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToSendAlerts_di" bpmnElement="Flow_ToSendAlerts">
+        <di:waypoint x="3360" y="760" />
+        <di:waypoint x="3410" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToMergeReview_di" bpmnElement="Flow_ToMergeReview">
+        <di:waypoint x="3510" y="760" />
+        <di:waypoint x="3547" y="760" />
+        <di:waypoint x="3547" y="560" />
+        <di:waypoint x="3585" y="560" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToReviewManhours_di" bpmnElement="Flow_ToReviewManhours">
+        <di:waypoint x="3635" y="560" />
+        <di:waypoint x="3710" y="560" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToApproveWeek_di" bpmnElement="Flow_ToApproveWeek">
+        <di:waypoint x="3810" y="560" />
+        <di:waypoint x="3835" y="560" />
+        <di:waypoint x="3835" y="360" />
+        <di:waypoint x="3860" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToIsWeekApproved_di" bpmnElement="Flow_ToIsWeekApproved">
+        <di:waypoint x="3960" y="360" />
+        <di:waypoint x="3997" y="360" />
+        <di:waypoint x="3997" y="760" />
+        <di:waypoint x="4035" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_WeekApproved_di" bpmnElement="Flow_WeekApproved">
+        <di:waypoint x="4085" y="760" />
+        <di:waypoint x="4160" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToLockPeriod_di" bpmnElement="Flow_ToLockPeriod">
+        <di:waypoint x="4260" y="760" />
+        <di:waypoint x="4310" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_WeekChangesRequested_di" bpmnElement="Flow_WeekChangesRequested">
+        <di:waypoint x="4060" y="735" />
+        <di:waypoint x="4060" y="110" />
+        <di:waypoint x="1360" y="110" />
+        <di:waypoint x="1360" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_WeekCostReviewRequested_di" bpmnElement="Flow_WeekCostReviewRequested">
+        <di:waypoint x="4060" y="735" />
+        <di:waypoint x="4060" y="510" />
+        <di:waypoint x="3610" y="510" />
+        <di:waypoint x="3610" y="535" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToPeriodLocked_di" bpmnElement="Flow_ToPeriodLocked">
+        <di:waypoint x="4410" y="760" />
+        <di:waypoint x="4492" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReportInvalid_di" bpmnElement="Flow_ReportInvalid">
+        <di:waypoint x="1250" y="818" />
+        <di:waypoint x="1250" y="850" />
+        <di:waypoint x="910" y="850" />
+        <di:waypoint x="910" y="185" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

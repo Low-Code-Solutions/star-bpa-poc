@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_ProgressRule" name="Progress rule" namespace="http://lowcodesol.com/star-bpa-poc" exporter="LCS generator (Claude)" exporterVersion="0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.1">
+  <decision id="Decision_ProgressRule" name="Progress rule">
+    <description>E2-11. Per Work Pack per week. FRD-21 §21.9.1: cumulative progress cannot exceed 100% and cannot decrease below the previous period unless an approved retraction is recorded. previousPct = last locked week's approved %, 0 when none. Exactly 100% and an unchanged % are accepted.</description>
+    <decisionTable id="DecisionTable_ProgressRule" hitPolicy="FIRST">
+      <input id="Input_NewPct" label="Completion % this week">
+        <inputExpression id="InputExpression_NewPct" typeRef="number">
+          <text>newPct</text>
+        </inputExpression>
+      </input>
+      <input id="Input_ChangePct" label="Change against the previous week">
+        <inputExpression id="InputExpression_ChangePct" typeRef="number">
+          <text>newPct - previousPct</text>
+        </inputExpression>
+      </input>
+      <input id="Input_RetractionApproved" label="Retraction approved">
+        <inputExpression id="InputExpression_RetractionApproved" typeRef="boolean">
+          <text>retractionApproved</text>
+        </inputExpression>
+      </input>
+      <output id="Output_ProgressResult" label="Progress result" name="progressResult" typeRef="string" />
+      <output id="Output_ProgressReason" label="Progress reason" name="progressReason" typeRef="string" />
+      <rule id="Rule_AboveHundred">
+        <description>Rule 1: above 100%</description>
+        <inputEntry id="UnaryTests_R1_1"><text>&gt; 100</text></inputEntry>
+        <inputEntry id="UnaryTests_R1_2"><text>-</text></inputEntry>
+        <inputEntry id="UnaryTests_R1_3"><text>-</text></inputEntry>
+        <outputEntry id="Literal_R1_1"><text>"Blocked"</text></outputEntry>
+        <outputEntry id="Literal_R1_2"><text>"ABOVE_100"</text></outputEntry>
+      </rule>
+      <rule id="Rule_BelowZero">
+        <description>Rule 2: below 0%</description>
+        <inputEntry id="UnaryTests_R2_1"><text>&lt; 0</text></inputEntry>
+        <inputEntry id="UnaryTests_R2_2"><text>-</text></inputEntry>
+        <inputEntry id="UnaryTests_R2_3"><text>-</text></inputEntry>
+        <outputEntry id="Literal_R2_1"><text>"Blocked"</text></outputEntry>
+        <outputEntry id="Literal_R2_2"><text>"BELOW_0"</text></outputEntry>
+      </rule>
+      <rule id="Rule_DecreaseWithoutRetraction">
+        <description>Rule 3: lower than last week, no approved retraction</description>
+        <inputEntry id="UnaryTests_R3_1"><text>-</text></inputEntry>
+        <inputEntry id="UnaryTests_R3_2"><text>&lt; 0</text></inputEntry>
+        <inputEntry id="UnaryTests_R3_3"><text>false</text></inputEntry>
+        <outputEntry id="Literal_R3_1"><text>"NeedsRetraction"</text></outputEntry>
+        <outputEntry id="Literal_R3_2"><text>"DECREASE"</text></outputEntry>
+      </rule>
+      <rule id="Rule_Accepted">
+        <description>Rule 4: accepted</description>
+        <inputEntry id="UnaryTests_R4_1"><text>-</text></inputEntry>
+        <inputEntry id="UnaryTests_R4_2"><text>-</text></inputEntry>
+        <inputEntry id="UnaryTests_R4_3"><text>-</text></inputEntry>
+        <outputEntry id="Literal_R4_1"><text>"Accepted"</text></outputEntry>
+        <outputEntry id="Literal_R4_2"><text>null</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="DMNDiagram_ProgressRule">
+      <dmndi:DMNShape id="DMNShape_ProgressRule" dmnElementRef="Decision_ProgressRule">
+        <dc:Bounds height="80" width="180" x="160" y="100" />
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

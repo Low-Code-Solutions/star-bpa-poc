@@ -51,3 +51,8 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-82](BPA-3-work-pack-assignment/plans/BPA-82.md) | Portal date checks follow the QA business date set by BPA_CLOCK_TODAY | Closed (11 Nov 2026) |
 | [BPA-9](BPA-3-work-pack-assignment/plans/BPA-9.md) | Project Engineer can sign off a Work Pack release | Closed (2026-11-05) |
 
+## BPA-4-timesheet-to-progress
+
+- [intent.md](BPA-4-timesheet-to-progress/intent.md): **DRAFT 10 Nov 2026, updated 21:15 after the DoR decisions D1-D8**, reviewed by Khitaba (deciding for the Product Owner, 10 Nov 2026).
+- [spec.md](BPA-4-timesheet-to-progress/spec.md): **DRAFT 10 Nov 2026**, for review by Khitaba (deciding for the Product Owner). Not accepted.
+
