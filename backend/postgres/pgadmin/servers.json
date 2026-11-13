@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "STAR POC PostgreSQL",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "bpa",
+      "Username": "postgres",
+      "SSLMode": "prefer"
+    }
+  }
+}
