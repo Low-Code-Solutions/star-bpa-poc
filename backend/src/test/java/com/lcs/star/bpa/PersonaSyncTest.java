@@ -19,7 +19,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** BPA-43 Part B: the S22 persona sync against the integration Camunda (ADR 0005, L2, L9; Q4, Q5); BPA-44: seven personas, no scope. */
+/** BPA-43 Part B: the S22 persona sync against the integration Camunda (ADR 0005, L2, L9; Q4, Q5); BPA-44: seven personas, no scope; BPA-48: eleven, with project rows. */
 @Tag("integration")
 @TestMethodOrder(OrderAnnotation.class)
 class PersonaSyncTest {
@@ -66,12 +66,14 @@ class PersonaSyncTest {
 
     @Test
     @Order(2)
-    void BPA44_personaSyncCreatesSevenPersonasInTheirGroups() {
+    void BPA48_personaSyncCreatesElevenPersonasInTheirGroups() {
         sync().sync();
 
-        // PO decision 2 Nov 2026: seven personas, username == Camunda group ID, access by group only (BPA-44).
+        // PO decision 2 Nov 2026 (BPA-44): username == Camunda group ID, access by group only. E2-D1 (BPA-48): four more, eleven in all;
+        // line-manager and hr-manager are parked with BPA-71.
         List<String> groupIds = List.of("time-method-analyst", "project-engineer", "production-planner", "production-team", "ppc-team",
-                "supervisor", "workpack-owner");
+                "supervisor", "workpack-owner", "timekeeper", "production-supervisor", "cost-controller", "project-manager");
+        assertThat(groupIds).hasSize(11);
         assertThat(personas.users()).extracting(PersonaFile.Persona::username).containsExactlyInAnyOrderElementsOf(groupIds);
         for (PersonaFile.Persona persona : personas.users()) {
             var user = identity.verify(persona.username(), DEMO_PASSWORD);
@@ -80,9 +82,13 @@ class PersonaSyncTest {
         }
 
         assertThat(jdbc.queryForList("SELECT username FROM bpa.app_user ORDER BY username", String.class))
-                .containsExactlyElementsOf(groupIds.stream().sorted().toList());
+                .containsExactlyInAnyOrderElementsOf(groupIds); // not ordered: the database collation sorts timekeeper before time-method-analyst
         assertThat(jdbc.queryForList("SELECT table_name FROM information_schema.tables WHERE table_schema = 'bpa' AND table_name LIKE '%scope%'",
                 String.class)).as("no scope table").isEmpty();
+        // BPA-48 (ASSUMPTION, plan Q6): project access for the project-scoped personas, written by the sync from personas.yaml
+        assertThat(jdbc.queryForList("SELECT username || ' ' || project_ref FROM bpa.user_project ORDER BY username, project_ref", String.class))
+                .containsExactly("cost-controller PRJ-140", "production-supervisor PRJ-139", "project-manager PRJ-139", "project-manager PRJ-140",
+                        "timekeeper PRJ-139");
     }
 
     @Test
@@ -95,9 +101,23 @@ class PersonaSyncTest {
         sync().sync();
         sync().sync();
 
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.app_user", Integer.class)).isEqualTo(7);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.app_user", Integer.class)).isEqualTo(11);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.user_project", Integer.class)).as("project rows are upserted, not doubled").isEqualTo(5);
         assertThat(admin.authorizations("bpa-service")).hasSize(authorizationsBefore);
         assertThat(permissionsOf("bpa-service")).isEqualTo(permissionsBefore);
+    }
+
+    @Test
+    @Order(4)
+    void BPA48_personaSyncDoesNotBringBackAProjectRemovedInThePortal() {
+        sync().sync();
+        jdbc.update("DELETE FROM bpa.user_project WHERE username = 'project-manager' AND project_ref = 'PRJ-140'"); // as BPA-76 will, in the portal
+
+        sync().sync();
+
+        assertThat(jdbc.queryForList("SELECT project_ref FROM bpa.user_project WHERE username = 'project-manager'", String.class))
+                .as("a user that already has project rows is left alone").containsExactly("PRJ-139");
+        jdbc.update("INSERT INTO bpa.user_project (username, project_ref, created_by, updated_by) VALUES ('project-manager', 'PRJ-140', 'test', 'test')");
     }
 
     /** BPA-25 comment 10420 (shown to work, not proven minimal), plus RESOURCE CREATE so the app can auto-deploy the models (ASSUMPTION), plus GROUP READ on the two notified groups (BPA-16, ASSUMPTION). */

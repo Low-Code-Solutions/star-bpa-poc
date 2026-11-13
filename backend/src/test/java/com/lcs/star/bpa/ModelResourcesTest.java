@@ -25,8 +25,11 @@ class ModelResourcesTest {
         assertThat(bpmn).containsExactlyInAnyOrder(
                 "Process_PPC_DrawingRevisionNotice.bpmn",
                 "Process_PPC_WorkPackAssignment.bpmn",
-                "Process_PPC_WorkerReassignment.bpmn");
-        assertThat(names(resolver.getResources("classpath*:dmn/*.dmn"))).containsExactly("Decision_WorkpackReleaseCheck.dmn");
+                "Process_PPC_WorkerReassignment.bpmn",
+                "Process_PPC_TimesheetToProgress.bpmn", // BPA-48: the two Epic 2 processes and four decisions are in models/
+                "Process_PPC_WeeklyProgressPeriod.bpmn");
+        assertThat(names(resolver.getResources("classpath*:dmn/*.dmn"))).containsExactlyInAnyOrder("Decision_WorkpackReleaseCheck.dmn",
+                "Decision_HoursWithinBudget.dmn", "Decision_ProgressRule.dmn", "Decision_ManhourVariance.dmn", "Decision_CostVariance.dmn");
     }
 
     @Test

@@ -5,6 +5,8 @@
 - Deciders: Ahsan (Build Lead), Usama (Lead Developer) for the 27 Oct rows; Faraz with Ahsan/Usama for
   S25-S27; Faraz for S28 and S29
 - Informed: Khitaba (BA)
+- Amended: 2026-11-13 (BPA-48; E2-D1, Khitaba for the PO, 10 and 11 Nov 2026): eleven personas; project scope returns as `user_project`.
+  See the last item under Consequences.
 - Amended: 2026-11-02 (PO decision 2 Nov 2026, BPA-44; approved by Ahsan on behalf of Faraz): seven personas, access by
   Camunda group only; `user_role_scope` removed. See the last item under Consequences.
 - 09 rows: S5, S6, G9, S22, S25, S26, S27, S28, S29; L2, L4, L9, L18
@@ -104,6 +106,16 @@ tests and in the showcase.
   through OIDC claims). `user_role_scope` was dropped from V1 (no shared or showcase environment existed,
   09 L5) and the S22 job no longer writes it. Test users are named exactly as the persona IDs
   (04-conventions). Jira BPA-15, BPA-16 and BPA-26 were updated the same day.
+- **Amended 13 Nov 2026 (BPA-48; E2-D1, Khitaba for the PO, 10 Nov 2026; HR route parked 11 Nov 2026):** Epic 2 adds four personas, so
+  `personas.yaml` lists **eleven** users, one per Camunda group, username equal to the group ID: `timekeeper`, `production-supervisor`,
+  `cost-controller`, `project-manager` (employeeRef E9008 to E9011) beside the seven above. `line-manager` and `hr-manager` are not
+  added: the HR approval route is parked with BPA-71. Access to a task is still by group only. **Project scope returns in one narrow
+  form:** the table `user_project` (username, project_ref; POC database, ASSUMPTION; data model v0.7 section 13) holds which projects a
+  user sees (BPA-76 to BPA-79). It is written by this S22 sync from a `projects:` list per persona in `personas.yaml` (it has a foreign key to
+  `app_user`, so a SQL seed cannot write it), and by the PPC Team through the portal (BPA-76). There is still no department or role
+  scope and no `user_role_scope` table. **Restart behaviour (ASSUMPTION):** the sync gives a persona its projects only while that user has no
+  `user_project` row, so a project the PPC Team removed in the portal is not brought back by a restart; if every project of a user was removed,
+  the next start seeds that user again.
 
 ## Sources
 

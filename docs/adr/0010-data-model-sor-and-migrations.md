@@ -4,6 +4,7 @@
 - Date: 2026-10-27 (decided, 09 LOCKED); written 2026-10-29 (BPA-37)
 - Deciders: Ahsan (Build Lead), Usama (Lead Developer)
 - Informed: Faraz (Product Owner and Architect), Khitaba (BA)
+- Amended: 2026-11-13 (BPA-48): V1 is frozen; Epic 2 is `V2__epic2_timesheet_to_progress.sql`. See the last item under Consequences.
 - 09 rows: S16, S17; L5, L8, L11
 
 ## Context
@@ -52,6 +53,11 @@ per-story or per-epic models would drift.
 - 04-conventions' `V<n>__<description>` and the top-level `db/migration/` are superseded by S16 and L1;
   the Flyway naming is to be added to 04-conventions (L16).
 - Shared-contract rules for V1 and the seed are in `intent/BPA-3-work-pack-assignment/spec.md`.
+- **Amended 13 Nov 2026 (Q-DM21, Ahsan, Build Lead, 11 Nov 2026; delivered by BPA-48):** the freeze condition above (the first shared
+  environment) is met: the QA dev server already runs `V1__baseline_schema.sql`, and editing V1 would fail Flyway's checksum there. V1 is
+  not edited again; Epic 2's schema change is `V2__epic2_timesheet_to_progress.sql` (data model v0.7, section 13). Data that a V-file needs
+  to make a change safe on a database that already holds rows (for example the `worker.employee_id` backfill before `SET NOT NULL`) stays in
+  the V-file; reference-data rows go in the repeatable seed, which runs after it.
 
 ## Sources
 

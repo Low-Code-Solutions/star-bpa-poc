@@ -3,6 +3,9 @@
     "bpmnlint:recommended",
     "plugin:camunda-compat/camunda-cloud-8-10"
   ],
+  "rules": {
+    "camunda-compat/user-task-definition": "off"
+  },
   "moddleExtensions": {
     "zeebe": "zeebe-bpmn-moddle/resources/zeebe.json"
   }

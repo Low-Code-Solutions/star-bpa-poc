@@ -1,0 +1,563 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_TimesheetToProgress" targetNamespace="http://lowcodesol.com/star-bpa-poc" exporter="LCS generator (Claude)" exporterVersion="0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.1">
+  <bpmn:collaboration id="Collaboration_TimesheetToProgress">
+    <bpmn:participant id="Participant_PPC_TimesheetToProgress" name="Timesheet to Progress (Epic 2), one instance per Work Pack" processRef="Process_PPC_TimesheetToProgress" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_PPC_TimesheetToProgress" name="Timesheet to Progress" isExecutable="true">
+    <bpmn:documentation>Epic 2 (BPA-4). One instance per Work Pack, started when its Epic 1 instance ends (EndEvent_WorkPackAssigned, message WorkPackAssigned). Loops: book hours, budget check, submit, Timekeeper, Production Supervisor, PPC. Ends when the weekly period process completes the Work Pack (message WorkPackCompleted). DRAFT 10 Nov 2026, updated 11 Nov 2026 (BPA-69, BPA-74, BPA-75, delete rule); not reviewed. The HR approval route (BPA-71) is parked and not modelled; all hours follow the Production route.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_TimesheetToProgress">
+      <bpmn:lane id="Lane_Supervisor" name="Supervisor (Yard Supervisor)">
+        <bpmn:flowNodeRef>StartEvent_WorkPackAssigned</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_MergeBooking</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_BookHours</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_TimesheetsClosed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BoundaryEvent_WorkPackCompleted</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Timekeeper" name="Timekeeper">
+        <bpmn:flowNodeRef>BoundaryEvent_HoursWaitingTimekeeper</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_SendHoursReminderTimekeeper</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_HoursReminderSentTimekeeper</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_ValidateHours</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_ProductionSupervisor" name="Production Supervisor">
+        <bpmn:flowNodeRef>BoundaryEvent_HoursWaitingProductionSupervisor</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_SendHoursReminderProductionSupervisor</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_HoursReminderSentProductionSupervisor</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_ApproveHoursProduction</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_PpcTeam" name="PPC Team">
+        <bpmn:flowNodeRef>BoundaryEvent_HoursWaitingPpc</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_SendHoursReminderPpc</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_HoursReminderSentPpc</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>UserTask_ApproveHoursPpc</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_System" name="System (POC workers)">
+        <bpmn:flowNodeRef>ServiceTask_PrepareHoursSubmission</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BusinessRuleTask_CheckHoursWithinBudget</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_AreHoursWithinBudget</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_SubmitHours</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_RecordTimekeeperDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_IsValidated</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_RecordProductionDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_IsProductionApproved</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_RecordPpcDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>BoundaryEvent_NothingToSubmit</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="StartEvent_WorkPackAssigned" name="Work Pack assigned">
+      <bpmn:documentation>E2-01. Message WorkPackAssigned, published by the Epic 1 message end event EndEvent_WorkPackAssigned (Process_PPC_WorkPackAssignment) with variables workpackId, workpackNumber. One instance per Work Pack; the publisher sets messageId = workpackNumber so a retry does not start a second instance (09 G10 pattern).</bpmn:documentation>
+      <bpmn:outgoing>Flow_ToMergeBooking</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_WorkPackAssigned" messageRef="Message_WorkPackAssigned" />
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="Gateway_MergeBooking" name="Merge">
+      <bpmn:documentation>E2-03. Entry for every booking round: first round, budget block, Returned, Rejected and after PPC approval.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToMergeBooking</bpmn:incoming>
+      <bpmn:incoming>Flow_HoursBlocked</bpmn:incoming>
+      <bpmn:incoming>Flow_NotValidated</bpmn:incoming>
+      <bpmn:incoming>Flow_ProductionNotApproved</bpmn:incoming>
+      <bpmn:incoming>Flow_PpcDecided</bpmn:incoming>
+      <bpmn:incoming>Flow_NothingToSubmit</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToBookHours</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="UserTask_BookHours" name="Book hours">
+      <bpmn:documentation>E2-03, E2-03b. React screen (S14). Hours are saved line by line through the API (form) or POST /api/v1/timesheet-files (bulk upload) while this task is open; each line is checked at save against Decision_HoursWithinBudget and the line rules. Completing the task means 'Send to Timekeeper' for the Work Pack's Draft and Returned lines. The first saved line sets workpack.status Released -&gt; In Progress (E2-03). At save the backend also refuses a line on a CBS closed for productive hours (BPA-69, cbs_block) and a line for a Worker on approved leave that day (BPA-75, worker_leave). Draft and Returned lines can be changed or deleted while this task is open; Submitted, Approved and Rejected lines cannot (BPA-50, FRD-5-12 §5.12.8.1).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="supervisor" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToBookHours</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToPrepareSubmission</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="ServiceTask_PrepareHoursSubmission" name="Prepare hours submission">
+      <bpmn:documentation>E2-04, E2-05. Collects the Work Pack's Draft and Returned lines and builds lineChecks (one element per line: workDate, phase, badgeNo, phaseBudgetHours, phaseHoursAfter, dailyHoursAfter, cbsCodeRef, cbsClosed, workerOnLeave; cbsClosed is false when the time sheet has no CBS, D40). Throws HOURS_INVALID with validationMessages when there is nothing to send.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="prepare-hours-submission" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToPrepareSubmission</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToCheckBudget</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:businessRuleTask id="BusinessRuleTask_CheckHoursWithinBudget" name="Check hours within budget">
+      <bpmn:documentation>E2-04. Decision_HoursWithinBudget per line (FIRST). Re-check at send time; the same decision runs at save time in the backend.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:calledDecision decisionId="Decision_HoursWithinBudget" resultVariable="lineCheck" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToCheckBudget</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToAreHoursWithinBudget</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics>
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=lineChecks" inputElement="lineCheck" outputCollection="lineCheckResults" outputElement="=lineCheck" />
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="Gateway_AreHoursWithinBudget" name="All lines allowed?" default="Flow_HoursWithinBudget">
+      <bpmn:documentation>E2-04. Any lineCheckResults[].budgetResult = "Blocked" returns to Book hours with the reasons; this includes a CBS closed (BPA-69) or approved leave (BPA-75) since the line was saved. No new element.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToAreHoursWithinBudget</bpmn:incoming>
+      <bpmn:outgoing>Flow_HoursWithinBudget</bpmn:outgoing>
+      <bpmn:outgoing>Flow_HoursBlocked</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="ServiceTask_SubmitHours" name="Submit hours">
+      <bpmn:documentation>E2-05. Creates hours_submission (stage Timekeeper), sets the lines Submitted and links them. Outputs hoursSubmissionId. Re-run key: process instance key + loop counter (09 S7 pattern).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="submit-hours" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_HoursWithinBudget</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToValidateHours</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="UserTask_ValidateHours" name="Validate hours">
+      <bpmn:documentation>E2-05. Timekeeper validates or returns (FRD-22 §22.7 initiator; FRD-5-12 §5.12.4 Timekeeper verifies and can amend on request). hoursDecision Validated | Returned; reason required when Returned.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="timekeeper" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToValidateHours</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRecordTimekeeper</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="ServiceTask_RecordTimekeeperDecision" name="Record Timekeeper decision">
+      <bpmn:documentation>E2-05. record-hours-decision, step Timekeeper. Validated: stage ProductionSupervisor. Returned: lines Returned, submission closed.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="record-hours-decision" retries="3" />
+        <zeebe:taskHeaders>
+          <zeebe:header key="step" value="Timekeeper" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToRecordTimekeeper</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToIsValidated</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_IsValidated" name="Validated?" default="Flow_NotValidated">
+      <bpmn:documentation>E2-05.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToIsValidated</bpmn:incoming>
+      <bpmn:outgoing>Flow_Validated</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NotValidated</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="UserTask_ApproveHoursProduction" name="Approve hours (Production)">
+      <bpmn:documentation>E2-06. FRD-7 §7.6 step 15; FRD-22 §22.7. hoursDecision Approved | Returned | Rejected (options by analogy with FRD-5-12 §5.12.5.5, ASSUMPTION); reason required unless Approved.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="production-supervisor" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Validated</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRecordProduction</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="ServiceTask_RecordProductionDecision" name="Record Production decision">
+      <bpmn:documentation>E2-06. record-hours-decision, step ProductionSupervisor.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="record-hours-decision" retries="3" />
+        <zeebe:taskHeaders>
+          <zeebe:header key="step" value="ProductionSupervisor" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToRecordProduction</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToIsProductionApproved</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_IsProductionApproved" name="Approved?" default="Flow_ProductionNotApproved">
+      <bpmn:documentation>E2-06.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToIsProductionApproved</bpmn:incoming>
+      <bpmn:outgoing>Flow_ProductionApproved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ProductionNotApproved</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="UserTask_ApproveHoursPpc" name="Approve hours (PPC)">
+      <bpmn:documentation>E2-07. Final approval of production hours (FRD-22 §22.7: Production Supervisor -&gt; PPC). hoursDecision Approved | Returned | Rejected; reason required unless Approved.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:assignmentDefinition candidateGroups="ppc-team" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ProductionApproved</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToRecordPpc</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="ServiceTask_RecordPpcDecision" name="Record PPC decision">
+      <bpmn:documentation>E2-07. record-hours-decision, step Ppc. Approved: lines Approved (ready for the FMS export, E2-08). Returned or Rejected: lines Returned or Rejected.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="record-hours-decision" retries="3" />
+        <zeebe:taskHeaders>
+          <zeebe:header key="step" value="Ppc" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToRecordPpc</bpmn:incoming>
+      <bpmn:outgoing>Flow_PpcDecided</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="EndEvent_TimesheetsClosed" name="Time sheets closed">
+      <bpmn:documentation>E2-16. Reached only through BoundaryEvent_WorkPackCompleted.</bpmn:documentation>
+      <bpmn:incoming>Flow_ToTimesheetsClosed</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:boundaryEvent id="BoundaryEvent_NothingToSubmit" name="Nothing to send" attachedToRef="ServiceTask_PrepareHoursSubmission">
+      <bpmn:documentation>HOURS_INVALID; variables validationMessages (e.g. 'No Draft or Returned hours to send for WP-000457').</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:output source="=validationMessages" target="validationMessages" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:outgoing>Flow_NothingToSubmit</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_NothingToSubmit" errorRef="Error_HoursInvalid" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="BoundaryEvent_WorkPackCompleted" name="Work Pack completed" attachedToRef="UserTask_BookHours">
+      <bpmn:documentation>E2-16. Message WorkPackCompleted, correlation key workpackNumber, published by ServiceTask_CompleteWorkPacks in Process_PPC_WeeklyProgressPeriod. Interrupting: no more hours on a Completed Work Pack. TTL so it waits while a submission is in approval (ASSUMPTION, see spec).</bpmn:documentation>
+      <bpmn:outgoing>Flow_ToTimesheetsClosed</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_WorkPackCompleted" messageRef="Message_WorkPackCompleted" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_ToMergeBooking" sourceRef="StartEvent_WorkPackAssigned" targetRef="Gateway_MergeBooking" />
+    <bpmn:sequenceFlow id="Flow_ToBookHours" sourceRef="Gateway_MergeBooking" targetRef="UserTask_BookHours" />
+    <bpmn:sequenceFlow id="Flow_ToPrepareSubmission" sourceRef="UserTask_BookHours" targetRef="ServiceTask_PrepareHoursSubmission" />
+    <bpmn:sequenceFlow id="Flow_ToCheckBudget" sourceRef="ServiceTask_PrepareHoursSubmission" targetRef="BusinessRuleTask_CheckHoursWithinBudget" />
+    <bpmn:sequenceFlow id="Flow_ToAreHoursWithinBudget" sourceRef="BusinessRuleTask_CheckHoursWithinBudget" targetRef="Gateway_AreHoursWithinBudget" />
+    <bpmn:sequenceFlow id="Flow_HoursWithinBudget" name="Yes" sourceRef="Gateway_AreHoursWithinBudget" targetRef="ServiceTask_SubmitHours" />
+    <bpmn:sequenceFlow id="Flow_HoursBlocked" name="No" sourceRef="Gateway_AreHoursWithinBudget" targetRef="Gateway_MergeBooking">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=some r in lineCheckResults satisfies r.budgetResult = "Blocked"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ToValidateHours" sourceRef="ServiceTask_SubmitHours" targetRef="UserTask_ValidateHours" />
+    <bpmn:sequenceFlow id="Flow_ToRecordTimekeeper" sourceRef="UserTask_ValidateHours" targetRef="ServiceTask_RecordTimekeeperDecision" />
+    <bpmn:sequenceFlow id="Flow_ToIsValidated" sourceRef="ServiceTask_RecordTimekeeperDecision" targetRef="Gateway_IsValidated" />
+    <bpmn:sequenceFlow id="Flow_Validated" name="Validated" sourceRef="Gateway_IsValidated" targetRef="UserTask_ApproveHoursProduction">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=hoursDecision = "Validated"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NotValidated" name="Returned" sourceRef="Gateway_IsValidated" targetRef="Gateway_MergeBooking" />
+    <bpmn:sequenceFlow id="Flow_ToRecordProduction" sourceRef="UserTask_ApproveHoursProduction" targetRef="ServiceTask_RecordProductionDecision" />
+    <bpmn:sequenceFlow id="Flow_ToIsProductionApproved" sourceRef="ServiceTask_RecordProductionDecision" targetRef="Gateway_IsProductionApproved" />
+    <bpmn:sequenceFlow id="Flow_ProductionApproved" name="Approved" sourceRef="Gateway_IsProductionApproved" targetRef="UserTask_ApproveHoursPpc">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=hoursDecision = "Approved"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ProductionNotApproved" name="Returned or rejected" sourceRef="Gateway_IsProductionApproved" targetRef="Gateway_MergeBooking" />
+    <bpmn:sequenceFlow id="Flow_ToRecordPpc" sourceRef="UserTask_ApproveHoursPpc" targetRef="ServiceTask_RecordPpcDecision" />
+    <bpmn:sequenceFlow id="Flow_PpcDecided" sourceRef="ServiceTask_RecordPpcDecision" targetRef="Gateway_MergeBooking" />
+    <bpmn:sequenceFlow id="Flow_NothingToSubmit" sourceRef="BoundaryEvent_NothingToSubmit" targetRef="Gateway_MergeBooking" />
+    <bpmn:sequenceFlow id="Flow_ToTimesheetsClosed" sourceRef="BoundaryEvent_WorkPackCompleted" targetRef="EndEvent_TimesheetsClosed" />
+    <bpmn:boundaryEvent id="BoundaryEvent_HoursWaitingTimekeeper" name="Every 24 h while waiting" cancelActivity="false" attachedToRef="UserTask_ValidateHours">
+      <bpmn:documentation>BPA-74. Non-interrupting, fires every 24 h while UserTask_ValidateHours is open; the worker sends only once the hours have waited 48 h or more at this step, so the first reminder comes at 48 h and then daily until decided. Cancelled with the task when it is completed.</bpmn:documentation>
+      <bpmn:outgoing>Flow_ToServiceTask_SendHoursReminderTimekeeper</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_HoursWaitingTimekeeper">
+        <bpmn:timeCycle xsi:type="bpmn:tFormalExpression">R/PT24H</bpmn:timeCycle>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="ServiceTask_SendHoursReminderTimekeeper" name="Send hours reminder">
+      <bpmn:documentation>BPA-74. send-hours-reminder, step Timekeeper. If now - time the hours reached this step &gt;= 48 h: email (Mailpit) and in-system notice to group timekeeper: 'Hours for &lt;workpackNumber&gt; are waiting for your decision since &lt;date&gt;'; writes a notification row. Otherwise does nothing. Idempotent on process instance key + step + timer firing.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-hours-reminder" retries="3" />
+        <zeebe:taskHeaders>
+          <zeebe:header key="step" value="Timekeeper" />
+          <zeebe:header key="recipientGroup" value="timekeeper" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToServiceTask_SendHoursReminderTimekeeper</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEndEvent_HoursReminderSentTimekeeper</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="EndEvent_HoursReminderSentTimekeeper" name="Reminder handled">
+      <bpmn:incoming>Flow_ToEndEvent_HoursReminderSentTimekeeper</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_ToServiceTask_SendHoursReminderTimekeeper" sourceRef="BoundaryEvent_HoursWaitingTimekeeper" targetRef="ServiceTask_SendHoursReminderTimekeeper" />
+    <bpmn:sequenceFlow id="Flow_ToEndEvent_HoursReminderSentTimekeeper" sourceRef="ServiceTask_SendHoursReminderTimekeeper" targetRef="EndEvent_HoursReminderSentTimekeeper" />
+    <bpmn:boundaryEvent id="BoundaryEvent_HoursWaitingProductionSupervisor" name="Every 24 h while waiting" cancelActivity="false" attachedToRef="UserTask_ApproveHoursProduction">
+      <bpmn:documentation>BPA-74. Non-interrupting, fires every 24 h while UserTask_ApproveHoursProduction is open; the worker sends only once the hours have waited 48 h or more at this step, so the first reminder comes at 48 h and then daily until decided. Cancelled with the task when it is completed.</bpmn:documentation>
+      <bpmn:outgoing>Flow_ToServiceTask_SendHoursReminderProductionSupervisor</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_HoursWaitingProductionSupervisor">
+        <bpmn:timeCycle xsi:type="bpmn:tFormalExpression">R/PT24H</bpmn:timeCycle>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="ServiceTask_SendHoursReminderProductionSupervisor" name="Send hours reminder">
+      <bpmn:documentation>BPA-74. send-hours-reminder, step ProductionSupervisor. If now - time the hours reached this step &gt;= 48 h: email (Mailpit) and in-system notice to group production-supervisor: 'Hours for &lt;workpackNumber&gt; are waiting for your decision since &lt;date&gt;'; writes a notification row. Otherwise does nothing. Idempotent on process instance key + step + timer firing.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-hours-reminder" retries="3" />
+        <zeebe:taskHeaders>
+          <zeebe:header key="step" value="ProductionSupervisor" />
+          <zeebe:header key="recipientGroup" value="production-supervisor" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToServiceTask_SendHoursReminderProductionSupervisor</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEndEvent_HoursReminderSentProductionSupervisor</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="EndEvent_HoursReminderSentProductionSupervisor" name="Reminder handled">
+      <bpmn:incoming>Flow_ToEndEvent_HoursReminderSentProductionSupervisor</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_ToServiceTask_SendHoursReminderProductionSupervisor" sourceRef="BoundaryEvent_HoursWaitingProductionSupervisor" targetRef="ServiceTask_SendHoursReminderProductionSupervisor" />
+    <bpmn:sequenceFlow id="Flow_ToEndEvent_HoursReminderSentProductionSupervisor" sourceRef="ServiceTask_SendHoursReminderProductionSupervisor" targetRef="EndEvent_HoursReminderSentProductionSupervisor" />
+    <bpmn:boundaryEvent id="BoundaryEvent_HoursWaitingPpc" name="Every 24 h while waiting" cancelActivity="false" attachedToRef="UserTask_ApproveHoursPpc">
+      <bpmn:documentation>BPA-74. Non-interrupting, fires every 24 h while UserTask_ApproveHoursPpc is open; the worker sends only once the hours have waited 48 h or more at this step, so the first reminder comes at 48 h and then daily until decided. Cancelled with the task when it is completed.</bpmn:documentation>
+      <bpmn:outgoing>Flow_ToServiceTask_SendHoursReminderPpc</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_HoursWaitingPpc">
+        <bpmn:timeCycle xsi:type="bpmn:tFormalExpression">R/PT24H</bpmn:timeCycle>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="ServiceTask_SendHoursReminderPpc" name="Send hours reminder">
+      <bpmn:documentation>BPA-74. send-hours-reminder, step Ppc. If now - time the hours reached this step &gt;= 48 h: email (Mailpit) and in-system notice to group ppc-team: 'Hours for &lt;workpackNumber&gt; are waiting for your decision since &lt;date&gt;'; writes a notification row. Otherwise does nothing. Idempotent on process instance key + step + timer firing.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-hours-reminder" retries="3" />
+        <zeebe:taskHeaders>
+          <zeebe:header key="step" value="Ppc" />
+          <zeebe:header key="recipientGroup" value="ppc-team" />
+        </zeebe:taskHeaders>
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToServiceTask_SendHoursReminderPpc</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToEndEvent_HoursReminderSentPpc</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="EndEvent_HoursReminderSentPpc" name="Reminder handled">
+      <bpmn:incoming>Flow_ToEndEvent_HoursReminderSentPpc</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_ToServiceTask_SendHoursReminderPpc" sourceRef="BoundaryEvent_HoursWaitingPpc" targetRef="ServiceTask_SendHoursReminderPpc" />
+    <bpmn:sequenceFlow id="Flow_ToEndEvent_HoursReminderSentPpc" sourceRef="ServiceTask_SendHoursReminderPpc" targetRef="EndEvent_HoursReminderSentPpc" />
+  </bpmn:process>
+  <bpmn:message id="Message_WorkPackAssigned" name="WorkPackAssigned" />
+  <bpmn:message id="Message_WorkPackCompleted" name="WorkPackCompleted">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=workpackNumber" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:error id="Error_HoursInvalid" name="Hours input invalid" errorCode="HOURS_INVALID" />
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Process_PPC_TimesheetToProgress">
+    <bpmndi:BPMNPlane id="BPMNPlane_Process_PPC_TimesheetToProgress" bpmnElement="Collaboration_TimesheetToProgress">
+      <bpmndi:BPMNShape id="Participant_PPC_TimesheetToProgress_di" bpmnElement="Participant_PPC_TimesheetToProgress" isHorizontal="true">
+        <dc:Bounds x="160" y="60" width="2470" height="1000" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Supervisor_di" bpmnElement="Lane_Supervisor" isHorizontal="true">
+        <dc:Bounds x="190" y="60" width="2440" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Timekeeper_di" bpmnElement="Lane_Timekeeper" isHorizontal="true">
+        <dc:Bounds x="190" y="260" width="2440" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ProductionSupervisor_di" bpmnElement="Lane_ProductionSupervisor" isHorizontal="true">
+        <dc:Bounds x="190" y="460" width="2440" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_PpcTeam_di" bpmnElement="Lane_PpcTeam" isHorizontal="true">
+        <dc:Bounds x="190" y="660" width="2440" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_System_di" bpmnElement="Lane_System" isHorizontal="true">
+        <dc:Bounds x="190" y="860" width="2440" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_WorkPackAssigned_di" bpmnElement="StartEvent_WorkPackAssigned">
+        <dc:Bounds x="292" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="260" y="183" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_MergeBooking_di" bpmnElement="Gateway_MergeBooking" isMarkerVisible="true">
+        <dc:Bounds x="435" y="135" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="410" y="190" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_BookHours_di" bpmnElement="UserTask_BookHours">
+        <dc:Bounds x="560" y="120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_PrepareHoursSubmission_di" bpmnElement="ServiceTask_PrepareHoursSubmission">
+        <dc:Bounds x="710" y="920" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BusinessRuleTask_CheckHoursWithinBudget_di" bpmnElement="BusinessRuleTask_CheckHoursWithinBudget">
+        <dc:Bounds x="860" y="920" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_AreHoursWithinBudget_di" bpmnElement="Gateway_AreHoursWithinBudget" isMarkerVisible="true">
+        <dc:Bounds x="1035" y="935" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1010" y="990" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_SubmitHours_di" bpmnElement="ServiceTask_SubmitHours">
+        <dc:Bounds x="1160" y="920" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_ValidateHours_di" bpmnElement="UserTask_ValidateHours">
+        <dc:Bounds x="1310" y="320" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_RecordTimekeeperDecision_di" bpmnElement="ServiceTask_RecordTimekeeperDecision">
+        <dc:Bounds x="1460" y="920" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_IsValidated_di" bpmnElement="Gateway_IsValidated" isMarkerVisible="true">
+        <dc:Bounds x="1635" y="935" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1610" y="990" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_ApproveHoursProduction_di" bpmnElement="UserTask_ApproveHoursProduction">
+        <dc:Bounds x="1760" y="520" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_RecordProductionDecision_di" bpmnElement="ServiceTask_RecordProductionDecision">
+        <dc:Bounds x="1910" y="920" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_IsProductionApproved_di" bpmnElement="Gateway_IsProductionApproved" isMarkerVisible="true">
+        <dc:Bounds x="2085" y="935" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2060" y="990" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="UserTask_ApproveHoursPpc_di" bpmnElement="UserTask_ApproveHoursPpc">
+        <dc:Bounds x="2210" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_RecordPpcDecision_di" bpmnElement="ServiceTask_RecordPpcDecision">
+        <dc:Bounds x="2360" y="920" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_TimesheetsClosed_di" bpmnElement="EndEvent_TimesheetsClosed">
+        <dc:Bounds x="742" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="710" y="183" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BoundaryEvent_NothingToSubmit_di" bpmnElement="BoundaryEvent_NothingToSubmit">
+        <dc:Bounds x="782" y="982" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="750" y="1020" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BoundaryEvent_WorkPackCompleted_di" bpmnElement="BoundaryEvent_WorkPackCompleted">
+        <dc:Bounds x="632" y="182" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="600" y="220" width="100" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_ToMergeBooking_di" bpmnElement="Flow_ToMergeBooking">
+        <di:waypoint x="328" y="160" />
+        <di:waypoint x="435" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToBookHours_di" bpmnElement="Flow_ToBookHours">
+        <di:waypoint x="485" y="160" />
+        <di:waypoint x="560" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToPrepareSubmission_di" bpmnElement="Flow_ToPrepareSubmission">
+        <di:waypoint x="660" y="160" />
+        <di:waypoint x="685" y="160" />
+        <di:waypoint x="685" y="960" />
+        <di:waypoint x="710" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToCheckBudget_di" bpmnElement="Flow_ToCheckBudget">
+        <di:waypoint x="810" y="960" />
+        <di:waypoint x="860" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToAreHoursWithinBudget_di" bpmnElement="Flow_ToAreHoursWithinBudget">
+        <di:waypoint x="960" y="960" />
+        <di:waypoint x="1035" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_HoursWithinBudget_di" bpmnElement="Flow_HoursWithinBudget">
+        <di:waypoint x="1085" y="960" />
+        <di:waypoint x="1160" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_HoursBlocked_di" bpmnElement="Flow_HoursBlocked">
+        <di:waypoint x="1060" y="935" />
+        <di:waypoint x="1060" y="110" />
+        <di:waypoint x="460" y="110" />
+        <di:waypoint x="460" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToValidateHours_di" bpmnElement="Flow_ToValidateHours">
+        <di:waypoint x="1260" y="960" />
+        <di:waypoint x="1285" y="960" />
+        <di:waypoint x="1285" y="360" />
+        <di:waypoint x="1310" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToRecordTimekeeper_di" bpmnElement="Flow_ToRecordTimekeeper">
+        <di:waypoint x="1410" y="360" />
+        <di:waypoint x="1435" y="360" />
+        <di:waypoint x="1435" y="960" />
+        <di:waypoint x="1460" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToIsValidated_di" bpmnElement="Flow_ToIsValidated">
+        <di:waypoint x="1560" y="960" />
+        <di:waypoint x="1635" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Validated_di" bpmnElement="Flow_Validated">
+        <di:waypoint x="1685" y="960" />
+        <di:waypoint x="1722" y="960" />
+        <di:waypoint x="1722" y="560" />
+        <di:waypoint x="1760" y="560" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotValidated_di" bpmnElement="Flow_NotValidated">
+        <di:waypoint x="1660" y="935" />
+        <di:waypoint x="1660" y="110" />
+        <di:waypoint x="460" y="110" />
+        <di:waypoint x="460" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToRecordProduction_di" bpmnElement="Flow_ToRecordProduction">
+        <di:waypoint x="1860" y="560" />
+        <di:waypoint x="1885" y="560" />
+        <di:waypoint x="1885" y="960" />
+        <di:waypoint x="1910" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToIsProductionApproved_di" bpmnElement="Flow_ToIsProductionApproved">
+        <di:waypoint x="2010" y="960" />
+        <di:waypoint x="2085" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ProductionApproved_di" bpmnElement="Flow_ProductionApproved">
+        <di:waypoint x="2135" y="960" />
+        <di:waypoint x="2172" y="960" />
+        <di:waypoint x="2172" y="760" />
+        <di:waypoint x="2210" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ProductionNotApproved_di" bpmnElement="Flow_ProductionNotApproved">
+        <di:waypoint x="2110" y="935" />
+        <di:waypoint x="2110" y="110" />
+        <di:waypoint x="460" y="110" />
+        <di:waypoint x="460" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToRecordPpc_di" bpmnElement="Flow_ToRecordPpc">
+        <di:waypoint x="2310" y="760" />
+        <di:waypoint x="2335" y="760" />
+        <di:waypoint x="2335" y="960" />
+        <di:waypoint x="2360" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PpcDecided_di" bpmnElement="Flow_PpcDecided">
+        <di:waypoint x="2410" y="920" />
+        <di:waypoint x="2410" y="110" />
+        <di:waypoint x="460" y="110" />
+        <di:waypoint x="460" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NothingToSubmit_di" bpmnElement="Flow_NothingToSubmit">
+        <di:waypoint x="800" y="1018" />
+        <di:waypoint x="800" y="1050" />
+        <di:waypoint x="460" y="1050" />
+        <di:waypoint x="460" y="185" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToTimesheetsClosed_di" bpmnElement="Flow_ToTimesheetsClosed">
+        <di:waypoint x="650" y="218" />
+        <di:waypoint x="650" y="250" />
+        <di:waypoint x="760" y="250" />
+        <di:waypoint x="760" y="178" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="BoundaryEvent_HoursWaitingTimekeeper_di" bpmnElement="BoundaryEvent_HoursWaitingTimekeeper">
+        <dc:Bounds x="1372" y="302" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_SendHoursReminderTimekeeper_di" bpmnElement="ServiceTask_SendHoursReminderTimekeeper">
+        <dc:Bounds x="1460" y="270" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_HoursReminderSentTimekeeper_di" bpmnElement="EndEvent_HoursReminderSentTimekeeper">
+        <dc:Bounds x="1610" y="292" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_ToServiceTask_SendHoursReminderTimekeeper_di" bpmnElement="Flow_ToServiceTask_SendHoursReminderTimekeeper">
+        <di:waypoint x="1390" y="302" />
+        <di:waypoint x="1390" y="310" />
+        <di:waypoint x="1460" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToEndEvent_HoursReminderSentTimekeeper_di" bpmnElement="Flow_ToEndEvent_HoursReminderSentTimekeeper">
+        <di:waypoint x="1560" y="310" />
+        <di:waypoint x="1610" y="310" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="BoundaryEvent_HoursWaitingProductionSupervisor_di" bpmnElement="BoundaryEvent_HoursWaitingProductionSupervisor">
+        <dc:Bounds x="1822" y="502" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_SendHoursReminderProductionSupervisor_di" bpmnElement="ServiceTask_SendHoursReminderProductionSupervisor">
+        <dc:Bounds x="1910" y="470" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_HoursReminderSentProductionSupervisor_di" bpmnElement="EndEvent_HoursReminderSentProductionSupervisor">
+        <dc:Bounds x="2060" y="492" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_ToServiceTask_SendHoursReminderProductionSupervisor_di" bpmnElement="Flow_ToServiceTask_SendHoursReminderProductionSupervisor">
+        <di:waypoint x="1840" y="502" />
+        <di:waypoint x="1840" y="510" />
+        <di:waypoint x="1910" y="510" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToEndEvent_HoursReminderSentProductionSupervisor_di" bpmnElement="Flow_ToEndEvent_HoursReminderSentProductionSupervisor">
+        <di:waypoint x="2010" y="510" />
+        <di:waypoint x="2060" y="510" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="BoundaryEvent_HoursWaitingPpc_di" bpmnElement="BoundaryEvent_HoursWaitingPpc">
+        <dc:Bounds x="2272" y="702" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_SendHoursReminderPpc_di" bpmnElement="ServiceTask_SendHoursReminderPpc">
+        <dc:Bounds x="2360" y="670" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_HoursReminderSentPpc_di" bpmnElement="EndEvent_HoursReminderSentPpc">
+        <dc:Bounds x="2510" y="692" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_ToServiceTask_SendHoursReminderPpc_di" bpmnElement="Flow_ToServiceTask_SendHoursReminderPpc">
+        <di:waypoint x="2290" y="702" />
+        <di:waypoint x="2290" y="710" />
+        <di:waypoint x="2360" y="710" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToEndEvent_HoursReminderSentPpc_di" bpmnElement="Flow_ToEndEvent_HoursReminderSentPpc">
+        <di:waypoint x="2460" y="710" />
+        <di:waypoint x="2510" y="710" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

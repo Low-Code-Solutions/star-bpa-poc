@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_ManhourVariance" name="Man-hour variance" namespace="http://lowcodesol.com/star-bpa-poc" exporter="LCS generator (Claude)" exporterVersion="0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.1">
+  <decision id="Decision_ManhourVariance" name="Man-hour variance">
+    <description>E2-14. Per CBS code per week. FRD-22 §22.10: 'Manhour variance &gt; 15% against Current Forecast for any CBS' -&gt; Cost Control Engineer + PCON Manager (POC: cost-controller). Variance % = (actual - forecast) / forecast x 100. Over-run only and exactly 15% = no alert are ASSUMPTIONS. No forecast (null or 0) gives no alert.</description>
+    <decisionTable id="DecisionTable_ManhourVariance" hitPolicy="FIRST">
+      <input id="Input_CurrentForecastManhours" label="Current Forecast MH">
+        <inputExpression id="InputExpression_CurrentForecastManhours" typeRef="number">
+          <text>currentForecastManhours</text>
+        </inputExpression>
+      </input>
+      <input id="Input_ManhourVariancePct" label="Variance %">
+        <inputExpression id="InputExpression_ManhourVariancePct" typeRef="number">
+          <text>if currentForecastManhours != null and currentForecastManhours &gt; 0 then (actualManhours - currentForecastManhours) / currentForecastManhours * 100 else null</text>
+        </inputExpression>
+      </input>
+      <output id="Output_ManhourAlert" label="Alert" name="manhourAlert" typeRef="boolean" />
+      <output id="Output_ManhourResult" label="Result" name="manhourResult" typeRef="string" />
+      <rule id="Rule_NoForecast">
+        <description>Rule 1: no forecast</description>
+        <inputEntry id="UnaryTests_R1_1"><text>null, &lt;= 0</text></inputEntry>
+        <inputEntry id="UnaryTests_R1_2"><text>-</text></inputEntry>
+        <outputEntry id="Literal_R1_1"><text>false</text></outputEntry>
+        <outputEntry id="Literal_R1_2"><text>"NO_FORECAST"</text></outputEntry>
+      </rule>
+      <rule id="Rule_OverFifteen">
+        <description>Rule 2: more than 15% over forecast</description>
+        <inputEntry id="UnaryTests_R2_1"><text>-</text></inputEntry>
+        <inputEntry id="UnaryTests_R2_2"><text>&gt; 15</text></inputEntry>
+        <outputEntry id="Literal_R2_1"><text>true</text></outputEntry>
+        <outputEntry id="Literal_R2_2"><text>"OVER_15_PCT"</text></outputEntry>
+      </rule>
+      <rule id="Rule_Within">
+        <description>Rule 3: within tolerance</description>
+        <inputEntry id="UnaryTests_R3_1"><text>-</text></inputEntry>
+        <inputEntry id="UnaryTests_R3_2"><text>-</text></inputEntry>
+        <outputEntry id="Literal_R3_1"><text>false</text></outputEntry>
+        <outputEntry id="Literal_R3_2"><text>"WITHIN"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="DMNDiagram_ManhourVariance">
+      <dmndi:DMNShape id="DMNShape_ManhourVariance" dmnElementRef="Decision_ManhourVariance">
+        <dc:Bounds height="80" width="180" x="160" y="100" />
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

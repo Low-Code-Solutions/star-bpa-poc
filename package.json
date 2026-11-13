@@ -3,7 +3,7 @@
   "private": true,
   "description": "Repo tooling for the STAR BPA POC: BPMN lint (09 L10). Application code lives in backend/ and frontend/.",
   "scripts": {
-    "lint:bpmn": "node -e \"require('fs').readdirSync('models/bpmn').some(f=>f.endsWith('.bpmn'))||(console.error('lint:bpmn: no .bpmn files in models/bpmn'),process.exit(1))\" && bpmnlint --max-warnings=4 \"models/bpmn/*.bpmn\""
+    "lint:bpmn": "node -e \"require('fs').readdirSync('models/bpmn').some(f=>f.endsWith('.bpmn'))||(console.error('lint:bpmn: no .bpmn files in models/bpmn'),process.exit(1))\" && bpmnlint --max-warnings=0 \"models/bpmn/*.bpmn\""
   },
   "devDependencies": {
     "bpmnlint": "12.0.0",
