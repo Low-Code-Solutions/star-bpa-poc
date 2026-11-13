@@ -1,7 +1,7 @@
 # Plan: BPA-48 Data model v0.7, V2 migration, seed, test users and lint for Epic 2
 Jira: BPA-48 (Task, epic BPA-4)
 Story last updated: 2026-11-13T13:30:38.000+0400
-Status: Approved (Ahsan, Build Lead, 2026-11-13)
+Status: Closed (13 Nov 2026)
 Approver: Ahsan (Build Lead)
 Branch: BPA-48-epic2-data-model-v07, from main a035b88 (inputs commit 0a61a4b on top)
 

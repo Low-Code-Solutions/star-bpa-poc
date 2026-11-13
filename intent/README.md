@@ -58,5 +58,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 
 | Plan | Summary | Status |
 |---|---|---|
-| [BPA-48](BPA-4-timesheet-to-progress/plans/BPA-48.md) | Data model v0.7, V2 migration, seed, test users and lint for Epic 2 | Approved (Ahsan, Build Lead, 2026-11-13) |
+| [BPA-48](BPA-4-timesheet-to-progress/plans/BPA-48.md) | Data model v0.7, V2 migration, seed, test users and lint for Epic 2 | Closed (13 Nov 2026) |
 
