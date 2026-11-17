@@ -25,9 +25,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Add, change and delete hour lines on a Digital Time sheet (BPA-50; E2-03). Every rule is checked here, one message per refusal and in this order
  * (ASSUMPTION): time sheet or line found, Cancelled, editable status, remarks, hours, decimals, reported completion, future date, cut-off week, phase
  * on the Work Pack, Worker assigned, duplicate, then Decision_HoursWithinBudget at every save (its rule scenarios belong to BPA-51, BPA-69 and
- * BPA-75; here cbsClosed and workerOnLeave are sent as false until those stories read cbs_block and worker_leave). The checks, the line write and
- * the Released to In Progress move (D1) run in one transaction after the decision, which is a call to Camunda and sits outside it. Dates and the
- * clock are the business zone's (ADR 0013). A refusal is a {@link Refused}; an engine that cannot answer the decision is an
+ * BPA-75; here cbsClosed and workerOnLeave are sent as false until those stories read cbs_block and worker_leave). Only the write runs in a
+ * transaction: the line insert, update or delete, its audit rows and the Released to In Progress move (D1). Every check, the sums the decision gets
+ * and the decision itself (a call to Camunda) run before it, so two saves at the same moment can both pass the daily and phase limits; only the
+ * one-line rule has a database backstop (the partial unique index, mapped to the same 400). A POC accepts that (QA review). Dates and the clock are
+ * the business zone's (ADR 0013). A refusal is a {@link Refused}; an engine that cannot answer the decision is an
  * EngineUnavailableException (the controller answers 503 and nothing is saved).
  */
 @Service

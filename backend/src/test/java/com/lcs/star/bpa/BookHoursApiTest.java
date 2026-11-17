@@ -292,6 +292,90 @@ class BookHoursApiTest {
         assertThat(lineCount("E1021")).isZero();
     }
 
+    // --- not scenarios: the rest of the rules and of the contract (QA review) ----------------------------------------------------
+
+    @Test
+    void otherPersonasCannotListChangeOrDeleteLines() {
+        UUID line = fixture.line(ids.timesheet("E1021"), D17, "Cutting", new BigDecimal("8"), "Draft");
+        var timekeeper = flow.loggedInAs("timekeeper");
+
+        assertThat(timekeeper.get(lines("E1021")).statusCode()).isEqualTo(403);
+        assertThat(timekeeper.put("/api/v1/digital-timesheet-lines/" + line, toJson(Map.of("hours", 9))).statusCode()).isEqualTo(403);
+        assertThat(timekeeper.delete("/api/v1/digital-timesheet-lines/" + line).statusCode()).isEqualTo(403);
+        assertThat(jdbc.queryForObject("SELECT hours FROM bpa.digital_timesheet_line WHERE id = ?", BigDecimal.class, line)).isEqualByComparingTo("8");
+    }
+
+    @Test
+    void aDraftLineInACutOffWeekIsClosedButAReturnedOneCanBeCorrected() {
+        UUID draft = fixture.line(ids.timesheet("E1021"), LocalDate.of(2026, 11, 12), "Cutting", new BigDecimal("8"), "Draft");
+        UUID returned = fixture.line(ids.timesheet("E1099"), LocalDate.of(2026, 11, 12), "Welding", new BigDecimal("8"), "Returned");
+        var supervisor = flow.loggedInAs("supervisor");
+
+        assertRefused(supervisor.put("/api/v1/digital-timesheet-lines/" + draft, toJson(Map.of("hours", 9))), 400, "Week ending 12 Nov 2026 is closed");
+        assertRefused(supervisor.delete("/api/v1/digital-timesheet-lines/" + draft), 400, "Week ending 12 Nov 2026 is closed");
+        HttpResponse<String> corrected = supervisor.put("/api/v1/digital-timesheet-lines/" + returned, toJson(Map.of("hours", 9)));
+        assertThat(corrected.statusCode()).as(corrected.body()).isEqualTo(200);
+        assertThat(json(corrected.body()).path("status").asText()).as("a Returned line stays Returned").isEqualTo("Returned");
+    }
+
+    @Test
+    void aWorkerKeptForLoadedHoursTakesNoNewLines() {
+        // E2-D16: HoursLoadedNotRemoved keeps the Worker's lines but blocks new ones
+        jdbc.update("UPDATE bpa.worker_assignment SET flag = 'HoursLoadedNotRemoved' WHERE worker_id = (SELECT id FROM bpa.worker WHERE employee_ref = 'E1021')");
+
+        assertRefused(add("supervisor", "E1021", "2026-11-17", "Cutting", "8", null), 400, "Worker E1021 is not assigned to WP-000457");
+        assertThat(lineCount("E1021")).isZero();
+    }
+
+    @Test
+    void insertAndDeleteAreAuditedColumnByColumn() {
+        HttpResponse<String> saved = add("supervisor", "E1021", "2026-11-17", "Cutting", "8", "Night shift");
+        UUID line = UUID.fromString(json(saved.body()).path("id").asText());
+
+        assertThat(jdbc.queryForList("SELECT column_name || '=' || new_value FROM bpa.audit_log WHERE table_name = 'digital_timesheet_line' AND record_id = ? AND old_value IS NULL",
+                String.class, line)).contains("hours=8", "phase=Cutting", "work_date=2026-11-17", "status=Draft", "entry_source=Form", "remarks=Night shift");
+
+        assertThat(flow.loggedInAs("supervisor").delete("/api/v1/digital-timesheet-lines/" + line).statusCode()).isEqualTo(204);
+        assertThat(jdbc.queryForList("SELECT column_name || ':' || old_value FROM bpa.audit_log WHERE table_name = 'digital_timesheet_line' AND record_id = ? AND new_value IS NULL AND old_value IS NOT NULL",
+                String.class, line)).contains("hours:8", "phase:Cutting", "remarks:Night shift");
+    }
+
+    @Test
+    void unknownTimesheetAndLineAnswer404() {
+        UUID unknown = UUID.randomUUID();
+        var supervisor = flow.loggedInAs("supervisor");
+
+        assertRefused(supervisor.get("/api/v1/digital-timesheets/" + unknown + "/lines"), 404, "Time sheet not found");
+        assertRefused(supervisor.post("/api/v1/digital-timesheets/" + unknown + "/lines", toJson(body("2026-11-17", "Cutting", "8", null))), 404, "Time sheet not found");
+        assertRefused(supervisor.put("/api/v1/digital-timesheet-lines/" + unknown, toJson(Map.of("hours", 9))), 404, "Line not found");
+        assertRefused(supervisor.delete("/api/v1/digital-timesheet-lines/" + unknown), 404, "Line not found");
+    }
+
+    @Test
+    void aBodyWithoutAPhaseIsRefused() {
+        HttpResponse<String> refused = flow.loggedInAs("supervisor").post(lines("E1021"), toJson(Map.of("workDate", "2026-11-17", "hours", 8)));
+
+        assertRefused(refused, 400, "workDate, phase and hours are required");
+        assertThat(lineCount("E1021")).isZero();
+    }
+
+    @Test
+    void aChangeReplacesTheRemarkAndTheCompletionItDoesNotCarry() {
+        // PUT replaces hours, remarks and reported completion (plan: ASSUMPTION): a body with hours only clears the other two, and audits it
+        Map<String, Object> body = body("2026-11-17", "Cutting", "8", "Night shift");
+        body.put("reportedCompletionPct", new BigDecimal("40"));
+        UUID line = UUID.fromString(json(flow.loggedInAs("supervisor").post(lines("E1021"), toJson(body)).body()).path("id").asText());
+
+        HttpResponse<String> changed = flow.loggedInAs("supervisor").put("/api/v1/digital-timesheet-lines/" + line, toJson(Map.of("hours", 9)));
+
+        assertThat(changed.statusCode()).as(changed.body()).isEqualTo(200);
+        Map<String, Object> row = jdbc.queryForMap("SELECT remarks, reported_completion_pct FROM bpa.digital_timesheet_line WHERE id = ?", line);
+        assertThat(row.get("remarks")).isNull();
+        assertThat(row.get("reported_completion_pct")).isNull();
+        assertThat(jdbc.queryForList("SELECT column_name || ':' || old_value || '>' || coalesce(new_value, 'null') FROM bpa.audit_log WHERE record_id = ? AND old_value IS NOT NULL AND new_value IS NULL AND column_name IN ('remarks', 'reported_completion_pct')",
+                String.class, line)).containsExactlyInAnyOrder("remarks:Night shift>null", "reported_completion_pct:40>null");
+    }
+
     // --- helpers ----------------------------------------------------------------------------------------------------------
 
     private String lines(String badge) {

@@ -522,3 +522,29 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Local stack (author, 17 Nov): WP-000030 taken through Epic 1 by API as the personas; Epic 1 instance COMPLETED at EndEvent_WorkPackAssigned, one `Process_PPC_TimesheetToProgress`
   instance ACTIVE at UserTask_BookHours for group supervisor, `published_message` row `WorkPackAssigned`; one-off call for it 409; WP-000011 (assigned before BPA-49) 201 then 409; an AwaitingFile Work Pack 409 "not assigned yet";
   unknown 404; deployed Process_PPC_WorkPackAssignment XML equals the repo file.
+
+### BPA-50 at c850bf4, 17 Nov 2026 (qa-reviewer)
+- Code: 0 High, 6 Important, 9 Nits. Reviewer read BPA-50 in Jira (Description, 19 scenarios, SOR Notes, 4 comments), the plan, the diff and REVIEW.md; no test was run by the reviewer
+  (author: 21 backend tests red first with 404 "No static resource", then green on the first run; full `./mvnw -B verify` 384 tests; frontend 10 React tests red first
+  with `Failed to resolve import "./BookHours"`; lint, format, build clean).
+- Checks passed: all 19 scenario messages character-exact; check order; business date from the injected Clock and zone; week ends on the Thursday on or after the date; duplicate rule
+  matches the partial index; decision inputs and `cbsClosed`/`workerOnLeave` sent as false; audit rows in the write transaction; security patterns cover every method; task serving.
+- Important (6):
+  - Production-team access (C-E2-5) is met only on paper: the list and the task stay supervisor-only because widening them would break `BPA15_otherRolesCannotReadTimesheets` and
+    `BPA49_assignedWorkPackStartsTimesheetProcess`. This is an exception to the plan's own Q7 recommendation, taken so no merged test is edited silently: Ahsan or Faraz must accept it in
+    the PR or settle Q7 with Khitaba. Fixed: openapi says so on the POST; the plan's Design, Files and Proof rows now match the diff.
+  - PUT replaces hours, remarks and completion (a body with only `hours` clears the other two): fixed by stating it in openapi, the data model and the plan, and by a test
+    (`aChangeReplacesTheRemarkAndTheCompletionItDoesNotCarry`).
+  - Test gaps: added tests for 403 on GET, PUT and DELETE; a Draft line in a cut-off week (PUT and DELETE 400) and a Returned one corrected; the `HoursLoadedNotRemoved` flag; insert and
+    delete audit rows; the four 404 texts; a body without a phase; and a React test for `canComplete=false` (Enter completes nothing). Not covered: the 503 path and the unique-index race.
+  - Plan did not match the diff: Files table, Design and Proof rows corrected; "no existing test was edited" now says `PersonaSyncTest` gained one expected-permission line.
+  - Transaction scope overstated: only the write, its audit rows and the status move are transactional; checks and the decision's sums run before it, so two simultaneous saves can both
+    pass the daily and phase limits (only the one-line rule has a backstop). Fixed in the Javadoc, the data model and the plan; accepted for the POC.
+  - Open for people: plan Q3 (scenario 2 title and Source Reference still say ASSUMPTION), Q5 (the screen was built inside BPA-50, so the story is larger than its 5 points), Q7, Q8 (who owns
+    "Send to Timekeeper", so the Book hours task cannot complete yet), the Q9 ASSUMPTION comments (drafted for a yes), and the epic's intent/spec acceptance (Jira DoR box).
+- Nits (9): fixed: DELETE documents its 400. Left: the API lets a Returned line be deleted while the screen offers Delete on Draft only (Jira comment 10515 names Draft); PUT and DELETE are not
+  refused on a Cancelled time sheet; `add` does not check the Work Pack is Released or In Progress (FRD-7 §7.7.1; the plan chose not to); non-numeric hours show "Hours must be greater than 0";
+  the remark length counts UTF-16 characters; the empty cell shows "+"; `<p role="group">` for the confirmation; two naming nits.
+- Not verified by the reviewer: red-first runs (tests and code are in separate commits only for the plan), test runs, CI, a browser click-through (human gap), spec.md and data-model §13.1 in full.
+- Local stack (author, 17 Nov): the supervisor's list shows the Book hours tasks; on WP-000031 a line booked (201), the Work Pack went Released to In Progress with one audit row, a change, a duplicate,
+  a missing phase, a future date, 7.125 h, the timekeeper (403) and a production-team line all behaved as the tests say; the lines were deleted again.

@@ -1,7 +1,7 @@
 # Plan: BPA-50 Supervisor can book daily hours for each Worker on a Work Pack by phase
 Jira: BPA-50 (Story, epic BPA-4)
 Story last updated: 2026-11-17T14:28:03.756+0400
-Status: Approved (Ahsan, Build Lead, 17 Nov 2026)
+Status: Closed (17 Nov 2026)
 Approver: Ahsan (Build Lead)
 Branch: BPA-50-book-daily-hours, from main 30f6685
 
@@ -84,29 +84,29 @@ through the API while the task is open (BPMN doc on `UserTask_BookHours`).
 ### Serving the task (needed for the screen, found while planning)
 - `TaskService` serves only `bpa.tasks.process-id: Process_PPC_WorkPackAssignment`, only allow-listed elements, and `TaskSummary.elementId` is a 4-value enum: `UserTask_BookHours` never shows today.
 - Change: `process-id` becomes `process-ids` (list: Epic 1 + `Process_PPC_TimesheetToProgress`), allow-list `UserTask_BookHours` read `[workpackNumber]`, write `[]`, enum gains `UserTask_BookHours`.
-- `UserTask_BookHours` candidate group is `supervisor` only (BPMN l.66), so production-team cannot open the screen (Q7).
+- `UserTask_BookHours` candidate group is `supervisor` only (BPMN l.66). **Not changed** (departure from this plan's Q7 recommendation, see Progress): the task stays the Supervisor's.
 - The screen does not complete the task (Q8): `TaskScreenShell` gets an optional `canComplete` (default true); Book hours passes false.
 
 ### Frontend: Book hours screen (new-task-screen skill)
-- `frontend/src/features/timesheets/` (`components/BookHours/`, `hooks/useTimesheetLines.ts`, `services/timesheetService.ts`, `timesheets.types.ts`); registered in `taskScreens.ts`, `USER_TASKS.bookHours` in `utils/constants.ts`.
+- `frontend/src/features/timesheets/` (`components/BookHours/`, `hooks/useBookHoursBoard.ts`, `services/timesheetService.ts`, `lineMessages.ts`); registered in `taskScreens.ts`, `USER_TASKS.bookHours` in `utils/constants.ts`.
 - On `TaskScreenShell` (title "Book daily hours", `canComplete={false}`): reads `workpackNumber` from the task, lists the time sheets (`GET /api/v1/digital-timesheets?workpackNumber=`), then `GET .../{id}/lines` per Worker.
 - Grid: one row per Worker, one column per day from `openWeekStart` to `today` (from the API; `utils/dates.ts` gets a `daysFrom(start, end)` helper), each cell one input per Work Pack phase. Cancelled time sheets are shown read-only.
 - Selecting a cell opens a line panel below the grid: hours, remark (max 250), reported completion % (optional), Save (POST or PUT) and, on Draft lines only, Delete with an inline confirmation ("Delete this line? Yes / No"). Server messages shown in `ErrorMessage`. No UI library (skill).
-- `GET /api/v1/digital-timesheets` gains production-team (today supervisor only) — needed for C-E2-5; changes BPA-15's rule (Q7).
+- `GET /api/v1/digital-timesheets` stays supervisor-only (BPA-15); **not widened** (departure from the Q7 recommendation, see Progress).
 
 ## Files that change
 | Area | Files |
 |---|---|
 | Contract | `api/openapi.yaml`: 3 paths, schemas `TimesheetLines`, `DigitalTimesheetLine`, `NewDigitalTimesheetLine`, `DigitalTimesheetLineChange`; `DigitalTimesheet.id`; `TaskSummary.elementId` + `UserTask_BookHours`; tag |
-| Backend API | new `api/DigitalTimesheetLineController.java`; `api/DigitalTimesheetController.java` (id) |
+| Backend API | new `api/DigitalTimesheetLineController.java`; `persistence/DigitalTimesheetRepository.java` (the id of a time sheet; the controller is unchanged) |
 | Rules | new `timesheet/HourLineService.java` (transaction, order, decision call, In Progress); new `domain/HourLineChecks.java` (pure: hours, decimals, remarks, completion %, future date, week ending) |
 | Persistence | new `persistence/DigitalTimesheetLineRepository.java` (insert/update/delete with audit, sums, cut-off, assignment, phase, status move); `DigitalTimesheetRepository` (id) |
 | Camunda | new `adapter/CamundaDecisionClient.java`; `config/CamundaClientsConfig.java` (bean); `config/PersonaSync.java` + `PersonaSyncTest` (decision permission) |
-| Security | `config/SecurityConfig.java`: `/api/v1/digital-timesheets/*/lines`, `/api/v1/digital-timesheet-lines/*` → supervisor, production-team; `/api/v1/digital-timesheets` + production-team (Q7) |
-| Tasks | `task/TaskAllowList.java`, `task/TaskService.java`, `adapter/CamundaTaskClient.java` (process list); `application.yml` (process-ids, allow-list) |
-| Model | only if Q7 = yes: `UserTask_BookHours` candidateGroups `supervisor, production-team` |
+| Security | `config/SecurityConfig.java`: `/api/v1/digital-timesheets/*/lines`, `/api/v1/digital-timesheet-lines/*` → supervisor, production-team; `/api/v1/digital-timesheets` unchanged, supervisor only (Q7 not applied) |
+| Tasks | `task/TaskAllowList.java`, `task/TaskService.java`; `application.yml` (process-ids, allow-list) |
+| Model | none: `UserTask_BookHours` stays `supervisor` (Q7 not applied) |
 | Frontend | `features/timesheets/**`, `features/tasks/components/TaskScreenShell` (`canComplete`), `features/tasks/taskScreens.ts`, `utils/constants.ts`, `utils/dates.ts`, `types/api.ts`, `features/tasks/components/TaskList` (no Work-Pack "saved" wording for Book hours) |
-| Tests | new `BookHoursApiTest` (19), `BookHoursFixture` (SQL Background), `HourLineChecksTest` (unit), `TaskApiTest` (Book hours listed for supervisor); `frontend/src/features/timesheets/components/BookHours/BookHours.test.tsx`, `TaskScreenShell.test.tsx` |
+| Tests | new `BookHoursApiTest` (19 scenario tests + 9 extras), `TestBrowser` put and delete, `BookHoursFixture` (SQL Background), `HourLineChecksTest` (unit), `TaskApiTest` (Book hours listed for supervisor; PersonaSyncTest one line); `frontend/src/features/timesheets/components/BookHours/BookHours.test.tsx`, `TaskScreenShell.test.tsx` |
 | Docs | `docs/data-model.md` §13.1 one line: where each line rule is enforced; plan; `REVIEW.md`; `intent/README.md` (generated) |
 Not changed: database (no V3), DMN, Epic 1 models, workers.
 
@@ -167,7 +167,7 @@ Step 5 (frontend) done, see the last bullets.
 - **ASSUMPTION added while building:** PUT and DELETE of a **Draft** line in a cut-off week are refused with "Week ending ... is closed" (data model §13.1:
   "editable only while Draft or Returned and its week is not cut off"); a **Returned** line is exempt (Description: "except correcting a Returned line, BPA-67 a").
 - **Task serving:** `bpa.tasks.process-id` became `process-ids` (a list, Epic 1 + `Process_PPC_TimesheetToProgress`); `UserTask_BookHours` has empty read and write lists.
-  New test `TaskApiTest.supervisorSeesTheBookHoursTask` (not a scenario); no existing test was edited.
+  New test `TaskApiTest.supervisorSeesTheBookHoursTask` (not a scenario); no existing Epic 1, BPA-15 or BPA-49 test was edited (`PersonaSyncTest` gained one expected-permission line).
 - **Contract lint:** the repo has no `npm run lint:api`; CI runs `npx --yes @redocly/cli@2.62.1 lint api/openapi.yaml` (valid).
 - **Also added:** `TestBrowser.put` and `delete` (test helper), `HourLineChecksTest` (unit), the data model §13.1 enforcement note.
 - **PUT replaces hours, remark and completion (ASSUMPTION, found on the live stack):** a PUT without `remarks` clears the remark (and audits old value > null). The screen always
@@ -190,7 +190,7 @@ Step 5 (frontend) done, see the last bullets.
 | Merged through a reviewed PR | `gh pr view <n> --json state,mergedAt,title` |
 | 19 tests passing in CI | `./mvnw -B -Dtest=BookHoursApiTest test` (19 run, 0 failures); `gh pr checks <n>` |
 | Endpoints in openapi; React screen on TaskScreenShell | `npx --yes @redocly/cli@2.62.1 lint api/openapi.yaml` (CI's api-lint); `grep -n "digital-timesheet-lines" api/openapi.yaml`; `cd frontend && npm test -- BookHours && npm run build` |
-| Process runs end to end in the local stack | `docker build -f backend/Dockerfile -t star-bpa-poc-bpa-app . && docker compose up -d --no-build bpa-app frontend` (bake grant issue after the folder rename); log in to http://localhost:3000 as supervisor, open "Book daily hours" for an Assigned Work Pack (e.g. WP-000031), book one cell → `psql … "select status from bpa.workpack where workpack_number='WP-000031'"` = In Progress, one Draft line, audit rows; then the same as production-team (if Q7 = yes) |
+| Process runs end to end in the local stack | `docker build -f backend/Dockerfile -t star-bpa-poc-bpa-app . && docker compose up -d --no-build bpa-app frontend` (bake grant issue after the folder rename); log in to http://localhost:3000 as supervisor, open "Book daily hours" for an Assigned Work Pack (e.g. WP-000031), book one cell → `psql … "select status from bpa.workpack where workpack_number='WP-000031'"` = In Progress, one Draft line, audit rows; production-team cannot open the task (Q7 not applied), so it is checked through the API only |
 | BPMN and DMN match deployed | `curl -u demo:demo localhost:8080/v2/process-definitions/<key>/xml` diffed with the repo file (only if the model changes, Q7); DMN unchanged |
 | Open questions resolved or logged | Questions below answered in Jira comments (shown first) or new items (with confirmation) |
 | Plan matches the diff, Closed | `grep '^Status: Closed' intent/BPA-4-timesheet-to-progress/plans/BPA-50.md` in the final commit |
@@ -220,3 +220,9 @@ Step 5 (frontend) done, see the last bullets.
 - Plan written in plan mode: git switch/pull and the branch wait for approval.
 - Jira BPA-50 was already In Progress when planning started (who moved it is in Jira's history; not by me).
 - Faraz: intent/spec acceptance in the repo; Q2/Q3/Q4/Q6/Q7 decisions with Khitaba. Ahsan: Q0, Q5, Q8, merge.
+
+## QA review outcome (17 Nov 2026; REVIEW.md)
+6 Important, all handled or handed to people: the Q7 exception is documented (openapi POST note, plan Progress, Files, Proof); PUT replace semantics stated and tested; seven extra backend tests and
+a shell test added (28 backend tests in `BookHoursApiTest`: 19 scenario tests and 9 extras; React 12 across `BookHours.test.tsx` and `TaskScreenShell.test.tsx`); plan sections matched to the diff;
+the transaction scope stated honestly; the open Jira items (Q3, Q5, Q7, Q8, Q9) listed for a person. Not covered: the 503 path and the unique-index race. Full `verify` (384 tests) ran before the
+extra tests and the doc fixes; CI runs it again on the PR.

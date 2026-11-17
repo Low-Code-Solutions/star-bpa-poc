@@ -813,6 +813,10 @@ paths:
       operationId: addTimesheetLine
       summary: Add an hour line for a Worker, date and phase
       description: |
+        Open point (plan Q7): production-team may call the four lines operations (C-E2-5), but the time sheet list
+        (`GET /api/v1/digital-timesheets`, BPA-15) and the Book hours task (BPA-49) stay supervisor-only, so a Production
+        Team member cannot find a time sheet id from the portal.
+
         Saves a Draft line with entry source Form (BPA-50). Every rule is checked here, one message per response, in this
         order (ASSUMPTION): time sheet found, not Cancelled, remarks, hours above 0, at most 2 decimals, completion %, not a
         future date, week not cut off, phase on the Work Pack, Worker assigned, no line for the Worker, date and phase, then
@@ -872,8 +876,10 @@ paths:
       summary: Change the hours, remark or reported completion of a Draft or Returned line
       description: |
         Date and phase cannot change (ASSUMPTION; delete the line and add another). The status is not changed (a Returned
-        line stays Returned; the resubmit is BPA-52). One audit row per changed column (D64). Groups supervisor and
-        production-team.
+        line stays Returned; the resubmit is BPA-52). PUT replaces hours, remarks and reported completion: a body with
+        `hours` only clears the other two (ASSUMPTION). A Draft line in a cut-off week answers 400 "Week ending 12 Nov
+        2026 is closed" (a Returned line may still be corrected, BPA-67 a). One audit row per changed column (D64). Groups
+        supervisor and production-team.
       x-assumption: true
       x-assumption-note: which fields can change, and that the status stays, are not stated by BPA-50
       requestBody:
@@ -914,10 +920,17 @@ paths:
       tags: [timesheet-lines]
       operationId: deleteTimesheetLine
       summary: Delete a Draft or Returned line
-      description: A Submitted, Approved or Rejected line cannot be deleted; corrections go through approval (FRD-5-12 §5.12.8.1). Groups supervisor and production-team.
+      description: A Submitted, Approved or Rejected line cannot be deleted; corrections go through approval (FRD-5-12 §5.12.8.1). A Draft line in a cut-off week answers 400 "Week ending ... is closed". Groups supervisor and production-team.
       responses:
         '204':
           description: Line deleted
+        '400':
+          description: The line's week is cut off (E2-D15)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 400, title: Bad Request, detail: Week ending 12 Nov 2026 is closed }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
