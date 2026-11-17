@@ -159,7 +159,7 @@ public class DigitalTimesheetRepository {
             return Optional.empty();
         }
         return Optional.of(jdbc.query("""
-                SELECT w.employee_ref, p.workpack_number, t.project_ref, t.wbs_ref, t.activity_ref, t.cbs_code_ref, t.cost_centre_ref,
+                SELECT t.id, w.employee_ref, p.workpack_number, t.project_ref, t.wbs_ref, t.activity_ref, t.cbs_code_ref, t.cost_centre_ref,
                        t.submission_status
                 FROM bpa.digital_timesheet t
                 JOIN bpa.worker w ON w.id = t.worker_id
@@ -169,6 +169,7 @@ public class DigitalTimesheetRepository {
                     DigitalTimesheet sheet = new DigitalTimesheet(rs.getString("employee_ref"), rs.getString("workpack_number"),
                             rs.getString("project_ref"), rs.getString("wbs_ref"), rs.getString("activity_ref"),
                             DigitalTimesheet.SubmissionStatusEnum.fromValue(rs.getString("submission_status")));
+                    sheet.setId(rs.getObject("id", UUID.class)); // BPA-50: the key of the lines endpoints
                     sheet.setCbsCodeRef(rs.getString("cbs_code_ref"));
                     sheet.setCostCentreRef(rs.getString("cost_centre_ref"));
                     return sheet;

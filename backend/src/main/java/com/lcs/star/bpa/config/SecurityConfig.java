@@ -79,6 +79,10 @@ public class SecurityConfig {
                         // BPA-15: the Digital Time sheets are read by the Supervisor only (group ASSUMPTION in the story; no department or project
                         // scope, BPA-44); 403 for anyone else (09 S6). Every method, so a HEAD request cannot skip the rule.
                         .requestMatchers("/api/v1/digital-timesheets").hasAuthority(SUPERVISOR)
+                        // BPA-50 (C-E2-5): hour lines are booked by the Supervisor and by a Production Team member (FRD-7 §7.5.6, FRD-5-12 §5.12.4). The time
+                        // sheet list above stays the Supervisor's (BPA-15 scenario: other roles get 403), so a Production Team member can book through the
+                        // lines endpoints but cannot list time sheets: an open contradiction, plan Q7. Every method; one segment for the id.
+                        .requestMatchers("/api/v1/digital-timesheets/*/lines", "/api/v1/digital-timesheet-lines/*").hasAnyAuthority(SUPERVISOR, PRODUCTION_TEAM)
                         // BPA-49: the one-off start of a timesheet process is the PPC Team's (group ASSUMPTION in the story); every method (the BPA-10 lesson).
                         .requestMatchers("/api/v1/timesheet-processes").hasAuthority(PPC_TEAM)
                         .anyRequest().authenticated())

@@ -80,8 +80,13 @@ bpa:
   # description in api/openapi.yaml. read: what GET /api/v1/tasks/{key} returns in `variables`; equal to write for prefill
   # (ASSUMPTION, no source names the read list). workpackNumber, validationMessages and confirmMessage have their own fields.
   tasks:
-    process-id: Process_PPC_WorkPackAssignment
+    # BPA-50: the Epic 2 process joins, for UserTask_BookHours (its other user tasks have no allow-list entry yet, so they are not served)
+    process-ids: [Process_PPC_WorkPackAssignment, Process_PPC_TimesheetToProgress]
     allow-lists:
+      "[UserTask_BookHours]": # supervisor (and production-team, C-E2-5), BPA-50: hours are saved line by line through the lines API, not as
+        # variables of the completion, so both lists are empty; completing the task ("Send to Timekeeper") waits for the story that builds it
+        write: []
+        read: []
       "[UserTask_CreateWorkPack]": # time-method-analyst (G9), BPA-6
         write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
         read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]

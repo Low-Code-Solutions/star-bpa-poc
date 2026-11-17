@@ -50,6 +50,8 @@ tags:
     description: Worker assignment file upload and result (BPA-12, BPA-13, BPA-22; S19 as D58)
   - name: timesheets
     description: Digital Time sheets (BPA-15)
+  - name: timesheet-lines
+    description: Daily hour lines on Digital Time sheets (BPA-50; E2-03)
   - name: timesheet-processes
     description: One-off start of a Work Pack's timesheet process (BPA-49; E2-D18)
   - name: drawing-revisions
@@ -780,6 +782,155 @@ paths:
                 detail: Drawing not found
         '503':
           $ref: '#/components/responses/EngineUnavailable'
+  /api/v1/digital-timesheets/{timesheetId}/lines:
+    parameters:
+      - $ref: '#/components/parameters/TimesheetId'
+    get:
+      tags: [timesheet-lines]
+      operationId: listTimesheetLines
+      summary: The hour lines of one Digital Time sheet, with what the Book hours grid needs
+      description: |
+        The Worker's lines on this Work Pack, the Work Pack's phases and the open week (BPA-50). Groups supervisor and
+        production-team (C-E2-5). The open week starts the Friday after the last cut-off Thursday, or 7 days before the
+        coming Thursday, and runs to today (E2-D15; ASSUMPTION, nothing seeds progress_period).
+      x-assumption: true
+      x-assumption-note: the response shape and the open-week start are not stated by BPA-50
+      responses:
+        '200':
+          description: The time sheet and its lines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimesheetLines'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TimesheetNotFound'
+    post:
+      tags: [timesheet-lines]
+      operationId: addTimesheetLine
+      summary: Add an hour line for a Worker, date and phase
+      description: |
+        Saves a Draft line with entry source Form (BPA-50). Every rule is checked here, one message per response, in this
+        order (ASSUMPTION): time sheet found, not Cancelled, remarks, hours above 0, at most 2 decimals, completion %, not a
+        future date, week not cut off, phase on the Work Pack, Worker assigned, no line for the Worker, date and phase, then
+        Decision_HoursWithinBudget. The first saved line on a Released Work Pack sets it In Progress (D1). Groups
+        supervisor and production-team (C-E2-5).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewDigitalTimesheetLine'
+      responses:
+        '201':
+          description: Line saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DigitalTimesheetLine'
+        '400':
+          description: A line rule failed, or a required field is missing (x-assumption for the missing-field text)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                duplicate:
+                  value: { status: 400, title: Bad Request, detail: Hours already booked for E1021 on 17 Nov 2026 for phase Cutting }
+                future:
+                  value: { status: 400, title: Bad Request, detail: Work date cannot be in the future }
+                closedWeek:
+                  value: { status: 400, title: Bad Request, detail: Week ending 12 Nov 2026 is closed }
+                phase:
+                  value: { status: 400, title: Bad Request, detail: Phase Finishing is not on this Work Pack }
+                worker:
+                  value: { status: 400, title: Bad Request, detail: Worker E1150 is not assigned to WP-000457 }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TimesheetNotFound'
+        '409':
+          description: The time sheet is Cancelled (BPA-13, D7)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 409, title: Conflict, detail: Time sheet for E1099 on WP-000457 is Cancelled }
+        '503':
+          $ref: '#/components/responses/EngineUnavailable'
+  /api/v1/digital-timesheet-lines/{lineId}:
+    parameters:
+      - $ref: '#/components/parameters/LineId'
+    put:
+      tags: [timesheet-lines]
+      operationId: updateTimesheetLine
+      summary: Change the hours, remark or reported completion of a Draft or Returned line
+      description: |
+        Date and phase cannot change (ASSUMPTION; delete the line and add another). The status is not changed (a Returned
+        line stays Returned; the resubmit is BPA-52). One audit row per changed column (D64). Groups supervisor and
+        production-team.
+      x-assumption: true
+      x-assumption-note: which fields can change, and that the status stays, are not stated by BPA-50
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DigitalTimesheetLineChange'
+      responses:
+        '200':
+          description: Line changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DigitalTimesheetLine'
+        '400':
+          description: A line rule failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/LineNotFound'
+        '409':
+          description: The line is not Draft or Returned
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 409, title: Conflict, detail: Line is not editable (status Submitted) }
+        '503':
+          $ref: '#/components/responses/EngineUnavailable'
+    delete:
+      tags: [timesheet-lines]
+      operationId: deleteTimesheetLine
+      summary: Delete a Draft or Returned line
+      description: A Submitted, Approved or Rejected line cannot be deleted; corrections go through approval (FRD-5-12 §5.12.8.1). Groups supervisor and production-team.
+      responses:
+        '204':
+          description: Line deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/LineNotFound'
+        '409':
+          description: The line is not Draft or Returned
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 409, title: Conflict, detail: Line is not editable (status Submitted) }
   /api/v1/timesheet-processes:
     post:
       tags: [timesheet-processes]
@@ -867,6 +1018,22 @@ components:
       in: cookie
       name: JSESSIONID
   parameters:
+    TimesheetId:
+      name: timesheetId
+      in: path
+      required: true
+      description: digital_timesheet.id
+      schema:
+        type: string
+        format: uuid
+    LineId:
+      name: lineId
+      in: path
+      required: true
+      description: digital_timesheet_line.id
+      schema:
+        type: string
+        format: uuid
     TaskKey:
       name: taskKey
       in: path
@@ -891,6 +1058,20 @@ components:
       schema:
         $ref: '#/components/schemas/WorkpackNumber'
   responses:
+    TimesheetNotFound:
+      description: No Digital Time sheet with this id (BPA-50)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example: { status: 404, title: Not Found, detail: Time sheet not found }
+    LineNotFound:
+      description: No hour line with this id (BPA-50)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example: { status: 404, title: Not Found, detail: Line not found }
     Unauthorized:
       description: Not logged in, or the session expired (S27)
       x-assumption: true
@@ -1042,7 +1223,7 @@ components:
         elementId:
           type: string
           description: BPMN element ID of the user task
-          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack]
+          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours]
         processInstanceKey:
           $ref: '#/components/schemas/CamundaKey'
         workpackNumber:
@@ -1254,11 +1435,106 @@ components:
         status:
           type: string
           enum: [Open, Closed]
+    TimesheetPhase:
+      type: string
+      enum: [Engineering, Cutting, Welding, Finishing]
+    NewDigitalTimesheetLine:
+      type: object
+      description: One day's hours for a Worker and phase (BPA-50). Limits are checked by the service so the messages are the story's.
+      required: [workDate, phase, hours]
+      properties:
+        workDate:
+          type: string
+          format: date
+          example: '2026-11-17'
+        phase:
+          $ref: '#/components/schemas/TimesheetPhase'
+        hours:
+          type: number
+          example: 8
+        remarks:
+          type: string
+          description: At most 250 characters (checked by the service)
+        reportedCompletionPct:
+          type: number
+          description: Optional, 0 to 100, information only (C-E2-10)
+          example: 40
+    DigitalTimesheetLineChange:
+      type: object
+      required: [hours]
+      properties:
+        hours:
+          type: number
+          example: 9.5
+        remarks:
+          type: string
+        reportedCompletionPct:
+          type: number
+    DigitalTimesheetLine:
+      type: object
+      description: digital_timesheet_line (data model §13.1)
+      required: [id, workDate, phase, hours, status, entrySource, createdBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+        workDate:
+          type: string
+          format: date
+        phase:
+          $ref: '#/components/schemas/TimesheetPhase'
+        hours:
+          type: number
+        status:
+          type: string
+          enum: [Draft, Submitted, Approved, Returned, Rejected]
+        entrySource:
+          type: string
+          enum: [Form, Upload]
+        remarks:
+          type: string
+        reportedCompletionPct:
+          type: number
+        createdBy:
+          type: string
+    TimesheetLines:
+      type: object
+      description: A time sheet with its lines and what the grid needs (BPA-50; x-assumption)
+      required: [timesheetId, employeeRef, workpackNumber, submissionStatus, phases, openWeekStart, today, lines]
+      properties:
+        timesheetId:
+          type: string
+          format: uuid
+        employeeRef:
+          type: string
+        workpackNumber:
+          $ref: '#/components/schemas/WorkpackNumber'
+        submissionStatus:
+          type: string
+          enum: [Draft, Cancelled]
+        phases:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimesheetPhase'
+        openWeekStart:
+          type: string
+          format: date
+        today:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/DigitalTimesheetLine'
     DigitalTimesheet:
       type: object
       description: digital_timesheet (data model §5.7), joined to worker and workpack
       required: [employeeRef, workpackNumber, projectRef, wbsRef, activityRef, submissionStatus]
       properties:
+        id:
+          type: string
+          format: uuid
+          description: digital_timesheet.id (BPA-50), the key of the lines endpoints
         employeeRef:
           type: string
           description: worker.employee_ref, the Badge No (D59)

@@ -112,7 +112,7 @@ Not changed: database (no V3), DMN, Epic 1 models, workers.
 
 ## Order of work
 1. Approve this plan; `git switch main && git pull`; branch (Q0); commit the plan as `Approved`; regenerate `intent/README.md`. Ask before any Jira move (it is already In Progress).
-2. Contract: `api/openapi.yaml` (+ `npm run lint:api` / Redocly), `npm run gen:api`, backend generate-sources.
+2. Contract: `api/openapi.yaml` (+ `npx --yes @redocly/cli@2.62.1 lint api/openapi.yaml` (CI's api-lint) / Redocly), `npm run gen:api`, backend generate-sources.
 3. Tests first: `BookHoursFixture`, the 19 `BPA50_` tests and the decision/permission test; run, show red (expected: 404 "No static resource" on the new paths). Commit nothing until red is shown.
 4. Backend: repository, checks, decision client, service, controller, security, permission, task serving. Green: `BookHoursApiTest`, `PersonaSyncTest`, `TaskApiTest`, then the BPA-15 and BPA-49 classes.
 5. Frontend tests first (red), then the shell prop, grid, panel, registration; `npm run lint`, `format:check`, `test`, `build`.
@@ -149,12 +149,35 @@ Outline rows run inside their one test. Extra tests (not scenarios, named as sen
 maps to the same 400; `HourLineChecksTest` week-ending and decimals; React: grid shows open week to today, Delete only on Draft with
 confirmation, server message shown, no Complete button.
 
+## Progress and departures (17 Nov 2026)
+Steps 1-4 done (contract, tests first, backend, task serving). Questions answered by taking the plan's recommendation (Ahsan: "do your recommended
+approach"): Q0 branch renamed; Q1 partial index stands; Q2 `cbsClosed`/`workerOnLeave` sent as false; Q4 "a `progress_period` row exists = cut off";
+Q6 assignment checked on `worker_assignment` (the test gives E1150 a time sheet and no assignment row); Q8 no completion in BPA-50. Not applied:
+Q7 (below). Not started: the frontend, which waits on Q5 (a new Jira story needs a confirmation, CLAUDE.md).
+- **Red first:** all 21 tests of `BookHoursApiTest` (the 19 scenario tests and 2 extras: `decisionBlockedAnswerStopsTheSave`, `phaseBudgetBlocksTheSave`)
+  failed with 404 "No static resource" on the new paths; then 21/21 green on the first run of the new code. The fixture's SQL Background ran in every red test.
+- **Q7 not applied (open, needs Khitaba or Faraz):** adding `production-team` to the time sheet list and to `UserTask_BookHours` would break two merged
+  scenarios: BPA-15 ("other roles cannot read time sheets": `BPA15_otherRolesCannotReadTimesheets` logs in as production-team and expects 403) and BPA-49
+  ("it waits at UserTask_BookHours for group supervisor": `BPA49_assignedWorkPackStartsTimesheetProcess` asserts exactly `supervisor`). Editing those tests
+  would resolve a contradiction silently. So: the lines endpoints allow supervisor and production-team (scenario 17 passes), the list endpoint and the task stay
+  the Supervisor's, the model is unchanged. Consequence: a Production Team member can book through the API but cannot list time sheets (to find the id) or open
+  the task in the portal. Jira C-E2-5 and the BPA-15/BPA-49 scenarios disagree; precedence says the Jira stories, and both are Jira.
+- **Decision permission proven:** `DECISION_DEFINITION:Decision_HoursWithinBudget` with `CREATE_DECISION_INSTANCE` was enough; both blocked tests passed.
+- **ASSUMPTION added while building:** PUT and DELETE of a **Draft** line in a cut-off week are refused with "Week ending ... is closed" (data model §13.1:
+  "editable only while Draft or Returned and its week is not cut off"); a **Returned** line is exempt (Description: "except correcting a Returned line, BPA-67 a").
+- **Task serving:** `bpa.tasks.process-id` became `process-ids` (a list, Epic 1 + `Process_PPC_TimesheetToProgress`); `UserTask_BookHours` has empty read and write lists.
+  New test `TaskApiTest.supervisorSeesTheBookHoursTask` (not a scenario); no existing test was edited.
+- **Contract lint:** the repo has no `npm run lint:api`; CI runs `npx --yes @redocly/cli@2.62.1 lint api/openapi.yaml` (valid).
+- **Also added:** `TestBrowser.put` and `delete` (test helper), `HourLineChecksTest` (unit), the data model §13.1 enforcement note.
+- **Left for the frontend story:** `TaskScreenShell` has no way to hide "Complete task" (`canComplete`), no grid component and no week helpers; the contract, the lines
+  endpoints and the task list are ready for it.
+
 ## Proof (one command per Definition of Done line)
 | DoD line | Command / evidence |
 |---|---|
 | Merged through a reviewed PR | `gh pr view <n> --json state,mergedAt,title` |
 | 19 tests passing in CI | `./mvnw -B -Dtest=BookHoursApiTest test` (19 run, 0 failures); `gh pr checks <n>` |
-| Endpoints in openapi; React screen on TaskScreenShell | `npm run lint:api`; `grep -n "digital-timesheet-lines" api/openapi.yaml`; `cd frontend && npm test -- BookHours && npm run build` |
+| Endpoints in openapi; React screen on TaskScreenShell | `npx --yes @redocly/cli@2.62.1 lint api/openapi.yaml` (CI's api-lint); `grep -n "digital-timesheet-lines" api/openapi.yaml`; `cd frontend && npm test -- BookHours && npm run build` |
 | Process runs end to end in the local stack | `docker build -f backend/Dockerfile -t star-bpa-poc-bpa-app . && docker compose up -d --no-build bpa-app frontend` (bake grant issue after the folder rename); log in to http://localhost:3000 as supervisor, open "Book daily hours" for an Assigned Work Pack (e.g. WP-000031), book one cell → `psql … "select status from bpa.workpack where workpack_number='WP-000031'"` = In Progress, one Draft line, audit rows; then the same as production-team (if Q7 = yes) |
 | BPMN and DMN match deployed | `curl -u demo:demo localhost:8080/v2/process-definitions/<key>/xml` diffed with the repo file (only if the model changes, Q7); DMN unchanged |
 | Open questions resolved or logged | Questions below answered in Jira comments (shown first) or new items (with confirmation) |

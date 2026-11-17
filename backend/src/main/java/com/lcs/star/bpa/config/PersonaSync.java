@@ -49,6 +49,8 @@ public class PersonaSync implements SmartInitializingSingleton {
                 "Process_PPC_TimesheetToProgress" /* BPA-49 (ASSUMPTION): started by the WorkPackAssigned message; proven by BPA49_ tests */)) {
             permissions.put("PROCESS_DEFINITION:" + process, PROCESS_PERMISSIONS);
         }
+        // BPA-50 (ASSUMPTION, proven by the BPA50_ tests): evaluates Decision_HoursWithinBudget at every hour-line save
+        permissions.put("DECISION_DEFINITION:Decision_HoursWithinBudget", Set.of("CREATE_DECISION_INSTANCE"));
         permissions.put("MESSAGE:*", Set.of("CREATE"));
         permissions.put("RESOURCE:*", Set.of("CREATE"));
         // BPA-16 (ASSUMPTION): read the members of the two groups that receive a drawing-revision notice, and only those. Without GROUP READ

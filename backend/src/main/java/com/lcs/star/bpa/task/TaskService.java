@@ -51,9 +51,11 @@ public class TaskService {
         return engine(() -> {
             Map<String, UserTask> tasks = new LinkedHashMap<>();
             for (String group : groups.stream().sorted().toList()) {
-                camunda.searchOpen(group, allowList.processId()).stream()
-                        .filter(t -> allowList.forElement(t.elementId()).isPresent())
-                        .forEach(t -> tasks.putIfAbsent(t.key(), t));
+                for (String process : allowList.processIds()) {
+                    camunda.searchOpen(group, process).stream()
+                            .filter(t -> allowList.forElement(t.elementId()).isPresent())
+                            .forEach(t -> tasks.putIfAbsent(t.key(), t));
+                }
             }
             List<TaskSummary> summaries = new ArrayList<>();
             for (UserTask task : tasks.values()) {
@@ -133,7 +135,7 @@ public class TaskService {
     /** The task, if Camunda knows it and it is one of the user tasks this API serves. */
     private UserTask served(String taskKey) {
         return camunda.get(taskKey)
-                .filter(t -> allowList.processId().equals(t.processDefinitionId()))
+                .filter(t -> allowList.processIds().contains(t.processDefinitionId()))
                 .filter(t -> allowList.forElement(t.elementId()).isPresent())
                 .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, NOT_FOUND));
     }
