@@ -93,6 +93,13 @@ public class WorkPackRepository {
                 .stream().findFirst();
     }
 
+    /** The Work Pack with this number, if any (BPA-49: the one-off timesheet start names it by number). */
+    public Optional<SavedWorkPack> findByNumber(String workpackNumber) {
+        return jdbc.query("SELECT id, workpack_number FROM bpa.workpack WHERE workpack_number = ?",
+                (rs, n) -> new SavedWorkPack(rs.getObject("id", UUID.class), rs.getString("workpack_number")), workpackNumber)
+                .stream().findFirst();
+    }
+
     /** The Work Pack's status (Draft, Released, ...), or empty if there is no such Work Pack. */
     public Optional<String> status(UUID workpackId) {
         return jdbc.queryForList("SELECT status FROM bpa.workpack WHERE id = ?", String.class, workpackId).stream().findFirst();

@@ -1,6 +1,6 @@
 # Plan: BPA-49 System can start a Work Pack's timesheet process when its assignment completes
 Jira: BPA-49 (Story, epic BPA-4)
-Story last updated: 2026-11-12T16:55:14.948+0400
+Story last updated: 2026-11-17T11:39:44.136+0400
 Status: Approved (Ahsan, Build Lead, 17 Nov 2026)
 Approver: Ahsan (Build Lead)
 Branch: BPA-49, from main 398fd45
@@ -98,6 +98,20 @@ call the starter as a Spring bean; the worker itself is proven by 1 and 4.
 7. Local stack end-to-end run (Proof). `qa-reviewer`, fixes, `REVIEW.md`, plan Closed, push, PR, read CI, draft Jira comments
    (PR link, plan path, plan SHA; a comment on BPA-15 that its end event now publishes), shown first.
 
+## Progress and departures (17 Nov 2026)
+Steps 1-5 done; step 6: the new class (6 tests), the five Epic 1 classes and `PersonaSyncTest` pass (100 tests, 0 failures); `lint:bpmn` 0 warnings.
+Departures from the plan above, found while building:
+- **Publish call.** `CamundaProcessClient.publish` uses `POST /v2/messages/publication` (messageId = workpackNumber, TTL 0), not the correlate call
+  other stories use: correlate answers 404 both for "nothing waiting" and for a duplicate dropped while an instance with the key is active, so a
+  retried publish (test 2) was read as "engine down". Publication does not say whether anything received it; a missing deployment or permission
+  is caught by test 1 instead.
+- **Test edit (said here as the test-first rule requires):** `TimesheetProcessStartApiTest.timesheetInstances` counts only `ACTIVE` instances. The
+  first version also counted a cancelled instance (its variables stay searchable), so `BPA49_alreadyAssignedWorkPackCanBeStartedOnce` failed
+  on its own set-up, not on the code. No assertion was weakened.
+- **No new repository.** The guard uses `AssignmentFileRepository.published/claim/workPack` (same table); only `WorkPackRepository.findByNumber` is new.
+- **Q8 answered by lint:** no `bpmn:message` root element is needed for the message end event. **Q11 answered by test 1:** `bpa-service` needs
+  `PROCESS_DEFINITION:Process_PPC_TimesheetToProgress` only as the plan's permission line adds it; `MESSAGE:*` CREATE already existed.
+
 ## Proof (one command per Definition of Done line)
 | DoD line | Command / evidence |
 |---|---|
@@ -136,3 +150,4 @@ Also: `npm run lint:bpmn` (0 warnings).
 - The end-to-end run in the local stack is driven through the API by me; a look at Operate/Tasklist by a person is optional.
 - Faraz: Ready move and the intent/spec acceptance record; demo at sprint review.
 - Ahsan: DoR agreement (Q1) and merge.
+- Repo path had a space; the OpenAPI generator failed. Ahsan renamed the folder to D:\LCS-Claude on 17 Nov 2026.

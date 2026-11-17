@@ -50,6 +50,7 @@ process starts (07 G6).
   | `AssignmentFileReceived` | `workpackNumber` | 0 (D62; was PT1H) | Upload endpoint, only when `assignment_state = AwaitingFile` |
   | `AssignmentFileReplaced` | `workpackNumber` | 0 (G7) | Upload endpoint, setting `Replacing` in the same transaction (D61) |
   | `DrawingRevised` | `drawingRef:revision` | 0 | `POST /api/v1/drawing-revisions` (G6) |
+  | `WorkPackAssigned` | `workpackNumber` (messageId the same) | 0 (ASSUMPTION; BPA-49) | Job worker `publish-workpack-assigned` behind the Epic 1 message end event, and `POST /api/v1/timesheet-processes` (E2-D18); starts `Process_PPC_TimesheetToProgress`. Duplicate guard: `published_message`, published first and recorded after |
 
   The message ID for assignment files is in ADR 0007 (G10).
 - **Upload while busy.** Upload while `Assigning` → "Assignment still in progress; try again later";

@@ -39,7 +39,9 @@ final class IntegrationApp {
                 new ClassPathResource("bpmn/Process_PPC_WorkPackAssignment.bpmn"),
                 new ClassPathResource("bpmn/Process_PPC_WorkerReassignment.bpmn"),
                 new ClassPathResource("bpmn/Process_PPC_DrawingRevisionNotice.bpmn"),
-                new ClassPathResource("dmn/Decision_WorkpackReleaseCheck.dmn"));
+                new ClassPathResource("bpmn/Process_PPC_TimesheetToProgress.bpmn"), // BPA-49: the process the Epic 1 end event starts
+                new ClassPathResource("dmn/Decision_WorkpackReleaseCheck.dmn"),
+                new ClassPathResource("dmn/Decision_HoursWithinBudget.dmn")); // used by its BusinessRuleTask
         assertThat(deployed.status()).as("models deploy: " + deployed.body()).isEqualTo(200);
     }
 }
