@@ -155,7 +155,9 @@ class TimesheetProcessStartApiTest {
         Work wp = flow.assignedWorkPack(Map.of("E1021", 40, "E1099", 60));
         CamundaSteps.cancelInstancesWaitingAt(BOOK_HOURS);
         jdbc.update("DELETE FROM bpa.published_message WHERE sha256 = ? AND workpack_number = ?", MESSAGE, wp.number());
-        assertThat(timesheetInstances(wp.number())).as("no timesheet process any more").isEmpty();
+        // Camunda's search lags the cancel: wait until it no longer lists the instance as running (BPA-25)
+        assertThat(poll(() -> timesheetInstances(wp.number()), List::isEmpty, "the cancelled timesheet process of " + wp.number() + " to leave the search"))
+                .as("no timesheet process any more").isEmpty();
 
         HttpResponse<String> first = flow.loggedInAs("ppc-team").post(ONE_OFF, toJson(Map.of("workpackNumber", wp.number())));
         assertThat(first.statusCode()).as("first call: " + first.body()).isEqualTo(201);

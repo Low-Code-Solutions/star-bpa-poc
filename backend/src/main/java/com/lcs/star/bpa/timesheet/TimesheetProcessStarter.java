@@ -65,7 +65,10 @@ public class TimesheetProcessStarter {
         variables.put("workpackId", workPack.id().toString());
         variables.put("workpackNumber", workPack.workpackNumber());
         camunda.publish(MESSAGE, workPack.workpackNumber(), workPack.workpackNumber(), variables);
-        files.claim(MESSAGE, workPack.workpackNumber(), username, clock.instant());
+        // False: a concurrent call recorded the same Work Pack first. Both published; Camunda dropped one, so there is one process, and this caller is the second.
+        if (!files.claim(MESSAGE, workPack.workpackNumber(), username, clock.instant())) {
+            return Outcome.ALREADY_RUNNING;
+        }
         LOG.info("{} published for {}", MESSAGE, workPack.workpackNumber());
         return Outcome.STARTED;
     }

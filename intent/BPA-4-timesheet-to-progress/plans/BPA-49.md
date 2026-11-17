@@ -1,11 +1,11 @@
 # Plan: BPA-49 System can start a Work Pack's timesheet process when its assignment completes
 Jira: BPA-49 (Story, epic BPA-4)
-Story last updated: 2026-11-17T11:39:44.136+0400
-Status: Approved (Ahsan, Build Lead, 17 Nov 2026)
+Story last updated: 2026-11-17T13:51:38.868+0400
+Status: Closed (17 Nov 2026)
 Approver: Ahsan (Build Lead)
-Branch: BPA-49, from main 398fd45
+Branch: BPA-49-start-timesheet-process, from main 398fd45
 
-A local branch `BPA-49` already existed at main 398fd45 (the BPA-48 merge, = origin/main); CLAUDE.md says "if a branch for the key already exists, use it", so it is used instead of `BPA-49-start-timesheet-process` (Q9).
+A local branch `BPA-49` (HEAD read `bpa-49`, lower case, which only resolved on Windows) already existed at main 398fd45 (the BPA-48 merge, = origin/main). It was used for the plan commit and renamed to `BPA-49-start-timesheet-process` before the first push (QA review; docs/04 wants the key plus a description; Q9 answered).
 
 ## Context
 Epic 1 ends each Work Pack at `EndEvent_WorkPackAssigned` with Draft Digital Time sheets and nothing that lets anyone book hours
@@ -99,7 +99,7 @@ call the starter as a Spring bean; the worker itself is proven by 1 and 4.
    (PR link, plan path, plan SHA; a comment on BPA-15 that its end event now publishes), shown first.
 
 ## Progress and departures (17 Nov 2026)
-Steps 1-5 done; step 6: the new class (6 tests), the five Epic 1 classes and `PersonaSyncTest` pass (100 tests, 0 failures); `lint:bpmn` 0 warnings.
+All steps done. The new class (6 tests, re-run after the review fix), the five Epic 1 classes and `PersonaSyncTest` pass; full `./mvnw -B verify` 357 tests, 0 failures (before the claim-check fix; the BPA-49 class was re-run after it); `lint:bpmn` 0 warnings; local-stack run in the Human-gap log.
 Departures from the plan above, found while building:
 - **Publish call.** `CamundaProcessClient.publish` uses `POST /v2/messages/publication` (messageId = workpackNumber, TTL 0), not the correlate call
   other stories use: correlate answers 404 both for "nothing waiting" and for a duplicate dropped while an instance with the key is active, so a
@@ -108,6 +108,9 @@ Departures from the plan above, found while building:
 - **Test edit (said here as the test-first rule requires):** `TimesheetProcessStartApiTest.timesheetInstances` counts only `ACTIVE` instances. The
   first version also counted a cancelled instance (its variables stay searchable), so `BPA49_alreadyAssignedWorkPackCanBeStartedOnce` failed
   on its own set-up, not on the code. No assertion was weakened.
+  Second test edit, after the review fix: the same test now waits (`poll`) until the search stops listing the cancelled instance before it asserts "no
+  timesheet process any more". One re-run failed there because Camunda's search still showed the cancelled instance as ACTIVE for a moment; the
+  assertion is unchanged and is now made once the search has caught up. The class then passed (6/6).
 - **No new repository.** The guard uses `AssignmentFileRepository.published/claim/workPack` (same table); only `WorkPackRepository.findByNumber` is new.
 - **Q8 answered by lint:** no `bpmn:message` root element is needed for the message end event. **Q11 answered by test 1:** `bpa-service` needs
   `PROCESS_DEFINITION:Process_PPC_TimesheetToProgress` only as the plan's permission line adds it; `MESSAGE:*` CREATE already existed.
@@ -127,6 +130,13 @@ Also: `npm run lint:bpmn` (0 warnings).
 
 ## Risks
 - **Worker down**: Epic 1 instances wait at `EndEvent_WorkPackAssigned` and raise an incident after 3 retries (S7), as for any worker. Work Packs are still Assigned in the database; Operate shows the incident; resolving it re-runs the job, and the guard makes the re-run safe. The one-off endpoint is for Work Packs that never had the job, not for these (it would publish too, harmlessly, but the incident must still be resolved).
+- **Silent publish (QA review, accepted for the POC):** the publication call does not say whether a start event received the message. If
+  `Process_PPC_TimesheetToProgress` were not deployed, or `bpa-service` lacked the permission, the worker would still complete, the
+  `published_message` row would be written, and the one-off endpoint would answer 409 "already running" for a Work Pack with no process. The row
+  means "published once", not "an instance is active". Test 1 catches both causes in CI; there is no unclaim or re-publish route (proposal for
+  a later item, not built here). A 4xx from Camunda on publish (for example a missing permission) is an `IllegalStateException`: the worker
+  retries and raises an incident; the endpoint answers 500 (not in the contract).
+- **Concurrent one-off calls:** the claim result is checked, so of two simultaneous calls one answers 201 and the other 409.
 - **Weekly timer (from BPA-48)**: `Process_PPC_WeeklyProgressPeriod` is deployed with a Thursday 20:59 timer; each firing creates an instance whose first job (`open-progress-period`) has no worker until its story, piling up incidents/open jobs in every running stack and on the QA server. Not BPA-49's change; noted because the end-to-end run will show them in Operate.
 - **Shared test Camunda**: repeated Work Pack numbers across classes (handled by the clean-up above); a class that forgets it gets a flaky count.
 - **Permission**: if `bpa-service` lacks the right to start `Process_PPC_TimesheetToProgress`, the publish is accepted but no instance starts (silent). Test 1 catches it.
@@ -142,12 +152,19 @@ Also: `npm run lint:bpmn` (0 warnings).
 6. **No bulk start** for Work Packs already Assigned on the QA server: one call per Work Pack. Enough for the POC?
 7. **201 body:** Jira states only the status. Proposed `{ "workpackNumber": … }` (ASSUMPTION; the instance key is not known after a publish).
 8. **Lint and the message reference:** a message end event in Camunda 8 is a job worker and needs no `bpmn:message`; if `bpmnlint` (camunda-compat 8.10) asks for one, the existing `Message_WorkPackAssigned` name is reused by adding a root `bpmn:message` to the Epic 1 file. That is a root element, not a flow element; acceptable under "nothing else in the model changes"?
-9. **Branch name:** the existing local branch `BPA-49` is used (CLAUDE.md), not `BPA-49-start-timesheet-process`. Rename it before the first push?
+9. **Branch name:** answered: renamed to `BPA-49-start-timesheet-process` before the first push (see the header).
 10. **sha256 column holds a name:** Jira's fallback stores `'WorkPackAssigned'` in `published_message.sha256`. Works with the unique key, but the column name no longer says what it holds; documented in the data model, no V3. Fine?
 11. **Camunda permission:** adding `PROCESS_DEFINITION:Process_PPC_TimesheetToProgress` to `bpa-service` (ASSUMPTION; Camunda may require it to start an instance by message). Proven by test 1.
 
 ## Human-gap log
-- The end-to-end run in the local stack is driven through the API by me; a look at Operate/Tasklist by a person is optional.
+- The end-to-end run in the local stack was driven through the API (curl, as the personas) by Claude Code on 17 Nov 2026; a look at Operate/Tasklist by a person is optional.
+  Result: WP-000030 created, confirmed, signed off, scheduled (the first dates, 20-22 Nov, were refused: the earliest is 24 Nov) and its assignment file uploaded; its Epic 1
+  instance COMPLETED; one `Process_PPC_TimesheetToProgress` instance ACTIVE at `UserTask_BookHours`, candidate group `supervisor`; one `published_message` row
+  (`WorkPackAssigned`); one-off call for it 409 "Timesheet process already running for WP-000030"; WP-000011 (Assigned before BPA-49) 201, then 409; WP-000013 (AwaitingFile) 409
+  "WP-000013 is not assigned yet"; WP-999999 404; the deployed Process_PPC_WorkPackAssignment XML equals `models/bpmn/Process_PPC_WorkPackAssignment.bpmn`. The compose bake
+  build asked for a file-read grant after the folder rename, so the image was built with plain `docker build` and started with `docker compose up -d --no-build`.
+  The local stack now holds WP-000030 and two Epic 2 instances (WP-000030, WP-000011) as test data.
+- Not built (proposal for a later item, Faraz to decide): a re-publish or unclaim route for a Work Pack whose publish was accepted but started nothing (see Risks).
 - Faraz: Ready move and the intent/spec acceptance record; demo at sprint review.
 - Ahsan: DoR agreement (Q1) and merge.
 - Repo path had a space; the OpenAPI generator failed. Ahsan renamed the folder to D:\LCS-Claude on 17 Nov 2026.

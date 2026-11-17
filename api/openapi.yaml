@@ -788,7 +788,9 @@ paths:
       description: |
         Publishes WorkPackAssigned for one Work Pack, which starts Process_PPC_TimesheetToProgress (BPA-49; E2-D18). Only for a Work Pack
         whose assignment_state is Assigned and that has no timesheet process yet; a Work Pack assigned after BPA-49 gets its process from
-        the end of its Epic 1 instance, not from this call. Group ppc-team (ASSUMPTION in the story). Source: BPA-49.
+        the end of its Epic 1 instance, not from this call. Group ppc-team (ASSUMPTION in the story). "Already running" means
+        WorkPackAssigned was published once for this Work Pack (the `published_message` record), not that an instance is still active:
+        the publication call does not say whether a start event received it. Source: BPA-49.
       x-assumption: true
       x-assumption-note: group ppc-team (BPA-49 states it as an ASSUMPTION); the 201 body, the 400 and the 503 are not stated by the story
       requestBody:
