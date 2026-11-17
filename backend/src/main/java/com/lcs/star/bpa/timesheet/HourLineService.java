@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -60,14 +61,16 @@ public class HourLineService {
     private final TransactionTemplate transaction;
     private final Clock clock;
     private final ZoneId businessZone;
+    private final BigDecimal dailyHoursLimit;
 
     public HourLineService(DigitalTimesheetLineRepository lines, CamundaDecisionClient decisions, TransactionTemplate transaction, Clock clock,
-            ZoneId businessZone) {
+            ZoneId businessZone, @Value("${app.daily-hours-limit}") BigDecimal dailyHoursLimit) {
         this.lines = lines;
         this.decisions = decisions;
         this.transaction = transaction;
         this.clock = clock;
         this.businessZone = businessZone;
+        this.dailyHoursLimit = dailyHoursLimit;
     }
 
     public View view(UUID timesheetId) {
@@ -160,6 +163,7 @@ public class HourLineService {
         variables.put("cbsClosed", false);
         variables.put("workerOnLeave", false);
         variables.put("dailyHoursAfter", lines.workerHoursOn(sheet.workerId(), date, exceptLine).add(hours));
+        variables.put("dailyHoursLimit", dailyHoursLimit); // app.daily-hours-limit, BPA-51 decision (a)
         variables.put("phaseHoursAfter", lines.phaseHours(sheet.workpackId(), phase, exceptLine).add(hours));
         variables.put("phaseBudgetHours", budget);
         JsonNode answer = decisions.evaluate(DECISION, variables);
@@ -168,9 +172,9 @@ public class HourLineService {
         }
         String reason = answer.path("budgetReason").asText();
         throw new Refused(400, switch (reason) {
-            // texts from data model §13.2.3 (marked (A) there); 16 is the decision's daily limit (E2-D6, ASSUMPTION)
-            case "DAILY_LIMIT_EXCEEDED" -> "Worker " + sheet.employeeRef() + " would exceed 16 hours on " + HourLineChecks.show(date);
-            case "PHASE_BUDGET_EXCEEDED" -> "Phase " + phase + " budget of " + HourLineChecks.plain(budget) + " h would be exceeded";
+            // texts from data model §13.2.3 (marked (A) there), the same builders the send-time worker uses
+            case "DAILY_LIMIT_EXCEEDED" -> HourLineChecks.dailyLimitMessage(sheet.employeeRef(), date, dailyHoursLimit);
+            case "PHASE_BUDGET_EXCEEDED" -> HourLineChecks.phaseBudgetMessage(phase, budget);
             // CBS_CLOSED and WORKER_ON_LEAVE cannot happen yet; BPA-69 and BPA-75 give their texts
             default -> "Hours are blocked (" + reason + ")";
         });

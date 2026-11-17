@@ -108,3 +108,7 @@ app:
   business-zone: Asia/Riyadh
   # D9 (PO), data model §6.2: the lead time for planned dates, in days; configuration, not data, so a test can override it.
   lead-time-days: 7
+  # BPA-51 decision (a), data model §6.2 pattern: the most hours one Worker can have on one date over all Work Packs, in hours; configuration, not data,
+  # so STAR can change it without a code change. Passed to Decision_HoursWithinBudget as dailyHoursLimit at save and at send. 16 is an ASSUMPTION
+  # (FRD-5-12 §5.12.5.2 #7 says "e.g., 16h", E2-D6).
+  daily-hours-limit: 16

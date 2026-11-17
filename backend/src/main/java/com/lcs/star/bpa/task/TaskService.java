@@ -81,8 +81,12 @@ public class TaskService {
                     visible.put(name, all.get(name));
                 }
             }
+            List<String> shown = new ArrayList<>(messages(all.get("validationMessages")));
+            if ("UserTask_BookHours".equals(task.elementId())) {
+                budgetMessages(all.get("lineCheckResults")).stream().filter(m -> !shown.contains(m)).forEach(shown::add);
+            }
             Task result = new Task(task.key(), task.name(), Task.ElementIdEnum.fromValue(task.elementId()), task.processInstanceKey(),
-                    task.creationDate(), visible, messages(all.get("validationMessages")));
+                    task.creationDate(), visible, shown);
             result.setWorkpackNumber(text(all.get("workpackNumber")));
             result.setConfirmMessage(text(all.get("confirmMessage")));
             return result;
@@ -153,6 +157,23 @@ public class TaskService {
             LOG.warn("Task API call failed: {}", e.getMessage());
             throw problem(HttpStatus.SERVICE_UNAVAILABLE, ENGINE_UNAVAILABLE);
         }
+    }
+
+    /**
+     * BPA-51: the send-time budget re-check returns the instance to Book hours with lineCheckResults, one element per line, each with a
+     * {@code message} for a Blocked reason (BusinessRuleTask_CheckHoursWithinBudget's output). Those texts are shown as validationMessages, once each.
+     */
+    private static List<String> budgetMessages(Object lineCheckResults) {
+        List<String> found = new ArrayList<>();
+        if (lineCheckResults instanceof List<?> results) {
+            for (Object result : results) {
+                if (result instanceof Map<?, ?> entry && "Blocked".equals(entry.get("budgetResult")) && entry.get("message") != null
+                        && !found.contains(String.valueOf(entry.get("message")))) {
+                    found.add(String.valueOf(entry.get("message")));
+                }
+            }
+        }
+        return found;
     }
 
     private static List<String> messages(Object value) {

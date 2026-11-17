@@ -69,6 +69,17 @@ class Epic2DecisionTablesProcessTest {
         assertThat(r.output()).containsEntry("budgetResult", "Allowed").containsEntry("budgetReason", null);
     }
 
+    /** BPA-51 decision (a): the daily limit is the input dailyHoursLimit (app.daily-hours-limit), not a number in the table. */
+    @Test
+    void BPA51_dailyLimitFollowsTheDailyHoursLimitInput() {
+        Result over = evaluate("Decision_HoursWithinBudget", Map.of("cbsClosed", false, "workerOnLeave", false, "dailyHoursAfter", 10.01,
+                "dailyHoursLimit", 10, "phaseHoursAfter", 10, "phaseBudgetHours", 100));
+        assertThat(over.rule()).isEqualTo("Rule_DailyLimitExceeded");
+        Result at = evaluate("Decision_HoursWithinBudget", Map.of("cbsClosed", false, "workerOnLeave", false, "dailyHoursAfter", 10,
+                "dailyHoursLimit", 10, "phaseHoursAfter", 10, "phaseBudgetHours", 100));
+        assertThat(at.rule()).as("exactly at a limit of 10 is allowed").isEqualTo("Rule_Allowed");
+    }
+
     // ---- Decision_ProgressRule (E2-11; FIRST: above 100, below 0, decrease without retraction, accepted) ----
 
     @Test
@@ -155,7 +166,7 @@ class Epic2DecisionTablesProcessTest {
 
     private Result hours(boolean cbsClosed, boolean workerOnLeave, double dailyHoursAfter, double phaseHoursAfter, double phaseBudgetHours) {
         return evaluate("Decision_HoursWithinBudget", Map.of("cbsClosed", cbsClosed, "workerOnLeave", workerOnLeave,
-                "dailyHoursAfter", dailyHoursAfter, "phaseHoursAfter", phaseHoursAfter, "phaseBudgetHours", phaseBudgetHours));
+                "dailyHoursAfter", dailyHoursAfter, "dailyHoursLimit", 16, "phaseHoursAfter", phaseHoursAfter, "phaseBudgetHours", phaseBudgetHours));
     }
 
     private Result progress(double newPct, double previousPct, boolean retractionApproved) {

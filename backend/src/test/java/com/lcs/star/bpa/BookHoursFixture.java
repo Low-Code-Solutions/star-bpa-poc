@@ -76,4 +76,42 @@ final class BookHoursFixture {
                 INSERT INTO bpa.digital_timesheet_line (digital_timesheet_id, work_date, phase, hours, status, created_by, updated_by)
                 VALUES (?, ?, ?, ?, ?, 'test', 'test') RETURNING id""", UUID.class, timesheet, java.sql.Date.valueOf(date), phase, hours, status);
     }
+
+    /**
+     * Lines that add up to {@code total} hours on the phase, as a Given states "has N hours" (BPA-51): 16 h a day on consecutive days from
+     * 1 Oct 2026, the last one with the rest, so no day of them reaches the daily limit and none falls on 17 Nov.
+     */
+    void fill(UUID timesheet, String phase, BigDecimal total, String status) {
+        BigDecimal left = total;
+        LocalDate day = LocalDate.of(2026, 10, 1);
+        BigDecimal day16 = new BigDecimal("16");
+        while (left.signum() > 0) {
+            BigDecimal hours = left.min(day16);
+            line(timesheet, day, phase, hours, status);
+            left = left.subtract(hours);
+            day = day.plusDays(1);
+        }
+    }
+
+    /**
+     * A second Work Pack with a time sheet for E1021 (BPA-51: "The daily limit counts all Work Packs"). No phases or assignment: a
+     * Given line is inserted by SQL, which checks neither.
+     */
+    UUID secondWorkPackTimesheetOf(String badge, String workpackNumber) {
+        UUID workpack = jdbc.queryForObject("""
+                INSERT INTO bpa.workpack (workpack_number, activity_ref, drawing_ref, department_ref, completion_date, status, assignment_state,
+                                          process_instance_key, created_by, updated_by)
+                VALUES (?, 'A-2201', 'DWG-118', 'Fabrication', DATE '2026-11-30', 'In Progress', 'Assigned', 9000000003, 'test', 'test')
+                RETURNING id""", UUID.class, workpackNumber);
+        UUID header = jdbc.queryForObject("""
+                INSERT INTO bpa.hour_journal_header (workpack_id, estimated_manhours, created_by, updated_by) VALUES (?, 100, 'test', 'test') RETURNING id""",
+                UUID.class, workpack);
+        UUID worker = jdbc.queryForObject("SELECT id FROM bpa.worker WHERE employee_ref = ?", UUID.class, badge);
+        UUID journalLine = jdbc.queryForObject("""
+                INSERT INTO bpa.hour_journal_line (header_id, worker_id, role, designation, estimated_hours, created_by, updated_by)
+                SELECT ?, w.id, w.role, w.designation, 100, 'test', 'test' FROM bpa.worker w WHERE w.id = ? RETURNING id""", UUID.class, header, worker);
+        return jdbc.queryForObject("""
+                INSERT INTO bpa.digital_timesheet (worker_id, workpack_id, journal_line_id, project_ref, wbs_ref, activity_ref, created_by, updated_by)
+                VALUES (?, ?, ?, 'PRJ-139', '11031', 'A-2201', 'test', 'test') RETURNING id""", UUID.class, worker, workpack, journalLine);
+    }
 }

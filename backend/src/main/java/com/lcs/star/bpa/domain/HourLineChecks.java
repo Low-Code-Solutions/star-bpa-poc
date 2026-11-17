@@ -72,6 +72,19 @@ public final class HourLineChecks {
         return latestClosedWeekEnding.map(closed -> closed.plusDays(1)).filter(afterClosed -> afterClosed.isAfter(start)).orElse(start);
     }
 
+    /**
+     * DAILY_LIMIT_EXCEEDED: the text at save and at send (BPA-51; data model §13.2.3, marked (A) there). The limit is the setting
+     * app.daily-hours-limit, 16 by default.
+     */
+    public static String dailyLimitMessage(String badge, LocalDate date, BigDecimal dailyLimit) {
+        return "Worker " + badge + " would exceed " + plain(dailyLimit) + " hours on " + show(date);
+    }
+
+    /** PHASE_BUDGET_EXCEEDED: the text at save and at send; the budget is workpack_phase.manhours. */
+    public static String phaseBudgetMessage(String phase, BigDecimal budget) {
+        return "Phase " + phase + " budget of " + plain(budget) + " h would be exceeded";
+    }
+
     /** A plain decimal for messages and the audit log: 8 not 8.00, 9.5 not 9.50 (data model §6.1). */
     public static String plain(BigDecimal value) {
         return value.stripTrailingZeros().toPlainString();

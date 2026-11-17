@@ -69,7 +69,7 @@
       <bpmn:outgoing>Flow_ToPrepareSubmission</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:serviceTask id="ServiceTask_PrepareHoursSubmission" name="Prepare hours submission">
-      <bpmn:documentation>E2-04, E2-05. Collects the Work Pack's Draft and Returned lines and builds lineChecks (one element per line: workDate, phase, badgeNo, phaseBudgetHours, phaseHoursAfter, dailyHoursAfter, cbsCodeRef, cbsClosed, workerOnLeave; cbsClosed is false when the time sheet has no CBS, D40). Throws HOURS_INVALID with validationMessages when there is nothing to send.</bpmn:documentation>
+      <bpmn:documentation>E2-04, E2-05; built in BPA-51. Collects the Work Pack's Draft and Returned lines and builds lineChecks (one element per line: workDate, phase, badgeNo, phaseBudgetHours, phaseHoursAfter and dailyHoursAfter, the totals of lines not Rejected which already include the saved line, dailyHoursLimit from app.daily-hours-limit, cbsCodeRef (null when the time sheet has no CBS, D40), cbsClosed and workerOnLeave (false until BPA-69 and BPA-75), and dailyLimitMessage and phaseBudgetMessage, the texts a Blocked reason maps to). Completes with validationMessages set to an empty list, so an earlier send's messages do not stay. Throws HOURS_INVALID with validationMessages when there is nothing to send. Writes nothing, so a retried job builds the same checks.</bpmn:documentation>
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="prepare-hours-submission" retries="3" />
       </bpmn:extensionElements>
@@ -77,15 +77,23 @@
       <bpmn:outgoing>Flow_ToCheckBudget</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:businessRuleTask id="BusinessRuleTask_CheckHoursWithinBudget" name="Check hours within budget">
-      <bpmn:documentation>E2-04. Decision_HoursWithinBudget per line (FIRST). Re-check at send time; the same decision runs at save time in the backend.</bpmn:documentation>
+      <bpmn:documentation>E2-04, BPA-51. Decision_HoursWithinBudget per line (FIRST). Re-check at send time; the same decision runs at save time in the backend. The result goes to budgetCheck so the line's own data (lineCheck, with the texts the worker wrote) stays; each lineCheckResults element is the result plus the line's message for a Blocked reason, which the task API shows as validationMessages when the instance returns to Book hours.</bpmn:documentation>
       <bpmn:extensionElements>
-        <zeebe:calledDecision decisionId="Decision_HoursWithinBudget" resultVariable="lineCheck" />
+        <zeebe:calledDecision decisionId="Decision_HoursWithinBudget" resultVariable="budgetCheck" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=lineCheck.cbsClosed" target="cbsClosed" />
+          <zeebe:input source="=lineCheck.workerOnLeave" target="workerOnLeave" />
+          <zeebe:input source="=lineCheck.dailyHoursAfter" target="dailyHoursAfter" />
+          <zeebe:input source="=lineCheck.dailyHoursLimit" target="dailyHoursLimit" />
+          <zeebe:input source="=lineCheck.phaseHoursAfter" target="phaseHoursAfter" />
+          <zeebe:input source="=lineCheck.phaseBudgetHours" target="phaseBudgetHours" />
+        </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_ToCheckBudget</bpmn:incoming>
       <bpmn:outgoing>Flow_ToAreHoursWithinBudget</bpmn:outgoing>
       <bpmn:multiInstanceLoopCharacteristics>
         <bpmn:extensionElements>
-          <zeebe:loopCharacteristics inputCollection="=lineChecks" inputElement="lineCheck" outputCollection="lineCheckResults" outputElement="=lineCheck" />
+          <zeebe:loopCharacteristics inputCollection="=lineChecks" inputElement="lineCheck" outputCollection="lineCheckResults" outputElement="={budgetResult: budgetCheck.budgetResult, budgetReason: budgetCheck.budgetReason, message: if budgetCheck.budgetResult = &quot;Blocked&quot; then (if budgetCheck.budgetReason = &quot;DAILY_LIMIT_EXCEEDED&quot; then lineCheck.dailyLimitMessage else if budgetCheck.budgetReason = &quot;PHASE_BUDGET_EXCEEDED&quot; then lineCheck.phaseBudgetMessage else null) else null}" />
         </bpmn:extensionElements>
       </bpmn:multiInstanceLoopCharacteristics>
     </bpmn:businessRuleTask>
@@ -184,6 +192,7 @@
       <bpmn:extensionElements>
         <zeebe:ioMapping>
           <zeebe:output source="=validationMessages" target="validationMessages" />
+          <zeebe:output source="=[]" target="lineCheckResults" />
         </zeebe:ioMapping>
       </bpmn:extensionElements>
       <bpmn:outgoing>Flow_NothingToSubmit</bpmn:outgoing>
