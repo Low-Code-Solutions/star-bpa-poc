@@ -741,6 +741,7 @@ Dropped by the PO decision 2 Nov 2026, BPA-44: access is by Camunda group only, 
 - **Concurrent uploads.** Two identical uploads at the same moment cannot both claim the pair; the UNIQUE constraint decides.
 - `assignment_file` has no `published` column: whether a file published anything is derived by joining on `sha256`.
 - Written by the upload endpoint as the result of a user's upload, so `created_by` holds the uploader (§1.2). Not audited (it is itself a log).
+- **Also `WorkPackAssigned` (BPA-49).** The row `(sha256 = 'WorkPackAssigned', workpack_number)` records that the Work Pack's timesheet process was started; here `sha256` holds the message name, not a hash (no V3). Unlike the upload, the message is published first and the row written after: a crash in between leaves no row, and the retry publishes again, which Camunda drops while an instance with the same correlation key is active.
 - `published_message` is **not** the G10 message ID mechanism: with TTL 0 (D62) Camunda does not reject a duplicate message ID (ADR 0007), so the database is the guard.
 
 ---

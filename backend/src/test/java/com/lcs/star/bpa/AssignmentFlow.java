@@ -37,6 +37,8 @@ public final class AssignmentFlow {
     public static final String SCHEDULE = "UserTask_ScheduleWorkPack";
     public static final String CATCH = "IntermediateCatchEvent_AssignmentFileReceived";
     public static final String END = "EndEvent_WorkPackAssigned";
+    /** The user task of Process_PPC_TimesheetToProgress that the Epic 1 end event now starts (BPA-49); test classes cancel instances waiting here (shared Camunda). */
+    public static final String BOOK_HOURS = "UserTask_BookHours";
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final int port;

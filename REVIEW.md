@@ -505,3 +505,20 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Minor, fixed: `E1021`, the main Epic 1 Worker, was put on leave in the seed (now E1203); a redundant column comment; constraint-message assertions now name the constraint; test comments that said "seven personas".
 - Minor, recorded not changed: no 0 to 100 CHECK on `progress_retraction.approved_pct` (the delta states none); the `bpa.*` setting keys differ from the Jira text and nothing validates their values (plan Q9); the A-2301 to CBS-139-PIP-01 mapping and every Worker HR, leave and A-2301 value are invented synthetic ASSUMPTIONS (plan Q10); CBS-139-PIP-99 maps to no activity (BPA-69); `E2_00_*` test names against the `BPA<n>_` convention (Jira names kept); spec.md still cites `user-task-form` (left to Khitaba); the plan is the second commit, after the staged inputs (recorded in the plan).
 - Not verified by the reviewer: test, build and lint runs; the Camunda permissions of the four new groups (none are added: no story starts the new processes yet); BPMN content beyond deploy; how the weekly timer behaves on the QA server (plan R4).
+
+### BPA-49 at f2b246b, 17 Nov 2026 (qa-reviewer)
+- Code: 0 High, 3 Important, 8 other findings. Reviewer read BPA-49 in Jira (evidence), the plan, spec.md and the diff; no test was run by the reviewer
+  (author: 6 BPA49 red first for the expected reasons, then 6/6 green, the five Epic 1 classes and PersonaSyncTest 100 tests, `./mvnw -B verify` 357 tests, 0 failures).
+- Important (3):
+  - Branch `bpa-49` (HEAD in lower case) has no description, against docs/04: fixed, renamed `BPA-49-start-timesheet-process` before the first push; plan header and Q9 updated.
+  - Plan "Story last updated" behind Jira: re-read; the only change since is the assignee set to Ahsan (13:51); stamp updated. The guard choice (database row, not a Camunda
+    search) stays an ASSUMPTION with no Jira comment yet: drafted in the PR for the developer's yes.
+  - Publish-then-record can leave a row without a process when the model or the permission is missing (the publication call does not say whether a start event received
+    it): accepted for the POC and written into the plan Risks and the endpoint's description ("already running" means "published once"); test 1 catches both causes. No re-publish route built.
+- Other: fixed: `claim` result now checked (two simultaneous one-off calls: one 201, one 409). Documented: a Camunda 4xx on publish is an `IllegalStateException` (worker incident, endpoint 500).
+  Left: no tests for 400, 503, 401, GET/HEAD on the path; test 2 uses two fixed pauses for its negative check; the instance finder reads at most 1000 variables; the 201 body reuses the schema name `TimesheetProcessRequest`.
+- Test edit (said here and in the PR, L15): `TimesheetProcessStartApiTest` finder counts only ACTIVE instances; no assertion weakened (reviewer checked).
+- Not verified by the reviewer: red-first runs, test runs, `lint:bpmn` (author: 0 warnings), the local stack (author, below), CI.
+- Local stack (author, 17 Nov): WP-000030 taken through Epic 1 by API as the personas; Epic 1 instance COMPLETED at EndEvent_WorkPackAssigned, one `Process_PPC_TimesheetToProgress`
+  instance ACTIVE at UserTask_BookHours for group supervisor, `published_message` row `WorkPackAssigned`; one-off call for it 409; WP-000011 (assigned before BPA-49) 201 then 409; an AwaitingFile Work Pack 409 "not assigned yet";
+  unknown 404; deployed Process_PPC_WorkPackAssignment XML equals the repo file.

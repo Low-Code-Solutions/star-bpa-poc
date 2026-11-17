@@ -50,6 +50,8 @@ tags:
     description: Worker assignment file upload and result (BPA-12, BPA-13, BPA-22; S19 as D58)
   - name: timesheets
     description: Digital Time sheets (BPA-15)
+  - name: timesheet-processes
+    description: One-off start of a Work Pack's timesheet process (BPA-49; E2-D18)
   - name: drawing-revisions
     description: POC trigger standing in for a D365 Document Control event (BPA-16; S20, S28; 07 §10)
   - name: notifications
@@ -778,6 +780,67 @@ paths:
                 detail: Drawing not found
         '503':
           $ref: '#/components/responses/EngineUnavailable'
+  /api/v1/timesheet-processes:
+    post:
+      tags: [timesheet-processes]
+      operationId: startTimesheetProcess
+      summary: Start the timesheet process of a Work Pack assigned before Epic 2 was deployed (one-off)
+      description: |
+        Publishes WorkPackAssigned for one Work Pack, which starts Process_PPC_TimesheetToProgress (BPA-49; E2-D18). Only for a Work Pack
+        whose assignment_state is Assigned and that has no timesheet process yet; a Work Pack assigned after BPA-49 gets its process from
+        the end of its Epic 1 instance, not from this call. Group ppc-team (ASSUMPTION in the story). "Already running" means
+        WorkPackAssigned was published once for this Work Pack (the `published_message` record), not that an instance is still active:
+        the publication call does not say whether a start event received it. Source: BPA-49.
+      x-assumption: true
+      x-assumption-note: group ppc-team (BPA-49 states it as an ASSUMPTION); the 201 body, the 400 and the 503 are not stated by the story
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimesheetProcessRequest'
+      responses:
+        '201':
+          description: WorkPackAssigned published; the timesheet process starts (BPA-49)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimesheetProcessRequest'
+        '400':
+          description: workpackNumber is missing or not WP- and six digits (x-assumption)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                status: 400
+                title: Bad Request
+                detail: workpackNumber is required, as WP- followed by 6 digits
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/WorkPackNotFound'
+        '409':
+          description: The timesheet process is already running, or the Work Pack is not assigned yet (BPA-49)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                alreadyRunning:
+                  value:
+                    status: 409
+                    title: Conflict
+                    detail: Timesheet process already running for WP-000457
+                notAssigned:
+                  value:
+                    status: 409
+                    title: Conflict
+                    detail: WP-000480 is not assigned yet
+        '503':
+          $ref: '#/components/responses/EngineUnavailable'
   /api/v1/me/notifications:
     get:
       tags: [notifications]
@@ -1317,6 +1380,13 @@ components:
         sentAt:
           type: string
           format: date-time
+    TimesheetProcessRequest:
+      type: object
+      description: The Work Pack whose timesheet process is started (BPA-49); also the 201 body (ASSUMPTION)
+      required: [workpackNumber]
+      properties:
+        workpackNumber:
+          $ref: '#/components/schemas/WorkpackNumber'
     Message:
       type: object
       required: [message]

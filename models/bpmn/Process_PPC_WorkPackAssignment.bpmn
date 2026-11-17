@@ -236,8 +236,12 @@
       <bpmn:outgoing>Flow_ToEnd</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:endEvent id="EndEvent_WorkPackAssigned" name="Work Pack assigned">
-      <bpmn:documentation>BPA-15. Replacement (BPA-13) and Epic 2 (BPA-4) start only after this (D37).</bpmn:documentation>
+      <bpmn:documentation>BPA-15. Replacement (BPA-13) and Epic 2 (BPA-4) start only after this (D37). BPA-49 (E2-D18): a message end event; job type publish-workpack-assigned publishes WorkPackAssigned, which starts Process_PPC_TimesheetToProgress.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="publish-workpack-assigned" retries="3" />
+      </bpmn:extensionElements>
       <bpmn:incoming>Flow_ToEnd</bpmn:incoming>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_WorkPackAssignedEnd" />
     </bpmn:endEvent>
     <bpmn:boundaryEvent id="BoundaryEvent_WorkPackInvalid" name="Input invalid" attachedToRef="ServiceTask_SaveWorkPack">
       <bpmn:documentation>WORKPACK_INVALID; variables validationMessages.</bpmn:documentation>

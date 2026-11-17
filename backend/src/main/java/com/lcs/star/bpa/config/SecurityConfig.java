@@ -79,6 +79,8 @@ public class SecurityConfig {
                         // BPA-15: the Digital Time sheets are read by the Supervisor only (group ASSUMPTION in the story; no department or project
                         // scope, BPA-44); 403 for anyone else (09 S6). Every method, so a HEAD request cannot skip the rule.
                         .requestMatchers("/api/v1/digital-timesheets").hasAuthority(SUPERVISOR)
+                        // BPA-49: the one-off start of a timesheet process is the PPC Team's (group ASSUMPTION in the story); every method (the BPA-10 lesson).
+                        .requestMatchers("/api/v1/timesheet-processes").hasAuthority(PPC_TEAM)
                         .anyRequest().authenticated())
                 // S26: token in the XSRF-TOKEN cookie (readable by React), sent back as X-XSRF-TOKEN on every state-changing call,
                 // the login included. The plain handler lets React send the cookie value unchanged.

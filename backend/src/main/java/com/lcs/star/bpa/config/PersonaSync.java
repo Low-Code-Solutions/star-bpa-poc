@@ -45,7 +45,8 @@ public class PersonaSync implements SmartInitializingSingleton {
 
     static {
         var permissions = new LinkedHashMap<String, Set<String>>();
-        for (String process : List.of("Process_PPC_WorkPackAssignment", "Process_PPC_WorkerReassignment", "Process_PPC_DrawingRevisionNotice")) {
+        for (String process : List.of("Process_PPC_WorkPackAssignment", "Process_PPC_WorkerReassignment", "Process_PPC_DrawingRevisionNotice",
+                "Process_PPC_TimesheetToProgress" /* BPA-49 (ASSUMPTION): started by the WorkPackAssigned message; proven by BPA49_ tests */)) {
             permissions.put("PROCESS_DEFINITION:" + process, PROCESS_PERMISSIONS);
         }
         permissions.put("MESSAGE:*", Set.of("CREATE"));

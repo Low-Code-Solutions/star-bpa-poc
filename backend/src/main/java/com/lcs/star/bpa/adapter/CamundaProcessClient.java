@@ -72,6 +72,31 @@ public class CamundaProcessClient {
         }
     }
 
+    /**
+     * Publishes a message with time-to-live 0 and a message id: {@code POST /v2/messages/publication} (BPA-49). Unlike {@link #correlate} it does not
+     * say whether anything received it: a message start event that already has an active instance with this correlation key drops it silently, which is
+     * what a retried publish needs. Only a 5xx or an unreachable engine is an error.
+     */
+    public void publish(String messageName, String correlationKey, String messageId, Map<String, Object> variables) {
+        try {
+            rest.post().uri("/v2/messages/publication")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("name", messageName, "correlationKey", correlationKey, "messageId", messageId, "timeToLive", 0, "variables", variables))
+                    .exchange((request, response) -> {
+                        if (response.getStatusCode().is5xxServerError()) {
+                            throw new EngineUnavailableException("Camunda message publication returned " + response.getStatusCode().value());
+                        }
+                        if (!response.getStatusCode().is2xxSuccessful()) {
+                            throw new IllegalStateException("Camunda message publication returned " + response.getStatusCode().value()
+                                    + ": " + new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8));
+                        }
+                        return null;
+                    });
+        } catch (ResourceAccessException e) {
+            throw new EngineUnavailableException("Camunda cannot be reached: " + e.getMessage());
+        }
+    }
+
     private record Started(String processInstanceKey) {
     }
 }

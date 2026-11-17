@@ -90,6 +90,7 @@ class WorkerReplacementApiTest {
     static void noInstanceLeftByAnotherClass() {
         IntegrationApp.background();
         CamundaSteps.cancelInstancesWaitingAt(CATCH);
+        CamundaSteps.cancelInstancesWaitingAt(AssignmentFlow.BOOK_HOURS); // BPA-49: the Epic 2 instance the end event now starts
         CamundaSteps.cancelInstancesWaitingAt(REPLACE_TASK);
     }
 
