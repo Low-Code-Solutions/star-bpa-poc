@@ -60,4 +60,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 |---|---|---|
 | [BPA-48](BPA-4-timesheet-to-progress/plans/BPA-48.md) | Data model v0.7, V2 migration, seed, test users and lint for Epic 2 | Closed (13 Nov 2026) |
 | [BPA-49](BPA-4-timesheet-to-progress/plans/BPA-49.md) | System can start a Work Pack's timesheet process when its assignment completes | Closed (17 Nov 2026) |
+| [BPA-50](BPA-4-timesheet-to-progress/plans/BPA-50.md) | Supervisor can book daily hours for each Worker on a Work Pack by phase | Approved (Ahsan, Build Lead, 17 Nov 2026) |
 
