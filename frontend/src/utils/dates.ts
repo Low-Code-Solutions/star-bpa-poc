@@ -20,3 +20,15 @@ export function showDate(iso?: string): string {
   const [y, m, d] = iso.split('-');
   return `${d} ${MONTHS[Number(m) - 1]} ${y}`;
 }
+
+/** The days from start to end inclusive as YYYY-MM-DD, without going through a time zone (BPA-50: the open week up to today). */
+export function daysFrom(start: string, end: string): string[] {
+  const [sy, sm, sd] = start.split('-').map(Number);
+  const [ey, em, ed] = end.split('-').map(Number);
+  const days: string[] = [];
+  const last = Date.UTC(ey, em - 1, ed);
+  for (let t = Date.UTC(sy, sm - 1, sd); t <= last; t += 86_400_000) {
+    days.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return days;
+}

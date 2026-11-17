@@ -153,7 +153,8 @@ confirmation, server message shown, no Complete button.
 Steps 1-4 done (contract, tests first, backend, task serving). Questions answered by taking the plan's recommendation (Ahsan: "do your recommended
 approach"): Q0 branch renamed; Q1 partial index stands; Q2 `cbsClosed`/`workerOnLeave` sent as false; Q4 "a `progress_period` row exists = cut off";
 Q6 assignment checked on `worker_assignment` (the test gives E1150 a time sheet and no assignment row); Q8 no completion in BPA-50. Not applied:
-Q7 (below). Not started: the frontend, which waits on Q5 (a new Jira story needs a confirmation, CLAUDE.md).
+Q7 (below). Q5: the split was **not** made; the frontend is built inside BPA-50 (the Jira Definition of Done requires the screen) and the story stays 5 points on paper.
+Step 5 (frontend) done, see the last bullets.
 - **Red first:** all 21 tests of `BookHoursApiTest` (the 19 scenario tests and 2 extras: `decisionBlockedAnswerStopsTheSave`, `phaseBudgetBlocksTheSave`)
   failed with 404 "No static resource" on the new paths; then 21/21 green on the first run of the new code. The fixture's SQL Background ran in every red test.
 - **Q7 not applied (open, needs Khitaba or Faraz):** adding `production-team` to the time sheet list and to `UserTask_BookHours` would break two merged
@@ -169,8 +170,19 @@ Q7 (below). Not started: the frontend, which waits on Q5 (a new Jira story needs
   New test `TaskApiTest.supervisorSeesTheBookHoursTask` (not a scenario); no existing test was edited.
 - **Contract lint:** the repo has no `npm run lint:api`; CI runs `npx --yes @redocly/cli@2.62.1 lint api/openapi.yaml` (valid).
 - **Also added:** `TestBrowser.put` and `delete` (test helper), `HourLineChecksTest` (unit), the data model §13.1 enforcement note.
-- **Left for the frontend story:** `TaskScreenShell` has no way to hide "Complete task" (`canComplete`), no grid component and no week helpers; the contract, the lines
-  endpoints and the task list are ready for it.
+- **PUT replaces hours, remark and completion (ASSUMPTION, found on the live stack):** a PUT without `remarks` clears the remark (and audits old value > null). The screen always
+  sends the remark it shows, so it is safe there; the contract text says "Change the hours, remark or reported completion".
+- **Frontend (step 5):** `features/timesheets/` (`BookHours` screen, `useBookHoursBoard`, `timesheetService`, `lineMessages`), `TaskScreenShell` `canComplete` (default true; no Complete
+  button and no submit when false), `TaskScreenProps.onClose` with a "Back to my tasks" button (the screen has no completion to leave by), `daysFrom` in `utils/dates.ts`,
+  `USER_TASKS.bookHours`, registered in `taskScreens.ts`, types in `types/api.ts`. 10 React tests `BPA50_...` in `BookHours.test.tsx`, red first (`Failed to resolve import
+  "./BookHours"`), then green; `npm run lint`, `format:check`, `test` (66 tests) and `build` clean. One earlier full run had 1 failure in an existing file (a timing flake
+  under load; the re-run was 66/66). The screen has **no** step to complete the task (plan Q8).
+- **Local stack (17 Nov, API as the personas through the portal proxy, images built with plain `docker build`):** the supervisor's list shows "Book hours" for WP-000030, WP-000011
+  and WP-000031; for WP-000031 (Released, phase Engineering only): a 8 h line on 16 Nov booked 201 (Draft, Form), the Work Pack went Released to In Progress with one audit row, the
+  PUT to 9.5 h wrote one audit row (8 > 9.5), a duplicate gave 400 "Hours already booked for E1021 on 16 Nov 2026 for phase Engineering", Cutting gave 400 "Phase Cutting is not on this
+  Work Pack", a date on 25 Nov 400 "Work date cannot be in the future", 7.125 h 400 "Hours can have at most 2 decimal places", the timekeeper 403, a production-team line on 15 Nov 201,
+  and both Draft lines deleted (204, audit rows with a null new value). **Not done by Claude: a click-through of the screen in a browser** (human gap; the screen's calls are the ones above).
+  The lines of WP-000031 are deleted again; its status stays In Progress.
 
 ## Proof (one command per Definition of Done line)
 | DoD line | Command / evidence |

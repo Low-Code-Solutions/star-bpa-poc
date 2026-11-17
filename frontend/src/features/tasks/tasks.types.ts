@@ -4,8 +4,11 @@ import type { Task, TaskSummary } from '@/types/api';
 
 export type { Task, TaskSummary };
 
-/** What a task screen gets from the task list: the API client, the task key, and what to do after a completion. */
-export type TaskScreenProps = { api: Api; taskKey: string; onDone: () => void };
+/**
+ * What a task screen gets from the task list: the API client, the task key, what to do after a completion, and (BPA-50) how to go back to
+ * the list without completing, for a screen that does not complete its task.
+ */
+export type TaskScreenProps = { api: Api; taskKey: string; onDone: () => void; onClose?: () => void };
 
 export type TaskScreen = ComponentType<TaskScreenProps>;
 
