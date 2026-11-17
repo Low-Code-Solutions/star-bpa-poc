@@ -78,6 +78,23 @@ public class DigitalTimesheetLineRepository {
                 (rs, n) -> line(rs), timesheetId);
     }
 
+    /** A Draft or Returned line waiting to be sent (BPA-51): what the send-time worker builds a budget check for. */
+    public record SendLine(UUID workerId, String badgeNo, LocalDate workDate, String phase) {
+    }
+
+    /** The Work Pack's Draft and Returned lines, by Badge No, date and phase (BPMN: ServiceTask_PrepareHoursSubmission collects these). */
+    public List<SendLine> sendable(UUID workpackId) {
+        return jdbc.query("""
+                SELECT t.worker_id, w.employee_ref, l.work_date, l.phase
+                FROM bpa.digital_timesheet_line l
+                JOIN bpa.digital_timesheet t ON t.id = l.digital_timesheet_id
+                JOIN bpa.worker w ON w.id = t.worker_id
+                WHERE t.workpack_id = ? AND l.status IN ('Draft', 'Returned')
+                ORDER BY w.employee_ref, l.work_date, array_position(ARRAY['Engineering','Cutting','Welding','Finishing'], l.phase)""",
+                (rs, n) -> new SendLine(rs.getObject("worker_id", UUID.class), rs.getString("employee_ref"), rs.getDate("work_date").toLocalDate(),
+                        rs.getString("phase")), workpackId);
+    }
+
     /** The Work Pack's phases in the order the grid shows them. */
     public List<String> phases(UUID workpackId) {
         return jdbc.queryForList("SELECT phase FROM bpa.workpack_phase WHERE workpack_id = ? ORDER BY array_position(ARRAY['Engineering','Cutting','Welding','Finishing'], phase)",

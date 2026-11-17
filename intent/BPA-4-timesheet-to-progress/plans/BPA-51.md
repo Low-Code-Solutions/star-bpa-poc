@@ -94,6 +94,28 @@ Key name: Jira says `app.daily-hours-limit`; the repo already has `app.lead-time
 **Note on the counts:** Jira has 8 scenarios but the DoD lists 8 names that do not map one to one: the phase outline has two names (`...ReachedExactlyIsAllowed`, `...ExceededIsBlocked`) and the rule-order scenario has **no** name. Plan: the outline's two rows are split over the two DoD names, and the rule-order scenario is a ninth test `BPA51_dailyLimitIsCheckedBeforeThePhaseBudget` (Q7).
 **Note on red-first:** 7 of 8 test BPA-50's save-time code and will pass on the first run; that is evidence BPA-50 met BPA-51's save rules, not a test edited to pass. The PR will show the first run.
 
+## Progress and departures (17 Nov 2026)
+Steps 1-4 done; answers taken from Ahsan (17 Nov): **Q1 = A** (new DMN input `dailyHoursLimit` plus `app.daily-hours-limit: 16`), **Q5 = 1** (model mappings plus the task API).
+Q2, Q3 confirmed as planned (the tests reuse `BookHoursFixture`; the DMN order gives the daily text first). Q4 (Jira transition), Q6 (owner of `submit-hours`), Q7 (the
+ninth test name, built as `BPA51_dailyLimitIsCheckedBeforeThePhaseBudget`), Q8, Q9 are still open.
+- **Red first:** `HoursBudgetApiTest` first run: 8 of 9 green at once (BPA-50's save-time code already does what BPA-51 asks, as the plan said) and `BPA51_sendRechecksTheBudget`
+  red (timed out: no `prepare-hours-submission` worker, the instance waited at `ServiceTask_PrepareHoursSubmission`). No test was edited to pass.
+- **Finding, a model change the plan did not list:** the business rule task had **no input mappings**. The decision reads `cbsClosed`, `dailyHoursAfter`... as flat variables but in
+  the multi-instance task they sit inside `lineCheck`, so every line would have read as Allowed and the Blocked path could never run (first green attempt: the "nothing to send" test
+  passed and the blocked send still timed out). Fixed by six `zeebe:input` mappings (`=lineCheck.<field>` to the flat name) on `BusinessRuleTask_CheckHoursWithinBudget`; no element added.
+- **Built:** `PrepareHoursSubmissionWorker` (`prepare-hours-submission`; read-only, so a retry builds the same checks); BRT `resultVariable="budgetCheck"` and `outputElement` carrying
+  the message; `BoundaryEvent_NothingToSubmit` clears `lineCheckResults`; `TaskService.get` adds each distinct Blocked `message` of `lineCheckResults` to `validationMessages` for
+  `UserTask_BookHours`; DMN: `dailyHoursAfter - dailyHoursLimit` with `> 0`; `app.daily-hours-limit: 16`; `HourLineChecks.dailyLimitMessage` and `phaseBudgetMessage` used at save and at send.
+- **Tests:** `HoursBudgetApiTest` 10 (the 9 planned and `sendingWithNoDraftOrReturnedLineReturnsToBookHoursWithAMessage`), all green; `Epic2DecisionTablesProcessTest` helper passes
+  `dailyHoursLimit` 16 (the one edit to a BPA-48 test, said in the PR) and a new test `BPA51_dailyLimitFollowsTheDailyHoursLimitInput` (limit 10); `ProcessTestApplication` excludes the
+  worker; `lint:bpmn` clean.
+- **Local stack (17 Nov; image rebuilt with plain `docker build`; version 2 of the process and the decision deployed):** on WP-000031 a booking of 8 h was refused at save with "Phase
+  Engineering budget of 20 h would be exceeded" (the Work Pack's 18 Draft hours already booked in the portal); with the budget cut to 5 h (psql, test-only), a **fresh Epic 2 instance
+  started by hand at `UserTask_BookHours`** (the existing one runs version 1, which has no BPA-51 mappings) was completed as supervisor through the portal API (204); a **new Book hours task
+  on the same instance** appeared and `GET /api/v1/tasks/{key}` returned `validationMessages: ["Phase Engineering budget of 5 h would be exceeded"]`; the two Draft lines stayed Draft.
+  Budget restored to 20 h, the manual instance cancelled. Not done by Claude: a look at Operate.
+- **Existing instances keep their model version:** Epic 2 instances started before this deploy (WP-000011, WP-000030, WP-000031) run version 1 and a send there skips the budget check.
+
 ## Proof (one command per Definition of Done line)
 | DoD line | Command / evidence |
 |---|---|

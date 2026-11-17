@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_HoursWithinBudget" name="Hours within budget" namespace="http://lowcodesol.com/star-bpa-poc" exporter="LCS generator (Claude)" exporterVersion="0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.1">
   <decision id="Decision_HoursWithinBudget" name="Hours within budget">
-    <description>E2-04. Evaluated per time sheet line, at save (backend) and at send (BusinessRuleTask_CheckHoursWithinBudget). Phase budget: FRD-7 §7.7.1 'Total manhours logged cannot exceed budgeted hours per phase' (all Workers on the Work Pack, lines not Rejected). Daily limit 16 h: FRD-5-12 §5.12.5.2 #7 gives '(e.g., 16h)', so the value is an ASSUMPTION. Exactly at the limit is allowed. CBS closed for productive hours (BPA-69, cbs_block; false when the time sheet has no CBS, D40) and approved leave (BPA-75, worker_leave) block the line before the hour limits. Rule order (ASSUMPTION): CBS, leave, daily limit, phase budget. Updated 11 Nov 2026. Reason codes; the backend writes the message with the values.</description>
+    <description>E2-04. Evaluated per time sheet line, at save (backend) and at send (BusinessRuleTask_CheckHoursWithinBudget). Phase budget: FRD-7 §7.7.1 'Total manhours logged cannot exceed budgeted hours per phase' (all Workers on the Work Pack, lines not Rejected). Daily limit: the input dailyHoursLimit, from application configuration app.daily-hours-limit (default 16, BPA-51 decision a); FRD-5-12 §5.12.5.2 #7 gives '(e.g., 16h)', so the value 16 is an ASSUMPTION. Exactly at the limit is allowed. CBS closed for productive hours (BPA-69, cbs_block; false when the time sheet has no CBS, D40) and approved leave (BPA-75, worker_leave) block the line before the hour limits. Rule order (ASSUMPTION): CBS, leave, daily limit, phase budget. Updated 11 Nov 2026. Reason codes; the backend writes the message with the values.</description>
     <decisionTable id="DecisionTable_HoursWithinBudget" hitPolicy="FIRST">
       <input id="Input_CbsClosed" label="CBS closed for productive hours">
         <inputExpression id="InputExpression_CbsClosed" typeRef="boolean">
@@ -13,9 +13,9 @@
           <text>workerOnLeave</text>
         </inputExpression>
       </input>
-      <input id="Input_DailyHoursAfter" label="Worker's hours on the date after this line">
+      <input id="Input_DailyHoursAfter" label="Hours over the daily limit after this line">
         <inputExpression id="InputExpression_DailyHoursAfter" typeRef="number">
-          <text>dailyHoursAfter</text>
+          <text>dailyHoursAfter - dailyHoursLimit</text>
         </inputExpression>
       </input>
       <input id="Input_HoursOverPhaseBudget" label="Hours over the phase budget after this line">
@@ -44,10 +44,10 @@
         <outputEntry id="Literal_RL_2"><text>"WORKER_ON_LEAVE"</text></outputEntry>
       </rule>
       <rule id="Rule_DailyLimitExceeded">
-        <description>Rule 3: more than 16 h for one Worker on one date</description>
+        <description>Rule 3: more than the daily limit (dailyHoursLimit, default 16 h) for one Worker on one date</description>
         <inputEntry id="UnaryTests_R1_c"><text>-</text></inputEntry>
         <inputEntry id="UnaryTests_R1_l"><text>-</text></inputEntry>
-        <inputEntry id="UnaryTests_R1_1"><text>&gt; 16</text></inputEntry>
+        <inputEntry id="UnaryTests_R1_1"><text>&gt; 0</text></inputEntry>
         <inputEntry id="UnaryTests_R1_2"><text>-</text></inputEntry>
         <outputEntry id="Literal_R1_1"><text>"Blocked"</text></outputEntry>
         <outputEntry id="Literal_R1_2"><text>"DAILY_LIMIT_EXCEEDED"</text></outputEntry>
