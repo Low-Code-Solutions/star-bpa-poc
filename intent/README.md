@@ -59,4 +59,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | Plan | Summary | Status |
 |---|---|---|
 | [BPA-48](BPA-4-timesheet-to-progress/plans/BPA-48.md) | Data model v0.7, V2 migration, seed, test users and lint for Epic 2 | Closed (13 Nov 2026) |
+| [BPA-49](BPA-4-timesheet-to-progress/plans/BPA-49.md) | System can start a Work Pack's timesheet process when its assignment completes | Approved (Ahsan, Build Lead, 17 Nov 2026) |
 
