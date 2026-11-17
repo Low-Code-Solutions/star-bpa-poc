@@ -11,13 +11,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * {@code write}: the only variable names a completion may carry (400 otherwise). {@code read}: the variables
  * {@code GET /api/v1/tasks/{key}} returns. A task whose element ID is not configured is not served by the task API.
  *
- * @param processId the process whose user tasks are served (Process_PPC_WorkPackAssignment)
+ * @param processIds the processes whose user tasks are served: Process_PPC_WorkPackAssignment, and from BPA-50 Process_PPC_TimesheetToProgress
+ *        for the Book hours task
  * @param allowLists element ID to its read and write lists
  */
 @ConfigurationProperties("bpa.tasks")
-public record TaskAllowList(String processId, Map<String, Lists> allowLists) {
+public record TaskAllowList(List<String> processIds, Map<String, Lists> allowLists) {
 
     public TaskAllowList {
+        processIds = processIds == null ? List.of() : List.copyOf(processIds);
         allowLists = allowLists == null ? Map.of() : Map.copyOf(allowLists);
     }
 

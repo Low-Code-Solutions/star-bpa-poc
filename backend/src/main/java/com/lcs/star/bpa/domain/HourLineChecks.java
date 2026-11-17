@@ -1,0 +1,79 @@
+package com.lcs.star.bpa.domain;
+
+import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
+import java.util.Locale;
+import java.util.Optional;
+
+/**
+ * The pure rules of an hour line (BPA-50; Gherkin texts exact): each check answers the message that refuses the value, or nothing. The service
+ * (HourLineService) decides the order, which is an ASSUMPTION of the plan; every check here is also backed by a table CHECK or the partial
+ * unique index where the data model has one (§13.1).
+ */
+public final class HourLineChecks {
+
+    public static final int MAX_REMARKS = 250;
+    private static final DateTimeFormatter LONG_DATE = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH);
+
+    private HourLineChecks() {
+    }
+
+    /** "17 Nov 2026", the way the story writes dates in its messages. */
+    public static String show(LocalDate date) {
+        return LONG_DATE.format(date);
+    }
+
+    public static Optional<String> remarks(String remarks) {
+        return remarks != null && remarks.length() > MAX_REMARKS ? Optional.of("Remarks can be at most 250 characters") : Optional.empty();
+    }
+
+    /** Above 0 first, then at most 2 decimals (numeric(7,2) would round, so the API refuses). */
+    public static Optional<String> hours(BigDecimal hours) {
+        if (hours.signum() <= 0) {
+            return Optional.of("Hours must be greater than 0");
+        }
+        if (hours.stripTrailingZeros().scale() > 2) {
+            return Optional.of("Hours can have at most 2 decimal places");
+        }
+        return Optional.empty();
+    }
+
+    /** Reported completion % (C-E2-10): 0 to 100, 2 decimals. The text is an ASSUMPTION; no story states it. */
+    public static Optional<String> completion(BigDecimal pct) {
+        if (pct == null) {
+            return Optional.empty();
+        }
+        boolean outside = pct.signum() < 0 || pct.compareTo(BigDecimal.valueOf(100)) > 0 || pct.stripTrailingZeros().scale() > 2;
+        return outside ? Optional.of("Reported completion must be between 0 and 100") : Optional.empty();
+    }
+
+    public static Optional<String> notInTheFuture(LocalDate workDate, LocalDate today) {
+        return workDate.isAfter(today) ? Optional.of("Work date cannot be in the future") : Optional.empty();
+    }
+
+    /** The Thursday on or after the date: the week ends on Thursday (E2-D15; day and time are an ASSUMPTION of the epic). */
+    public static LocalDate weekEnding(LocalDate date) {
+        return date.with(TemporalAdjusters.nextOrSame(DayOfWeek.THURSDAY));
+    }
+
+    public static String weekClosed(LocalDate weekEnding) {
+        return "Week ending " + show(weekEnding) + " is closed";
+    }
+
+    /**
+     * First day of the open week: the Friday that starts the week containing today, or the day after the latest cut-off week when that is later
+     * (ASSUMPTION: nothing seeds progress_period, so "open" means "no cut-off row yet", plan Q4).
+     */
+    public static LocalDate openWeekStart(LocalDate today, Optional<LocalDate> latestClosedWeekEnding) {
+        LocalDate start = weekEnding(today).minusDays(6);
+        return latestClosedWeekEnding.map(closed -> closed.plusDays(1)).filter(afterClosed -> afterClosed.isAfter(start)).orElse(start);
+    }
+
+    /** A plain decimal for messages and the audit log: 8 not 8.00, 9.5 not 9.50 (data model §6.1). */
+    public static String plain(BigDecimal value) {
+        return value.stripTrailingZeros().toPlainString();
+    }
+}

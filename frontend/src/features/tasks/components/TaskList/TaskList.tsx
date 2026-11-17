@@ -75,7 +75,9 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
 
   const Screen = open ? screenFor(open.elementId) : undefined;
   if (open && Screen) {
-    return <Screen key={open.key} api={api} taskKey={open.key} onDone={() => awaitSaveOutcome(open)} />;
+    return (
+      <Screen key={open.key} api={api} taskKey={open.key} onDone={() => awaitSaveOutcome(open)} onClose={() => setOpen(null)} />
+    );
   }
 
   return (

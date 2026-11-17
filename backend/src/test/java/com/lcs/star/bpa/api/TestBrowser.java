@@ -99,6 +99,28 @@ public final class TestBrowser {
         return send(request);
     }
 
+    /** PUT with the CSRF token (BPA-50). */
+    public HttpResponse<String> put(String path, String json) {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(base + path))
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(json));
+        String token = cookie("XSRF-TOKEN");
+        if (token != null) {
+            request.header("X-XSRF-TOKEN", token);
+        }
+        return send(request);
+    }
+
+    /** DELETE with the CSRF token (BPA-50). */
+    public HttpResponse<String> delete(String path) {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(base + path)).DELETE();
+        String token = cookie("XSRF-TOKEN");
+        if (token != null) {
+            request.header("X-XSRF-TOKEN", token);
+        }
+        return send(request);
+    }
+
     public HttpResponse<String> postWithoutCsrfToken(String path, String json) {
         return send(HttpRequest.newBuilder(URI.create(base + path))
                 .header("Content-Type", "application/json")

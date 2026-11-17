@@ -128,6 +128,7 @@ class PersonaSyncTest {
                 "PROCESS_DEFINITION:Process_PPC_WorkerReassignment", process,
                 "PROCESS_DEFINITION:Process_PPC_DrawingRevisionNotice", process,
                 "PROCESS_DEFINITION:Process_PPC_TimesheetToProgress", process, // BPA-49 (ASSUMPTION): started by the WorkPackAssigned message
+                "DECISION_DEFINITION:Decision_HoursWithinBudget", Set.of("CREATE_DECISION_INSTANCE"), // BPA-50 (ASSUMPTION): evaluated at every hour-line save
                 "MESSAGE:*", Set.of("CREATE"),
                 "RESOURCE:*", Set.of("CREATE"),
                 // BPA-16: reads the members of the two groups that receive a drawing-revision notice (probe: without it the search answers an empty list)

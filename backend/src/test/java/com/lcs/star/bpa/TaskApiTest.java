@@ -64,6 +64,31 @@ class TaskApiTest {
         servicePassword = IntegrationApp.servicePassword;
     }
 
+    /** BPA-50 (not a Gherkin scenario): the Epic 2 task UserTask_BookHours is served, to its candidate group only; its allow-lists are empty. */
+    @Test
+    void supervisorSeesTheBookHoursTask() {
+        Reply started = admin.post("/v2/process-instances", Map.of(
+                "processDefinitionId", "Process_PPC_TimesheetToProgress",
+                "variables", Map.of("workpackNumber", "WP-000499", "workpackId", "00000000-0000-0000-0000-000000000499"),
+                "startInstructions", List.of(Map.of("elementId", "UserTask_BookHours"))));
+        assertThat(started.status()).as("start at UserTask_BookHours: " + started.body()).isEqualTo(200);
+        try {
+            TestBrowser supervisor = loggedInAs("supervisor");
+            JsonNode mine = CamundaSteps.poll(() -> items(json(supervisor.get("/api/v1/tasks"))).stream()
+                            .filter(t -> "UserTask_BookHours".equals(t.path("elementId").asText()))
+                            .filter(t -> "WP-000499".equals(t.path("workpackNumber").asText())).findFirst(),
+                    found -> found.isPresent(), "the Book hours task of WP-000499 in the supervisor's list").orElseThrow();
+            assertThat(mine.path("workpackNumber").asText()).isEqualTo("WP-000499");
+            HttpResponse<String> one = supervisor.get("/api/v1/tasks/" + mine.path("key").asText());
+            assertThat(one.statusCode()).as(one.body()).isEqualTo(200);
+
+            assertThat(items(json(loggedInAs("timekeeper").get("/api/v1/tasks")))).as("not the timekeeper's task")
+                    .noneMatch(t -> "UserTask_BookHours".equals(t.path("elementId").asText()));
+        } finally {
+            CamundaSteps.cancelInstancesWaitingAt("UserTask_BookHours");
+        }
+    }
+
     @Test
     void BPA26_listsOnlyMyTasks() {
         String signOff = taskAt(SIGN_OFF, "WP-000457");

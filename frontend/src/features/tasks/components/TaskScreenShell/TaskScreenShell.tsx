@@ -18,6 +18,11 @@ type Props = {
   check: () => string[];
   /** The variables to complete the task with; names must be on the task's write allow-list (bpa.tasks, BPA-26). */
   variables: () => Record<string, unknown>;
+  /**
+   * False for a screen that saves through its own endpoints and does not complete the task (Book hours, BPA-50: completing it means
+   * "Send to Timekeeper", a later story). No "Complete task" button then, and submitting the form (Enter in a field) does nothing.
+   */
+  canComplete?: boolean;
   children: ReactNode;
 };
 
@@ -26,7 +31,17 @@ type Props = {
  * error, G2), blocks on the screen's field checks, completes the task through the task API and shows the contract's error
  * text. Renders: form[aria-label] > h2, the alert list, the screen's fields, and the "Complete task" button last.
  */
-export function TaskScreenShell({ api, taskKey, title, onDone, onLoaded, check, variables, children }: Props) {
+export function TaskScreenShell({
+  api,
+  taskKey,
+  title,
+  onDone,
+  onLoaded,
+  check,
+  variables,
+  canComplete = true,
+  children,
+}: Props) {
   const { data: task } = useTask(api, taskKey);
   const complete = useCompleteTask(api);
   const [messages, setMessages] = useState<string[]>([]);
@@ -44,6 +59,9 @@ export function TaskScreenShell({ api, taskKey, title, onDone, onLoaded, check, 
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (!canComplete) {
+      return;
+    }
     const blocked = check();
     setMessages(blocked);
     if (blocked.length > 0) {
@@ -62,9 +80,11 @@ export function TaskScreenShell({ api, taskKey, title, onDone, onLoaded, check, 
       <h2 className="task-tag">{title}</h2>
       <ErrorMessage messages={messages} />
       {children}
-      <Button type="submit" className="button--primary">
-        Complete task
-      </Button>
+      {canComplete && (
+        <Button type="submit" className="button--primary">
+          Complete task
+        </Button>
+      )}
     </form>
   );
 }
