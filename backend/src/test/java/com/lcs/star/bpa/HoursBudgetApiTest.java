@@ -220,7 +220,34 @@ class HoursBudgetApiTest {
         assertThat(messages).containsExactly("No Draft or Returned hours to send for WP-000457");
     }
 
+    @Test
+    void aLaterSendWithNothingToSendDoesNotShowTheEarlierBudgetMessages() {
+        // first send: blocked (budget cut to 5 h), so lineCheckResults holds the Blocked entry; then the line is Submitted elsewhere and the
+        // Supervisor sends again: BoundaryEvent_NothingToSubmit must clear lineCheckResults, so only the nothing-to-send text shows
+        UUID line = fixture.line(ids.timesheet("E1021"), D17, "Cutting", new BigDecimal("8"), "Draft");
+        jdbc.update("UPDATE bpa.workpack_phase SET manhours = 5 WHERE workpack_id = ? AND phase = 'Cutting'", ids.workpackId());
+        long instance = startAtBookHours();
+        String first = CamundaSteps.awaitOpenTask(instance, BOOK_HOURS).path("userTaskKey").asText();
+        assertThat(flow.loggedInAs("supervisor").post("/api/v1/tasks/" + first + "/complete", toJson(Map.of("variables", Map.of()))).statusCode()).isEqualTo(204);
+        String second = poll(() -> openTasks(instance, BOOK_HOURS).stream().filter(t -> !first.equals(t.path("userTaskKey").asText())).findFirst(),
+                found -> found.isPresent(), "UserTask_BookHours of " + instance + " after the blocked send").orElseThrow().path("userTaskKey").asText();
+        assertThat(messagesOf(second)).containsExactly("Phase Cutting budget of 5 h would be exceeded");
+
+        jdbc.update("UPDATE bpa.digital_timesheet_line SET status = 'Submitted' WHERE id = ?", line);
+        assertThat(flow.loggedInAs("supervisor").post("/api/v1/tasks/" + second + "/complete", toJson(Map.of("variables", Map.of()))).statusCode()).isEqualTo(204);
+        String third = poll(() -> openTasks(instance, BOOK_HOURS).stream().filter(t -> !first.equals(t.path("userTaskKey").asText()) && !second.equals(t.path("userTaskKey").asText())).findFirst(),
+                found -> found.isPresent(), "UserTask_BookHours of " + instance + " after the second send").orElseThrow().path("userTaskKey").asText();
+
+        assertThat(messagesOf(third)).containsExactly("No Draft or Returned hours to send for WP-000457");
+    }
+
     // --- helpers ----------------------------------------------------------------------------------------------------------
+
+    private List<String> messagesOf(String taskKey) {
+        List<String> messages = new ArrayList<>();
+        json(flow.loggedInAs("supervisor").get("/api/v1/tasks/" + taskKey).body()).path("validationMessages").forEach(m -> messages.add(m.asText()));
+        return messages;
+    }
 
     /** Starts Process_PPC_TimesheetToProgress at UserTask_BookHours for WP-000457, as BPA-49's message would have (the workpackId and workpackNumber it carries). */
     private long startAtBookHours() {

@@ -1,7 +1,7 @@
 # Plan: BPA-51 Supervisor can only book hours within the phase budget and the daily limit
 Jira: BPA-51 (Story, epic BPA-4)
 Story last updated: 2026-11-17T16:35:39.000+0400
-Status: Approved (Ahsan, Build Lead, 17 Nov 2026)
+Status: Closed (17 Nov 2026)
 Approver: Ahsan (Build Lead)
 Branch: BPA-51-hours-budget-and-daily-limit, from main 1cfb42c
 
@@ -70,7 +70,7 @@ Key name: Jira says `app.daily-hours-limit`; the repo already has `app.lead-time
 | Reuse | `domain/HourLineChecks` (message builders, limit); `timesheet/HourLineService` (passes the limit; uses the builders); `persistence/DigitalTimesheetLineRepository` (lines to send, by Work Pack) |
 | Task API | `task/TaskService` (Book hours: add Blocked `lineCheckResults` messages to `validationMessages`) |
 | Docs | ADR or data model §6.2 line for `app.daily-hours-limit`; data model §13 note on send-time messages; plan; REVIEW.md; `intent/README.md` |
-| Tests | new `HoursBudgetApiTest` (8 BPA51_ tests, reuses `BookHoursFixture`), fixture method for a second Work Pack (WP-000461); a worker test for "nothing to send"; `Epic2DecisionTablesProcessTest` helper (Q1 = A) |
+| Tests | new `HoursBudgetApiTest` (11 tests: the 8 DoD names, `BPA51_dailyLimitIsCheckedBeforeThePhaseBudget` and two non-scenario send tests; reuses `BookHoursFixture`, which gains `fill` and `secondWorkPackTimesheetOf`), fixture method for a second Work Pack (WP-000461); a worker test for "nothing to send"; `Epic2DecisionTablesProcessTest` helper (Q1 = A) |
 
 ## Order of work
 1. Approve; commit this plan (`Approved`) on the existing branch; regenerate `intent/README.md`. No Jira transition without asking (Q4).
@@ -106,7 +106,7 @@ ninth test name, built as `BPA51_dailyLimitIsCheckedBeforeThePhaseBudget`), Q8, 
 - **Built:** `PrepareHoursSubmissionWorker` (`prepare-hours-submission`; read-only, so a retry builds the same checks); BRT `resultVariable="budgetCheck"` and `outputElement` carrying
   the message; `BoundaryEvent_NothingToSubmit` clears `lineCheckResults`; `TaskService.get` adds each distinct Blocked `message` of `lineCheckResults` to `validationMessages` for
   `UserTask_BookHours`; DMN: `dailyHoursAfter - dailyHoursLimit` with `> 0`; `app.daily-hours-limit: 16`; `HourLineChecks.dailyLimitMessage` and `phaseBudgetMessage` used at save and at send.
-- **Tests:** `HoursBudgetApiTest` 10 (the 9 planned and `sendingWithNoDraftOrReturnedLineReturnsToBookHoursWithAMessage`), all green; `Epic2DecisionTablesProcessTest` helper passes
+- **Tests:** `HoursBudgetApiTest` 11 (the 9 planned, `sendingWithNoDraftOrReturnedLineReturnsToBookHoursWithAMessage` and `aLaterSendWithNothingToSendDoesNotShowTheEarlierBudgetMessages`), all green; `Epic2DecisionTablesProcessTest` helper passes
   `dailyHoursLimit` 16 (the one edit to a BPA-48 test, said in the PR) and a new test `BPA51_dailyLimitFollowsTheDailyHoursLimitInput` (limit 10); `ProcessTestApplication` excludes the
   worker; `lint:bpmn` clean.
 - **Local stack (17 Nov; image rebuilt with plain `docker build`; version 2 of the process and the decision deployed):** on WP-000031 a booking of 8 h was refused at save with "Phase
@@ -148,3 +148,11 @@ ninth test name, built as `BPA51_dailyLimitIsCheckedBeforeThePhaseBudget`), Q8, 
 ## Human-gap log
 - Plan written in plan mode: no file outside this plan is changed yet.
 - Faraz: intent/spec acceptance; Q1/Q5/Q6 with Khitaba if they change the model contract. Ahsan: Q1, Q5, Q7, merge.
+
+## QA review outcome (17 Nov 2026; REVIEW.md)
+3 Important, all fixed: the worker now sends `cbsCodeRef` (it was in the plan and the BPMN text but not in the code); the BPMN documentation of `ServiceTask_PrepareHoursSubmission` lists
+the fields as built; a test proves `BoundaryEvent_NothingToSubmit` clears an earlier send's budget messages. Nits left: a missing `workpackId` fails the job with an unclear message; `app.daily-hours-limit`
+is not validated (a zero or negative value is accepted; a missing key fails the start-up); no test overrides the setting through the save path (only the DMN input is tested) and the daily text at send is not asserted.
+**Risk for BPA-69 and BPA-75:** a Blocked entry for `CBS_CLOSED` or `WORKER_ON_LEAVE` has `message: null` in the `outputElement` today, so the task API would show nothing for it while the gateway still
+returns to Book hours; those stories must add their texts to the `outputElement` (and the worker's `lineChecks`). The `prepare-hours-submission` job is listed under E2-05 in spec.md (BPA-52?); plan Q6 is open.
+Full `verify` (402 tests) ran before the review fixes; the BPA-51 class (11 tests) and `lint:bpmn` ran after them; CI runs the full suite on the PR.

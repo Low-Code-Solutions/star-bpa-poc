@@ -548,3 +548,16 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Not verified by the reviewer: red-first runs (tests and code are in separate commits only for the plan), test runs, CI, a browser click-through (human gap), spec.md and data-model §13.1 in full.
 - Local stack (author, 17 Nov): the supervisor's list shows the Book hours tasks; on WP-000031 a line booked (201), the Work Pack went Released to In Progress with one audit row, a change, a duplicate,
   a missing phase, a future date, 7.125 h, the timekeeper (403) and a production-team line all behaved as the tests say; the lines were deleted again.
+
+### BPA-51 at 34fce81, 17 Nov 2026 (qa-reviewer)
+- Code: 0 High, 3 Important, 6 Nits. Reviewer read BPA-51 in Jira, the plan, spec.md and the diff; no test was run by the reviewer (author: `HoursBudgetApiTest` first run 8 of 9 green at once, since BPA-50
+  already does the save-time rules, and `BPA51_sendRechecksTheBudget` red; then green; full `./mvnw -B verify` 402 tests; `lint:bpmn` clean; local stack: a blocked send returned the task with the message).
+- Checks passed: DMN order and hit policy unchanged, only the daily input and rule entry changed, every caller passes `dailyHoursLimit`; BPMN touched in the three planned places only; the worker is read-only
+  (idempotent) with a clean error path; save and send use the same message builders; `TaskService` adds the messages for `UserTask_BookHours` only and exposes no new variable; the 8 DoD test names are present.
+- Important (3), fixed: `cbsCodeRef` missing from `lineChecks` although the plan and the BPMN text list it; the BPMN documentation of `ServiceTask_PrepareHoursSubmission` stale; no test for `BoundaryEvent_NothingToSubmit`
+  clearing `lineCheckResults` (added `aLaterSendWithNothingToSendDoesNotShowTheEarlierBudgetMessages`).
+- Nits (6): left: unclear failure for a missing `workpackId`; `app.daily-hours-limit` not validated (zero or negative accepted); no test overrides the setting through the save path and the daily text at send is not
+  asserted; plan counts (fixed); a stale comment in `BookHoursApiTest`; a Blocked entry with no message (CBS closed, leave) shows nothing on the returned task until BPA-69 and BPA-75 add their texts (written into the plan).
+- Found while building (not by the reviewer): the business rule task had no input mappings, so the original model could never block a line; six `zeebe:input` mappings fixed it (plan, Progress and departures).
+- Edit to an existing test (said in the PR): `Epic2DecisionTablesProcessTest.hours(...)` passes `dailyHoursLimit` 16; `ProcessTestApplication` excludes the new worker.
+- Not verified by the reviewer: red-first runs (tests and code are one commit), test runs, `lint:bpmn`, deployed models against the repo files, CI, Operate.

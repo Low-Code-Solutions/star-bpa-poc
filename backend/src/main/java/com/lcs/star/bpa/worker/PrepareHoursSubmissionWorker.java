@@ -64,6 +64,7 @@ public class PrepareHoursSubmissionWorker {
             check.put("phaseHoursAfter", lines.phaseHours(workpackId, line.phase(), null));
             check.put("dailyHoursAfter", lines.workerHoursOn(line.workerId(), line.workDate(), null));
             check.put("dailyHoursLimit", dailyHoursLimit);
+            check.put("cbsCodeRef", line.cbsCodeRef()); // null when the time sheet has no CBS (D40); BPA-69 reads cbs_block with it
             check.put("cbsClosed", false);
             check.put("workerOnLeave", false);
             check.put("dailyLimitMessage", HourLineChecks.dailyLimitMessage(line.badgeNo(), line.workDate(), dailyHoursLimit));
