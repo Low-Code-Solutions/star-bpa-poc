@@ -286,6 +286,13 @@ describe('BookHours', () => {
     expect(screen.queryByText(/Hours returned:/)).not.toBeInTheDocument();
   });
 
+  // BPA-56 (ASSUMPTION, plan Q2): Jira states the reason only after a return; the Supervisor re-books after a reject, so the reason shows too
+  it('BPA56_rejectedHoursShowTheReason', async () => {
+    await renderScreen({ taskVariables: { hoursDecision: 'Rejected', hoursReason: 'Hours not worked on this Work Pack' } });
+
+    expect(screen.getByText('Hours rejected: Hours not worked on this Work Pack')).toBeInTheDocument();
+  });
+
   it('BPA53_aReturnedLineCanBeDeleted', async () => {
     const { user, saves } = await renderScreen({ lines: [draft({ status: 'Returned' })] });
 
