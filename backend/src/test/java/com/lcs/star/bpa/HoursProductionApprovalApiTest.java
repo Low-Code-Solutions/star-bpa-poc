@@ -6,7 +6,7 @@ import static com.lcs.star.bpa.CamundaSteps.poll;
 import static com.lcs.star.bpa.CamundaSteps.toJson;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -119,9 +119,12 @@ class HoursProductionApprovalApiTest {
         HttpResponse<String> done = decide("production-supervisor", awaitTask(instance, APPROVE_PRODUCTION), "Approved", null);
 
         assertThat(done.statusCode()).as(done.body()).isEqualTo(204);
-        assertThat(awaitTask(instance, APPROVE_PPC)).as("a UserTask_ApproveHoursPpc task (group ppc-team)").isNotBlank();
+        awaitTask(instance, APPROVE_PPC);
+        List<String> groups = new java.util.ArrayList<>();
+        openTasks(instance, APPROVE_PPC).get(0).path("candidateGroups").forEach(g -> groups.add(g.asText()));
+        assertThat(groups).as("a UserTask_ApproveHoursPpc task for group ppc-team").containsExactly("ppc-team");
         assertThat(stage(instance, 1)).isEqualTo("Ppc");
-        assertThat(lineStatuses()).containsExactly("Submitted");
+        assertThat(lineStatuses(instance)).containsExactly("Submitted");
         Map<String, Object> decision = jdbc.queryForMap("SELECT * FROM bpa.hours_decision WHERE step = 'ProductionSupervisor'");
         assertThat(decision.get("decision")).isEqualTo("Approved");
         assertThat(decision.get("decided_by")).isEqualTo("production-supervisor");
@@ -135,7 +138,7 @@ class HoursProductionApprovalApiTest {
 
         assertThat(done.statusCode()).as(done.body()).isEqualTo(204);
         String back = awaitTask(instance, BOOK_HOURS);
-        assertThat(lineStatuses()).containsExactly("Returned");
+        assertThat(lineStatuses(instance)).containsExactly("Returned");
         Map<String, Object> submission = jdbc.queryForMap("SELECT * FROM bpa.hours_submission WHERE process_instance_key = ?", instance);
         assertThat(submission.get("stage")).isEqualTo("Closed");
         assertThat(submission.get("outcome")).isEqualTo("Returned");
@@ -151,7 +154,7 @@ class HoursProductionApprovalApiTest {
 
         assertThat(done.statusCode()).as(done.body()).isEqualTo(204);
         awaitTask(instance, BOOK_HOURS);
-        assertThat(lineStatuses()).containsExactly("Rejected");
+        assertThat(lineStatuses(instance)).containsExactly("Rejected");
         Map<String, Object> submission = jdbc.queryForMap("SELECT * FROM bpa.hours_submission WHERE process_instance_key = ?", instance);
         assertThat(submission.get("stage")).isEqualTo("Closed");
         assertThat(submission.get("outcome")).isEqualTo("Rejected");
@@ -198,6 +201,7 @@ class HoursProductionApprovalApiTest {
         HttpResponse<String> refused = decide("timekeeper", task, "Approved", null);
 
         assertThat(refused.statusCode()).as(refused.body()).isEqualTo(403);
+        assertThat(json(refused.body()).path("detail").asText()).as("the candidate-group refusal, not CSRF or segregation").isEqualTo("You are not allowed to work on this task");
         assertThat(openTasks(instance, APPROVE_PRODUCTION)).hasSize(1);
     }
 
@@ -264,7 +268,7 @@ class HoursProductionApprovalApiTest {
         JobClient client = mock(JobClient.class, RETURNS_DEEP_STUBS);
         worker.handle(client, job(instance, Long.parseLong(task), "production-supervisor", "Approved", null));
 
-        verify(client.newFailCommand(anyLong()).retries(0)).errorMessage(anyString());
+        verify(client.newFailCommand(anyLong()).retries(0)).errorMessage(contains("is not at stage ProductionSupervisor"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.hours_decision WHERE step = 'ProductionSupervisor'", Integer.class)).isZero();
         assertThat(stage(instance, 1)).isEqualTo("Timekeeper");
     }
@@ -322,8 +326,10 @@ class HoursProductionApprovalApiTest {
         return jdbc.queryForObject("SELECT stage FROM bpa.hours_submission WHERE process_instance_key = ? AND round_no = ?", String.class, instance, round);
     }
 
-    private List<String> lineStatuses() {
-        return jdbc.queryForList("SELECT DISTINCT status FROM bpa.digital_timesheet_line", String.class);
+    private List<String> lineStatuses(long instance) {
+        return jdbc.queryForList("""
+                SELECT DISTINCT l.status FROM bpa.digital_timesheet_line l JOIN bpa.hours_submission s ON s.id = l.hours_submission_id
+                WHERE s.process_instance_key = ?""", String.class, instance);
     }
 
     private String awaitTask(long instance, String elementId) {

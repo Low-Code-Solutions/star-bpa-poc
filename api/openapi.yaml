@@ -289,10 +289,43 @@ paths:
                     status: 400
                     title: Bad Request
                     detail: Decision must be Approved or Declined
+                hoursDecisionUnknown:
+                  summary: BPA-53 ASSUMPTION text; Validate hours with a decision that is neither Validated nor Returned
+                  value:
+                    status: 400
+                    title: Bad Request
+                    detail: Decision must be Validated or Returned
+                productionDecisionUnknown:
+                  summary: BPA-56 ASSUMPTION text; Approve hours (Production) with a decision that is not Approved, Returned or Rejected
+                  value:
+                    status: 400
+                    title: Bad Request
+                    detail: Decision must be Approved, Returned or Rejected
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: '#/components/responses/TaskForbidden'
+          description: |
+            The task's candidate groups do not include any of the user's groups (BPA-26), or (BPA-56) the user sent the hours this approval
+            decides on (segregation of duties; the task stays open).
+          x-assumption: true
+          x-assumption-note: BPA-56 segregation of duties; the status and the text are not stated by Jira (data model §13.2.2 says only "worker-checked")
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                wrongGroup:
+                  summary: BPA-26 "Wrong group is forbidden"
+                  value:
+                    status: 403
+                    title: Forbidden
+                    detail: You are not allowed to work on this task
+                segregationOfDuties:
+                  summary: BPA-56 ASSUMPTION; the Production Supervisor who decides sent these hours
+                  value:
+                    status: 403
+                    title: Forbidden
+                    detail: 'Segregation of duties: production-supervisor sent these hours and cannot decide on them'
         '404':
           $ref: '#/components/responses/TaskNotFound'
         '409':

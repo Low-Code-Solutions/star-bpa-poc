@@ -1,7 +1,7 @@
 # Plan: BPA-56 Production Supervisor can approve, return or reject a Work Pack's validated hours
 Jira: BPA-56 (Story, epic BPA-4)
-Story last updated: 2026-11-17T11:45:25.546+0400
-Status: Approved (Ahsan, Build Lead, 18 Nov 2026)
+Story last updated: 2026-11-18T17:17:48.888+0400
+Status: Closed (18 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-56-record-hours-decision, from main fabbc27
 
@@ -126,10 +126,10 @@ Segregation of duties is coded: the person who decides must not be the person wh
 ## Files that change
 | Area | Files |
 |---|---|
-| Contract | `api/openapi.yaml`: `TaskSummary.elementId` + `UserTask_ApproveHoursProduction`; the `GET /api/v1/hours-submissions/{id}` description (groups) |
+| Contract | `api/openapi.yaml`: `TaskSummary.elementId` + `UserTask_ApproveHoursProduction`; the `GET /api/v1/hours-submissions/{id}` description (groups); on `POST /api/v1/tasks/{taskKey}/complete`, 400 examples for the BPA-53 and BPA-56 decision texts and a 403 with the segregation example (x-assumption) |
 | Worker | `worker/RecordHoursDecisionWorker.java` (step table, segregation, Ppc message) |
 | Persistence | `persistence/HoursSubmissionRepository.java` (`decideAsTimekeeper` → `decide`, Approved and Rejected, stage guard, `submittedBy(id)`) |
-| Task API | `task/TaskValidity.java` (ApproveHoursProduction); new `task/HoursSegregationCheck.java`; `task/TaskService.java` (calls it before completing) |
+| Task API | `task/TaskValidity.java` (ApproveHoursProduction); new `task/HoursSegregationCheck.java`; `task/TaskService.java` (calls it before completing); `task/TaskConfig.java` (passes it to `TaskService`) |
 | Security, config | `config/SecurityConfig.java` (`PRODUCTION_SUPERVISOR` constant if absent; split matcher); `application.yml` (allow-list) |
 | Frontend | new `features/timesheets/components/ApproveHoursProduction/*` (+ test), new `components/SubmissionLines/*`; `ValidateHours.tsx` (uses it); `hoursDecisionMessages.ts`; `BookHours.tsx` (Rejected notice); `TaskList.tsx`; `taskScreens.ts`; `utils/constants.ts` |
 | Tests | new `HoursProductionApprovalApiTest` (6 BPA56_ + extras); `task/TaskValidityTest` (a row); React tests; `BookHours.test.tsx` (one BPA56 test added) |
@@ -240,6 +240,7 @@ Extra tests (not scenarios):
    - To comment in Jira after a yes.
 
 ## Human-gap log
+- Commits 90f047c and 90deb5b say "plan unaffected" but carried departures (the `decideAsTimekeeper` delegate, `WrongStage`, fail-with-no-retries for an unknown decision or a missing reason, the "Reason" label) that the plan recorded only in 73e5914: history left as is, stated in the PR.
 - Plan written in plan mode; the branch existed already (empty at main fabbc27). Approved by Ahsan on 18 Nov 2026 without answers to Q1-Q6 one by one, so the recommended options are applied and recorded as ASSUMPTIONs (Jira comment after a yes).
 
 ## Progress and departures (as built, 18 Nov 2026)
@@ -250,3 +251,7 @@ Extra tests (not scenarios):
 - **Frontend:** `SubmissionLines` extracted from `ValidateHours` (its 9 tests unchanged and green); the Book hours notice is "Hours returned: …" or "Hours rejected: …"; the reason field on the new screen is labelled "Reason" (ASSUMPTION).
 - **Existing tests edited:** `TaskValidityTest` gained a row; `BookHours.test.tsx` gained `BPA56_rejectedHoursShowTheReason`. No existing test was changed.
 - **Proof so far:** the class 11/11; `HoursValidationApiTest` 14, `TaskApiTest` 8, `TaskValidityTest` 6, `BookHoursApiTest` 28, all green; frontend 97 tests, lint, Prettier, tsc and build clean. Local stack (WP-000011, fresh instance on the current model): send, validate, reject without a reason 400, timekeeper on the task 403, amend as production-supervisor 403, reject with a reason (round 1 Closed/Rejected, 6 lines Rejected, Book hours with `hoursDecision` Rejected and the reason), re-book the rejected slot 201, send (round 2, 1 line), validate, production-supervisor reads the submission (200), approve: round 2 at stage Ppc; the instance waits at `UserTask_ApproveHoursPpc`. Decisions: Validated, Rejected, Validated, Approved.
+- **Frontend red run (not committed separately):** before the screen existed, `npm test -- BookHours ApproveHoursProduction ValidateHours` gave 2 failed files, 1 passed: `BPA56_rejectedHoursShowTheReason` failed (no "Hours rejected" notice) and the `ApproveHoursProduction` suite failed on the missing module; ValidateHours (after the `SubmissionLines` extraction) passed. The tests and the code then went into one commit (90deb5b). The `TaskValidityTest` row went into the backend commit (90f047c) with `TaskValidity`, without its own red run.
+- **Review fixes (qa-reviewer at 73e5914):** scenario 1 now asserts the Ppc task's candidate groups are exactly `ppc-team`; scenario 6 asserts the candidate-group text; the wrong-stage test matches the `WrongStage` message; `lineStatuses` is scoped to the instance; the contract documents the segregation 403 and the two decision 400 texts (x-assumption); this plan's header and Files table.
+- **Story drift checked:** Jira `updated` 18 Nov 17:17 is the move to In Progress and an assignee change; the Description and Acceptance Criteria are unchanged.
+- Ahsan checked the screens in the portal on 18 Nov 2026 ("Front end looks fine"); the sprint-review demo is still a human gap.
