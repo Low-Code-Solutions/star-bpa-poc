@@ -70,6 +70,7 @@ class TaskValidityTest {
         assertThat(TaskValidity.check(ppc, Map.of("hoursDecision", "Rejected", "hoursReason", "Duplicate of WP-000461"))).isEqualTo(Optional.empty());
         assertThat(TaskValidity.check(ppc, Map.of("hoursDecision", "Approved"))).isEqualTo(Optional.empty());
     }
+
     @Test
     void validCompletionsAndOtherTasksPass() {
         assertThat(TaskValidity.check(SIGN_OFF, Map.of("signOffDecision", "Approved"))).isEqualTo(Optional.empty());
