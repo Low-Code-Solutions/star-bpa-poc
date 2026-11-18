@@ -1136,7 +1136,7 @@ paths:
       tags: [timesheet-lines]
       operationId: getHoursSubmission
       summary: Read a submission of hours with its lines (the Timekeeper's screen)
-      description: BPA-53 (the shape is an ASSUMPTION). Group timekeeper now; production-supervisor and ppc-team join with BPA-56 and BPA-57.
+      description: BPA-53 (the shape is an ASSUMPTION). Groups timekeeper and production-supervisor (BPA-56); ppc-team joins with BPA-57.
       x-assumption: true
       x-assumption-note: the endpoint and its shape are not stated by BPA-53
       responses:
@@ -1449,7 +1449,7 @@ components:
         elementId:
           type: string
           description: BPMN element ID of the user task
-          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours]
+          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction]
         processInstanceKey:
           $ref: '#/components/schemas/CamundaKey'
         workpackNumber:
