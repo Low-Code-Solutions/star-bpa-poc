@@ -1,7 +1,7 @@
 # Plan: BPA-57 PPC Team can approve, return or reject production hours as the final step
 Jira: BPA-57 (Story, epic BPA-4)
-Story last updated: 2026-11-18T17:17:52.494+0400
-Status: Approved (Ahsan, Build Lead, 18 Nov 2026)
+Story last updated: 2026-11-18T18:19:01+0400
+Status: Closed (18 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-57-ppc-approve-hours, from main 3ad3f25
 
@@ -20,7 +20,7 @@ The segregation rule widens: the PPC decider must be neither the sender nor an e
 ## Readiness check (Definition of Ready, docs/02, against Jira 18 Nov 17:17)
 | Check | State |
 |---|---|
-| Jira status | **Ready** (comment 10548). The development panel shows 2 merged PRs, probably #48 and #49, which name BPA-57 in the worker's Ppc message. No transition without asking (Q5) |
+| Jira status | **Ready** when planned (comment 10548); In Progress since 18 Nov (status only: Description and Acceptance Criteria re-read at review, unchanged). The development panel shows 2 merged PRs, probably #48 and #49, which name BPA-57 in the worker's Ppc message. No transition without asking (Q5) |
 | Template, persona, outcome | Met |
 | Gherkin incl. unhappy paths | Met: 7 scenarios |
 | BPMN element IDs exist | Met. `UserTask_ApproveHoursPpc` has candidate group `ppc-team`. `ServiceTask_RecordPpcDecision` is `record-hours-decision` with header step=Ppc. `Flow_PpcDecided` goes to `Gateway_MergeBooking` and then Book hours for every decision. `BoundaryEvent_WorkPackCompleted` (E2-16) sits on Book hours and is not touched (Q4) |
@@ -239,3 +239,4 @@ Extra tests (not scenarios):
 - **Frontend:** BPA-56's `ApproveHoursProduction.tsx` moved to a shared `ApproveHours` (a `title` prop); `ApproveHoursProduction` and the new `ApproveHoursPpc` are one-line wrappers; BPA-56's tests are unchanged and green.
 - **Existing tests edited:** none; `TaskValidityTest` gained a row.
 - **Proof so far:** the class 15/15; `HoursProductionApprovalApiTest` 11, `HoursValidationApiTest` 14, `TaskApiTest` 8, `TaskValidityTest` 7, `BookHoursApiTest` 28, all green; frontend 101 tests, lint, Prettier, tsc and build clean. Local stack (WP-000011, fresh instance on the current model): send, validate, production approve, production-supervisor on the PPC task 403, PPC reject without a reason 400, ppc-team reads the submission (stage Ppc), PPC approve: round 1 Closed/Approved with 4 lines Approved and decisions Validated, Approved, Approved; Book hours open again; change, delete and amend of an Approved line all 409 "Line is not editable (status Approved)"; a new line for E1021 on 18 Nov 201; send: round 2 at stage Timekeeper and the instance at `UserTask_ValidateHours`. The earlier-decider 409 is proved by `BPA57_ppcDeciderMustDifferFromEarlierDeciders` (it needs seeded `decided_by`).
+- **Review (qa-reviewer at 65c27f6):** 0 High, 2 Important (process), 5 Nits. Fixed: the plan header and Readiness row (Jira `updated` 18 Nov 18:19 is the status move; Description and Acceptance Criteria unchanged); a missing blank line in `TaskValidityTest`; REVIEW.md. Open for people, not applied: the Jira comment for the ASSUMPTIONs (plan Q1, Q2, Q6), shown to Ahsan first; the read endpoint has no project scope for ppc-team (as the other two groups; BPA-76 to BPA-79); the commits titled "plan unaffected" carried the `earlierDeciders(step)` correction and the changed unknown-step message, recorded in 65c27f6.

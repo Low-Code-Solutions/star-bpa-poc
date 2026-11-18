@@ -603,3 +603,17 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Edits to existing tests (said in the PR): `TaskValidityTest` gained a row; `BookHours.test.tsx` gained `BPA56_rejectedHoursShowTheReason`; none changed.
 - After the review fixes the author re-ran `HoursProductionApprovalApiTest` (11, 0 failures) and the Redocly lint; the full verify (459) ran before them.
 - Not verified by the reviewer: backend test runs, the red-first output, CI, the local stack and a browser (Ahsan checked the screens in the portal, 18 Nov), the Jira dev-panel PR identity.
+
+### BPA-57 at 65c27f6, 18 Nov 2026 (qa-reviewer)
+- Code: 0 High, 2 Important (process), 5 Nits. Reviewer read BPA-57 in Jira (evidence view), the plan, REVIEW.md and the full diff; ran no tests (author: `HoursPpcApprovalApiTest` red first, 15 of 15 failed before any production code, on 404 "Task not found"
+  because `UserTask_ApproveHoursPpc` was not on the allow-list, scenario 2 only on its Given; then green 15/15; full `./mvnw -B verify` 475 tests, 0 failures; frontend 101 tests, lint, Prettier, tsc, build; Redocly lint not re-run (contract edit
+  limited to an enum value, a description and a 409 example); local stack: send, validate, production approve, PPC approve, round 1 Closed/Approved with 4 lines Approved, change, delete and amend of an Approved line 409, a new line and round 2).
+- Checks passed: Ppc Approved sets the lines Approved and closes the submission as Approved; Returned and Rejected unchanged; the retry-safety correction (`earlierDeciders(submissionId, "Ppc")` leaves out the step's own decisions); the sender check runs before the
+  earlier-decider check in the task API and the worker, with status and text as plan option A (403 BPA-56's text; 409 the Jira text); read access, allow-list and candidate group; no secrets or real personal data; the 7 DoD test names; red-first commits
+  (d9db07c tests and contract only; e3194a2 React tests) precede the production commits.
+- Important (2): the Jira comment for the ASSUMPTIONs (plan Q1, Q2, Q6) is not posted: left, to be shown to Ahsan first; the plan header was older than Jira's `updated` (status move only): header and Readiness row updated.
+- Nits (5): fixed: the blank line in `TaskValidityTest`; REVIEW.md entry; the plan's final status. Noted: the read endpoint has no project scope for ppc-team (as the other two groups; BPA-76 to BPA-79); the commits titled "plan unaffected" carried the
+  `earlierDeciders(step)` correction and the changed unknown-step message (recorded in the plan in 65c27f6).
+- Edits to existing tests (said in the PR): none; `TaskValidityTest` gained a row. `ApproveHoursProduction.tsx` moved to a shared `ApproveHours` with a title prop; its tests are unchanged.
+- Not verified by the reviewer: test runs, lint, build, the local stack, CI, the Jira dev-panel PR identity.
+- After the review fixes only a blank line and documents changed; the full verify (475) was run before them.
