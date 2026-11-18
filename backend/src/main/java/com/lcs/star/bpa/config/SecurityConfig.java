@@ -47,6 +47,7 @@ public class SecurityConfig {
 
     /** Reads the Project Hour Journal Lines with the PPC Team (BPA-14) and alone the Digital Time sheets (BPA-15); groups ASSUMPTION in the stories, 09 S6. */
     static final String SUPERVISOR = "supervisor";
+    static final String TIMEKEEPER = "timekeeper";
 
     /** The mock D365 Document Control event (BPA-16; 09 S28): open, and exempt from the CSRF check. */
     static final String DRAWING_REVISIONS = "/api/v1/drawing-revisions";
@@ -88,6 +89,9 @@ public class SecurityConfig {
                         // BPA-52 (C-E2-5): the time sheet upload, its result and its template are the Supervisor's and a Production Team member's (the
                         // Jira SOR Notes say "403 outside supervisor", the Gherkin lets production-team upload); every method, so HEAD cannot skip it.
                         .requestMatchers("/api/v1/timesheet-files", "/api/v1/timesheet-files/**").hasAnyAuthority(SUPERVISOR, PRODUCTION_TEAM)
+                        // BPA-53: the Timekeeper amends a sent line and reads the submission; every method (the BPA-10 lesson). Listed before the
+                        // lines rule: "digital-timesheet-lines/*" matches one segment, so "/{id}/amendments" is not caught by it.
+                        .requestMatchers("/api/v1/digital-timesheet-lines/*/amendments", "/api/v1/hours-submissions/**").hasAuthority(TIMEKEEPER)
                         .anyRequest().authenticated())
                 // S26: token in the XSRF-TOKEN cookie (readable by React), sent back as X-XSRF-TOKEN on every state-changing call,
                 // the login included. The plain handler lets React send the cookie value unchanged.

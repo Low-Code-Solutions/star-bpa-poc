@@ -20,9 +20,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class TimesheetFileRepository {
 
-    /** The approval stages of an hours_submission (data model §13.2.1): the hours are with an approver, not with the Supervisor. */
-    private static final String IN_APPROVAL = "('Timekeeper', 'ProductionSupervisor', 'Ppc')";
-
     private final JdbcTemplate jdbc;
 
     public TimesheetFileRepository(JdbcTemplate jdbc) {
@@ -55,12 +52,6 @@ public class TimesheetFileRepository {
         return jdbc.queryForList("""
                 SELECT t.id FROM bpa.digital_timesheet t JOIN bpa.worker w ON w.id = t.worker_id
                 WHERE t.workpack_id = ? AND w.employee_ref = ?""", UUID.class, workpackId, badgeNo).stream().findFirst();
-    }
-
-    /** ASSUMPTION (plan Q4): the Work Pack's hours are in approval while an hours_submission of it is at an approval stage; BPA-53 will write them. */
-    public boolean inApproval(UUID workpackId) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM bpa.hours_submission WHERE workpack_id = ? AND stage IN " + IN_APPROVAL + ")",
-                Boolean.class, workpackId));
     }
 
     public Optional<TimesheetFileResult> result(UUID fileId) {

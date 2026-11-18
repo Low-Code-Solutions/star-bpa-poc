@@ -12,4 +12,6 @@ export const USER_TASKS = {
   scheduleWorkPack: 'UserTask_ScheduleWorkPack',
   // Process_PPC_TimesheetToProgress (Epic 2, BPA-50)
   bookHours: 'UserTask_BookHours',
+  // BPA-53
+  validateHours: 'UserTask_ValidateHours',
 } as const;

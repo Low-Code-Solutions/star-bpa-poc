@@ -189,9 +189,21 @@ public class DigitalTimesheetLineRepository {
         }
     }
 
+    /** The Timekeeper's amendment (BPA-53): hours only, with an audit row for hours and one for the reason (column amend_reason; ASSUMPTION, plan Q1). */
+    public void amend(Line old, BigDecimal hours, String reason, String username, Instant now) {
+        Timestamp at = Timestamp.from(now);
+        jdbc.update("UPDATE bpa.digital_timesheet_line SET hours = ?, updated_at = ?, updated_by = ? WHERE id = ?", hours, at, username, old.id());
+        if (old.hours().compareTo(hours) != 0) {
+            audit(old.id(), "hours", HourLineChecks.plain(old.hours()), HourLineChecks.plain(hours), username, at);
+        }
+        audit(old.id(), "amend_reason", null, reason, username, at);
+    }
+
     /** Deletes the line; every business column is audited with a null new value (ASSUMPTION, plan). */
     public void delete(Line old, String username, Instant now) {
         Timestamp at = Timestamp.from(now);
+        // BPA-53 review: an upload's result log points at the line it saved (timesheet_file_row, nullable); the log stays, without the pointer
+        jdbc.update("UPDATE bpa.timesheet_file_row SET timesheet_line_id = NULL WHERE timesheet_line_id = ?", old.id());
         jdbc.update("DELETE FROM bpa.digital_timesheet_line WHERE id = ?", old.id());
         audit(old.id(), "digital_timesheet_id", old.sheet().id().toString(), null, username, at);
         audit(old.id(), "work_date", old.workDate().toString(), null, username, at);

@@ -20,9 +20,9 @@ const EDITABLE = ['Draft', 'Returned'];
  * BPA-50: the Book daily hours task screen (UserTask_BookHours) on the shared TaskScreenShell. One row per Worker and phase and one
  * column per day of the open week up to today (E2-D15: any date from the start of the open week up to today); a cell opens a line panel
  * with hours, remark (at most 250 characters) and an optional reported completion % (C-E2-10, information only). Lines are saved one at
- * a time through the lines API, and the backend's message is shown as it is. Delete is offered on Draft lines only, after a confirmation
- * (FRD-5-12 §5.12.8.1). The screen does not complete the task: that means "Send to Timekeeper", a later story (plan Q8), so the shell hides
- * "Complete task" and a button leads back to the task list. The task API gives only the Work Pack number; the time sheets, the phases and
+ * a time through the lines API, and the backend's message is shown as it is. Delete is offered on Draft and Returned lines, after a confirmation
+ * (FRD-5-12 §5.12.8.1). BPA-53: completing the task is "Send to Timekeeper" (the shell button; Enter in a line field does not submit). A Returned line can also be
+ * deleted, as a Draft one, and the Timekeeper's reason is shown. The task API gives only the Work Pack number; the time sheets, the phases and
  * the open week come from the lines API.
  */
 export function BookHours({ api, taskKey, onDone, onClose }: TaskScreenProps) {
@@ -35,6 +35,14 @@ export function BookHours({ api, taskKey, onDone, onClose }: TaskScreenProps) {
   const [completion, setCompletion] = useState('');
   const [messages, setMessages] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
+  const [returnedReason, setReturnedReason] = useState('');
+
+  /** The Work Pack number, and the Timekeeper's reason when the hours came back (BPA-53; read allow-list hoursDecision and hoursReason). */
+  function loaded(task: Task) {
+    const v = (task.variables ?? {}) as Record<string, unknown>;
+    setWorkpackNumber(task.workpackNumber ?? '');
+    setReturnedReason(v.hoursDecision === 'Returned' && typeof v.hoursReason === 'string' ? v.hoursReason : '');
+  }
 
   const days = board.length > 0 ? daysFrom(board[0].openWeekStart, board[0].today) : [];
   const lineOf = (sheet: TimesheetLines, phase: string, date: string): DigitalTimesheetLine | undefined =>
@@ -101,11 +109,12 @@ export function BookHours({ api, taskKey, onDone, onClose }: TaskScreenProps) {
       taskKey={taskKey}
       title="Book daily hours"
       onDone={onDone}
-      onLoaded={(task: Task) => setWorkpackNumber(task.workpackNumber ?? '')}
+      onLoaded={loaded}
       check={() => []}
       variables={() => ({})}
-      canComplete={false}
+      completeLabel="Send to Timekeeper"
     >
+      {returnedReason !== '' && <p className="notice">{`Hours returned: ${returnedReason}`}</p>}
       <label className="field field--number">
         Workpack number
         <input value={workpackNumber} readOnly />
@@ -152,7 +161,16 @@ export function BookHours({ api, taskKey, onDone, onClose }: TaskScreenProps) {
         </table>
       )}
       {sheet && selected && (
-        <section aria-label="Hour line" className="context-panel">
+        <section
+          aria-label="Hour line"
+          className="context-panel"
+          // Enter in a field must not submit the form, which now means "Send to Timekeeper" (BPA-53)
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+              e.preventDefault();
+            }
+          }}
+        >
           <h3>{`${sheet.employeeRef} ${selected.phase} ${showDate(selected.date)}`}</h3>
           <ErrorMessage messages={messages} />
           {!editable && line && <p className="notice">{`Line is not editable (status ${line.status})`}</p>}
@@ -170,8 +188,10 @@ export function BookHours({ api, taskKey, onDone, onClose }: TaskScreenProps) {
               Save line
             </Button>
           )}
-          {line?.status === 'Draft' && !confirming && <Button onClick={() => setConfirming(true)}>Delete line</Button>}
-          {line?.status === 'Draft' && confirming && (
+          {line && EDITABLE.includes(line.status) && !confirming && (
+            <Button onClick={() => setConfirming(true)}>Delete line</Button>
+          )}
+          {line && EDITABLE.includes(line.status) && confirming && (
             <p role="group" aria-label="Confirm delete">
               Delete this line?
               <Button onClick={remove}>Yes, delete</Button>

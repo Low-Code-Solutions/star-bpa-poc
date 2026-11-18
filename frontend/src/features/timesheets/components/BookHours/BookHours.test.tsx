@@ -23,7 +23,13 @@ type Line = {
   createdBy: string;
   remarks?: string;
 };
-type Options = { lines?: Line[]; secondStatus?: string; saveStatus?: number; saveDetail?: string };
+type Options = {
+  lines?: Line[];
+  secondStatus?: string;
+  saveStatus?: number;
+  saveDetail?: string;
+  taskVariables?: Record<string, unknown>;
+};
 
 const draft = (extra: Partial<Line> = {}): Line => ({
   id: LINE,
@@ -36,7 +42,13 @@ const draft = (extra: Partial<Line> = {}): Line => ({
   ...extra,
 });
 
-function fakeBackend({ lines = [], secondStatus = 'Draft', saveStatus = 201, saveDetail = '' }: Options = {}) {
+function fakeBackend({
+  lines = [],
+  secondStatus = 'Draft',
+  saveStatus = 201,
+  saveDetail = '',
+  taskVariables = {},
+}: Options = {}) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -68,7 +80,7 @@ function fakeBackend({ lines = [], secondStatus = 'Draft', saveStatus = 201, sav
           processInstanceKey: '2251799813692400',
           workpackNumber: 'WP-000457',
           creationDate: '2026-11-17T06:00:00Z',
-          variables: {},
+          variables: taskVariables,
           validationMessages: [],
         });
       case '/api/v1/digital-timesheets':
@@ -254,11 +266,33 @@ describe('BookHours', () => {
     expect(within(upload).getByRole('button', { name: 'Upload time sheet' })).toBeInTheDocument();
   });
 
-  it('BPA50_theTaskIsNotCompletedFromThisScreen', async () => {
+  // BPA-53 replaces BPA50_theTaskIsNotCompletedFromThisScreen: the screen now completes the task, as "Send to Timekeeper" (stated in the PR).
+  it('BPA53_theScreenSendsTheHoursToTheTimekeeper', async () => {
     await renderScreen();
 
-    // Completing the task means "Send to Timekeeper", a later story (plan Q8): no Complete button on this screen
+    expect(screen.getByRole('button', { name: 'Send to Timekeeper' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Complete task' })).not.toBeInTheDocument();
-    expect(screen.getByRole('form', { name: 'Book daily hours' })).toBeInTheDocument();
+  });
+
+  it('BPA53_returnedHoursShowTheTimekeepersReason', async () => {
+    await renderScreen({ taskVariables: { hoursDecision: 'Returned', hoursReason: 'E1099 16 Nov should be Welding' } });
+
+    expect(screen.getByText('Hours returned: E1099 16 Nov should be Welding')).toBeInTheDocument();
+  });
+
+  it('BPA53_noReturnNoticeWhenTheHoursWereNotReturned', async () => {
+    await renderScreen({ taskVariables: { hoursDecision: 'Validated' } });
+
+    expect(screen.queryByText(/Hours returned:/)).not.toBeInTheDocument();
+  });
+
+  it('BPA53_aReturnedLineCanBeDeleted', async () => {
+    const { user, saves } = await renderScreen({ lines: [draft({ status: 'Returned' })] });
+
+    await user.click(cell('E1021', 'Cutting', '17 Nov 2026'));
+    await user.click(screen.getByRole('button', { name: 'Delete line' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, delete' }));
+
+    await waitFor(() => expect(saves('DELETE')).toHaveLength(1));
   });
 });

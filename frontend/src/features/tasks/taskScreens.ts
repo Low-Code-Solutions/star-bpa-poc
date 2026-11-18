@@ -3,6 +3,7 @@ import { CreateWorkPack } from '@/features/workpacks/components/CreateWorkPack';
 import { ScheduleWorkPack } from '@/features/workpacks/components/ScheduleWorkPack';
 import { SignOffRelease } from '@/features/workpacks/components/SignOffRelease';
 import { BookHours } from '@/features/timesheets/components/BookHours';
+import { ValidateHours } from '@/features/timesheets/components/ValidateHours';
 import { USER_TASKS } from '@/utils/constants';
 import type { TaskScreen } from './tasks.types';
 
@@ -16,6 +17,7 @@ const screens: Record<string, TaskScreen> = {
   [USER_TASKS.signOffRelease]: SignOffRelease,
   [USER_TASKS.scheduleWorkPack]: ScheduleWorkPack,
   [USER_TASKS.bookHours]: BookHours,
+  [USER_TASKS.validateHours]: ValidateHours,
 };
 
 /** The screen for this element ID, or undefined. Own keys only, so a name like "constructor" is never a screen. */
