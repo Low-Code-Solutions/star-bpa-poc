@@ -70,7 +70,13 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
       }
     }
     // ASSUMPTION: no returned task within ~5 s means the save step accepted the data.
-    setNotice('Task completed; the Work Pack is saved');
+    setNotice(
+      done.elementId === USER_TASKS.bookHours
+        ? 'Hours sent to the Timekeeper' // BPA-53 (ASSUMPTION text)
+        : done.elementId === USER_TASKS.validateHours
+          ? 'Decision recorded' // BPA-53 (ASSUMPTION text)
+          : 'Task completed; the Work Pack is saved',
+    );
   }
 
   const Screen = open ? screenFor(open.elementId) : undefined;

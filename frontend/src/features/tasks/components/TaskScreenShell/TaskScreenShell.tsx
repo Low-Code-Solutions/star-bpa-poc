@@ -19,10 +19,12 @@ type Props = {
   /** The variables to complete the task with; names must be on the task's write allow-list (bpa.tasks, BPA-26). */
   variables: () => Record<string, unknown>;
   /**
-   * False for a screen that saves through its own endpoints and does not complete the task (Book hours, BPA-50: completing it means
-   * "Send to Timekeeper", a later story). No "Complete task" button then, and submitting the form (Enter in a field) does nothing.
+   * False for a screen that saves through its own endpoints and does not complete the task (none today; Book hours, BPA-50, did until BPA-53 made it
+   * "Send to Timekeeper"). No completion button then, and submitting the form (Enter in a field) does nothing.
    */
   canComplete?: boolean;
+  /** The completion button's text; "Complete task" unless the task means something more specific (Book hours: "Send to Timekeeper", BPA-53). */
+  completeLabel?: string;
   children: ReactNode;
 };
 
@@ -40,6 +42,7 @@ export function TaskScreenShell({
   check,
   variables,
   canComplete = true,
+  completeLabel = 'Complete task',
   children,
 }: Props) {
   const { data: task } = useTask(api, taskKey);
@@ -82,7 +85,7 @@ export function TaskScreenShell({
       {children}
       {canComplete && (
         <Button type="submit" className="button--primary">
-          Complete task
+          {completeLabel}
         </Button>
       )}
     </form>
