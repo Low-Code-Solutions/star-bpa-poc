@@ -46,6 +46,10 @@ export function TimesheetFileUpload({ api, onSaved }: { api: Api; onSaved: () =>
         }
       } else {
         setProblem(refusal(uploaded.status, uploaded.detail));
+        // A failed call (the engine down, 503, or no answer) can come after earlier rows were saved: the grid reads the lines again (BPA-52 review).
+        if (uploaded.status === 0 || uploaded.status >= 500) {
+          onSaved();
+        }
       }
     } finally {
       setBusy(false);

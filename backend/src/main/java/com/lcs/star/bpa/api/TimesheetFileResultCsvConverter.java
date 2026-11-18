@@ -73,10 +73,23 @@ public class TimesheetFileResultCsvConverter extends AbstractHttpMessageConverte
         return out.toString();
     }
 
-    /** RFC 4180: a value with a comma, a quote or a line break is quoted, and its quotes doubled. */
-    private static String field(String value) {
+    /**
+     * RFC 4180: a value with a comma, a quote or a line break is quoted, and its quotes doubled. A value that Excel would read as a formula (it starts with
+     * =, +, - or @, or a tab or carriage return) gets a leading apostrophe, unless it is a plain number, so a cell of an uploaded file cannot run in the
+     * Excel of whoever downloads the result (CSV injection; BPA-52 review).
+     */
+    private static String field(String raw) {
+        String value = neutralised(raw);
         return value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")
                 ? "\"" + value.replace("\"", "\"\"") + "\"" : value;
+    }
+
+    static String neutralised(String value) {
+        if (value.isEmpty() || value.matches("[-+]?\\d+(\\.\\d+)?")) {
+            return value;
+        }
+        char first = value.charAt(0);
+        return first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r' ? "'" + value : value;
     }
 
     private static String nullToEmpty(String value) {

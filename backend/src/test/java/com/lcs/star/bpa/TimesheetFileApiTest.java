@@ -294,6 +294,15 @@ class TimesheetFileApiTest {
     }
 
     @Test
+    void anAbsurdHoursValueIsRejectedWithoutBeingAdded() {
+        // a number like 1E999999999 would make BigDecimal.add build a number of a billion digits (BPA-52 review): it is refused before any sum
+        HttpResponse<String> response = upload("supervisor", "absurd.csv", timesheet().row("WP-000457", "E1021", "16/11/2026", "Cutting", "1E999999999").csv());
+
+        assertThat(outcomes(response)).containsExactly("Hours must be a number");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.digital_timesheet_line", Integer.class)).isZero();
+    }
+
+    @Test
     void aFileWithoutTheHoursColumnIsNotRecognised() {
         HttpResponse<String> response = upload("supervisor", "layout.xlsx", timesheet()
                 .headers("Workpack number", "Badge No", "Work date", "Phase")

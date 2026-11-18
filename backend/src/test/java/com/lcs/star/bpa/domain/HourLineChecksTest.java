@@ -33,6 +33,9 @@ class HourLineChecksTest {
         assertThat(HourLineChecks.hours(new BigDecimal("7.125"))).contains("Hours can have at most 2 decimal places");
         assertThat(HourLineChecks.hours(new BigDecimal("0.01"))).isEmpty();
         assertThat(HourLineChecks.hours(new BigDecimal("7.500"))).as("trailing zeros are not decimals").isEmpty();
+        assertThat(HourLineChecks.hours(new BigDecimal("99999.99"))).as("the most numeric(7,2) holds").isEmpty();
+        assertThat(HourLineChecks.hours(new BigDecimal("100000"))).as("more than 5 digits before the point cannot be stored").contains("Hours must be a number");
+        assertThat(HourLineChecks.hours(new BigDecimal("1E999999999"))).as("never reaches a sum (BPA-52 review)").contains("Hours must be a number");
     }
 
     @Test

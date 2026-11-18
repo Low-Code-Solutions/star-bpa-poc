@@ -1,7 +1,7 @@
 # Plan: BPA-52 Supervisor can upload a team's daily hours as an Excel or CSV time sheet
 Jira: BPA-52 (Story, epic BPA-4)
 Story last updated: 2026-11-18T11:33:12.414+0400
-Status: Approved (Ahsan, Build Lead, 18 Nov 2026)
+Status: Closed (18 Nov 2026)
 Approver: Ahsan (Build Lead)
 Branch: BPA-52-upload-timesheet-file, from main b94df49 (inputs commit 68ca3a5)
 
@@ -122,11 +122,11 @@ Q8 the 413 advice is global. Q6 (no Jira move) and Q9 (Jira ASSUMPTION comment, 
   1. **A second setting was needed for the 413.** With `spring.servlet.multipart.max-request-size: 6MB` Tomcat rejects the body and, after swallowing 2 MB, drops the connection, so the client got a reset, not the 413 (the
      20th test errored on a connection error). `server.tomcat.max-swallow-size: 20MB` was added to `application.yml`; it applies to every upload.
   2. **`UploadLimitAdvice` is `@Order(HIGHEST_PRECEDENCE)`:** Spring's problem-detail handler (`spring.mvc.problemdetails.enabled`) otherwise answers "Maximum upload size exceeded" before the advice.
-  3. **A CSV blank line keeps its line number** (an empty record, skipped as a row), so row numbers are the file's lines, as for a spreadsheet.
+  3. **A CSV blank line keeps its place** (an empty record, skipped as a row), so a blank line counts in the row number, as for a spreadsheet; a quoted field with a line break is one record.
   4. **The upload shares the form's code** through a second `HourLineService.add` with the upload's file id (the repository writes `entry_source` and `timesheet_file_id`); `DigitalTimesheetLineRepository.insert` gained that parameter.
   5. **Test fixture:** `BookHoursFixture.reset` now clears the upload log, lines, files and submissions in that order (a logged row points at its line and a line at its file); `workPack461()` and `fill(...)` are new.
   6. `TimesheetTemplateTest` became `TimesheetFileReaderTest` (it also covers the reader's CSV and date rules).
-- **Existing tests edited:** none beyond the fixture (a BPA-50/BPA-51 helper class); `AssignmentFileApiTest` was only run.
+- **Existing tests edited:** none beyond the fixture (a BPA-50/BPA-51 helper class); `AssignmentFileApiTest` was only run. One test was **added** to an existing file: `BPA52_theScreenOffersTheTimeSheetUpload` in `BookHours.test.tsx`.
 - **Local stack (18 Nov; both images rebuilt with plain `docker build`; the app container had exited 17 hours earlier):** a copy of `timesheet-demo-good.xlsx` with `WP-000001` replaced by **WP-000011** (Assigned, Cutting 150 h and
   Welding 250 h, Workers E1099, E2001, E1021, E1201) was uploaded through the portal proxy as supervisor: 201, three rows "Saved", three Draft lines with entry source Upload created by supervisor, the Work Pack went Released to In
   Progress; the same file again: each row "Hours already booked for <badge> on <date> for phase <phase>" (never overwritten); `Accept: text/csv` on the result gave the attachment `wp11-result.csv` with the header and the three rows;
@@ -167,3 +167,16 @@ Q8 the 413 advice is global. Q6 (no Jira move) and Q9 (Jira ASSUMPTION comment, 
 - Template and demo files staged from the Epic 2 draft pack by Ahsan via Claude before the plan (commit 68ca3a5), a departure from ADR 0015.
 - The local branch was behind `origin/BPA-52-upload-timesheet-file` at planning time (68ca3a5 only on the remote).
 - Plan written in plan mode; the local stack was not running, so the live data (WP-000001) was not checked.
+
+## QA review outcome (18 Nov 2026; REVIEW.md)
+3 Important, all fixed: (1) an `Hours` text like `1E999999999` reached `BigDecimal.add` in the budget sums and could stall the app: `HourLineChecks.hours` now refuses more than 5 digits before the point ("Hours must be a number"),
+for the upload and the form, with unit and upload tests; (2) the result CSV now puts a leading apostrophe on a cell that starts with =, +, - or @ (or a tab or carriage return) unless it is a plain number, with a converter test (BPA-12's
+`AssignmentFileResultCsvConverter` has the same gap and is **not** changed here: proposed for its own item); (3) the added test in `BookHours.test.tsx` is named above.
+Also done: the frontend refreshes the grid after an upload that failed with 0 or 5xx (a 503 can follow rows already saved).
+Left, as nits, for the PR:
+- **A 503 or other error mid-file** (`TimesheetFileService.upload` has no try/catch around the row loop): the failing row is not logged, the file keeps outcome null, the user gets no file id, and a retry rejects the saved rows as duplicates; a `\u0000` in a CSV field is
+  accepted by the UTF-8 decoder and refused by Postgres, a 500 with the earlier rows saved and unlogged. Accepted for the POC (partial saves are by design, Risks).
+- **`server.tomcat.max-swallow-size: 20MB` is global**, so every rejected body up to 20 MB is swallowed per connection (it was 2 MB); bounded. The portal's `nginx.conf` has `client_max_body_size 8m`: a file between 6 and 8 MB gets the app's 413 text, a larger one nginx's own page and the screen's general message.
+- The 5000-row cap counts non-blank rows only; `ZipSecureFile.setMaxEntrySize` (50 MB) is process-wide and set in both readers.
+- **Phase and Badge No match exactly** (`cutting` reads "Phase cutting is not on this Work Pack"): an unstated rule, ASSUMPTION; the section reuses the assignment screen's `assignment-file` CSS classes.
+- No test for a 503 mid-file; the in-approval rule is proven only with a seeded `hours_submission` until BPA-53.

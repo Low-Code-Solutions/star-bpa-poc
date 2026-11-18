@@ -128,6 +128,25 @@ describe('TimesheetFileUpload', () => {
     expect(calls().filter((c) => c.method === 'POST')).toHaveLength(0);
   });
 
+  it('BPA52_anUploadThatFailsHalfwayStillRefreshesTheGrid', async () => {
+    // the engine can fail on a later row (503) after earlier rows were saved: the grid must read the lines again
+    const { user, onSaved } = await renderSection({
+      upload: {
+        status: 503,
+        body: {
+          status: 503,
+          title: 'Service Unavailable',
+          detail: 'The process engine is not available right now; try again later',
+        },
+      },
+    });
+
+    await chooseAndUpload(user);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The file could not be uploaded');
+    expect(onSaved).toHaveBeenCalledTimes(1);
+  });
+
   it('BPA52_aRefusedUploadShowsTheServersText', async () => {
     const { user, onSaved } = await renderSection({
       upload: { status: 413, body: { status: 413, title: 'Content Too Large', detail: 'File is larger than 5 MB' } },

@@ -203,7 +203,7 @@ public final class TimesheetFileReader {
                 if (ch == '\r' && i + 1 < text.length() && text.charAt(i + 1) == '\n') {
                     i++;
                 }
-                // a blank line is kept as an empty record, so the row numbers stay the file's line numbers (the reader skips an empty row)
+                // a blank line is kept as an empty record, so a blank line counts in the row number (the reader skips an empty row); a quoted field with a line break is one record
                 if (any || field.length() > 0) {
                     record.add(field.toString().trim());
                 }
