@@ -1112,6 +1112,8 @@ One send of a Work Pack's lines by the Supervisor; holds the approval stage.
 
 SOR reason: approval record of the POC workflow (real equivalent: D365 timesheet approval workflow, FRD-5-12 §5.12.5.5).
 
+As built by BPA-53 (`submit-hours`, `record-hours-decision` step Timekeeper): `round_no` = 1 + the instance's Closed submissions, so a retried send finds the same open row (ON CONFLICT DO NOTHING); the send moves the Work Pack's Draft and Returned lines to Submitted and links them. A Validated decision moves the stage to `ProductionSupervisor`; a Returned decision returns the lines to `Returned` and closes the submission (`Closed`, outcome `Returned`). While a submission is at `Timekeeper`, `ProductionSupervisor` or `Ppc`, the Work Pack's hours are in approval and no new line can be booked (409). **ASSUMPTION:** a new send happens only after the previous round is Closed; BPA-56 and BPA-57 must close the later stages.
+
 #### 13.2.2 `hours_decision`
 One row per decision at a step; history of returns and rejections.
 
@@ -1127,6 +1129,8 @@ One row per decision at a step; history of returns and rejections.
 | `decided_at` | timestamptz | NOT NULL | | POC database | |
 
 Segregation of duties (FRD-21 §21.8.1 spirit; **(A)** for hours): `decided_by` at Production Supervisor and PPC must differ from `submitted_by`: **worker-checked**. With one test user per group this always holds; the check is still coded.
+
+As built by BPA-53: the Timekeeper's decision is written once per user task (`task_key`). A Timekeeper amendment of a sent line's hours is not a decision; it changes `digital_timesheet_line.hours` and writes `audit_log` rows for `hours` and for the reason under column name `amend_reason` (**ASSUMPTION**: no column holds the reason; a V3 column or table only if the Product Owner asks).
 
 #### 13.2.3 `timesheet_file` and `timesheet_file_row` (bulk upload, E2-03b)
 Same pattern as `assignment_file` / `assignment_file_row` (D49, ADR 0009): raw, nullable input columns so invalid rows can be logged.
