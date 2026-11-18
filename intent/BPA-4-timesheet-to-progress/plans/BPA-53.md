@@ -1,7 +1,7 @@
 # Plan: BPA-53 Timekeeper can validate or return the hours sent for a Work Pack
 Jira: BPA-53 (Story, epic BPA-4)
-Story last updated: 2026-11-17T11:45:21.094+0400
-Status: Approved (Ahsan, Build Lead, 18 Nov 2026)
+Story last updated: 2026-11-18T13:50:15.227+0400
+Status: Closed (18 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-53-timekeeper-validate-hours, from main e7f5afa
 
@@ -16,7 +16,7 @@ request with a reason; new lines are refused while the hours are in approval. No
 ## Readiness check (Definition of Ready, docs/02, against Jira 17 Nov 11:45)
 | Check | State |
 |---|---|
-| Jira status | **Ready** (comment 10546). Its Development panel shows a merged PR: PR #47 (BPA-52) mentions BPA-53. No transition without asking |
+| Jira status | **Ready** when planned (comment 10546); In Progress since 18 Nov 13:50 (Description and Acceptance Criteria re-read at review: unchanged). Its Development panel shows a merged PR: PR #47 (BPA-52) mentions BPA-53. No transition without asking |
 | Template, persona, outcome | Met |
 | Gherkin incl. unhappy paths | Met: 10 scenarios |
 | BPMN element IDs exist | Met: `UserTask_BookHours`, `ServiceTask_PrepareHoursSubmission`, `BoundaryEvent_NothingToSubmit`, `ServiceTask_SubmitHours`, `UserTask_ValidateHours`, `ServiceTask_RecordTimekeeperDecision` (header step=Timekeeper), `Gateway_IsValidated` (`Flow_Validated` → `UserTask_ApproveHoursProduction`, `Flow_NotValidated` default → `Gateway_MergeBooking`) |
@@ -77,7 +77,7 @@ request with a reason; new lines are refused while the hours are in approval. No
 | Workers | new `worker/SubmitHoursWorker.java`, `worker/RecordHoursDecisionWorker.java`; `ProcessTestApplication` excludes both |
 | Persistence | new `persistence/HoursSubmissionRepository.java` (submission, decision, line status moves, audit); `DigitalTimesheetLineRepository` (`inApproval` moved here) |
 | Rules | `timesheet/HourLineService` (in-approval 409 in `add`; new `amend`); `timesheet/TimesheetFileService` (drops its own in-approval check); `task/TaskValidity` (ValidateHours) |
-| API | new `api/HoursSubmissionController.java` (read + amend, or two controllers per tag); `config/SecurityConfig` (`/api/v1/hours-submissions/**`, `/api/v1/digital-timesheet-lines/*/amendments` → timekeeper; the existing lines rule keeps its pattern `digital-timesheet-lines/*`) |
+| API | `api/DigitalTimesheetLineController.java` gains the read and amend operations (one generated interface; see Progress and departures); `config/SecurityConfig` (`/api/v1/hours-submissions/**`, `/api/v1/digital-timesheet-lines/*/amendments` → timekeeper; the existing lines rule keeps its pattern `digital-timesheet-lines/*`) |
 | Config | `application.yml`: allow-lists for `UserTask_ValidateHours` and `UserTask_BookHours` read |
 | Frontend | new `features/timesheets/components/ValidateHours/*` (+ test), `services/hoursSubmissionService.ts`; `TaskScreenShell` (`completeLabel`); `BookHours.tsx` (Send, return notice); `TaskList.tsx` (notice); `taskScreens.ts`, `utils/constants.ts`, `types/api.ts` |
 | Tests | new `HoursValidationApiTest` (10 BPA53_), worker retry tests (`submit-hours`, `record-hours-decision` called twice with a mocked JobClient); `TaskValidityTest`; React tests; `BookHours.test.tsx` (the BPA-50 test above) |
@@ -148,3 +148,5 @@ Extra (not scenarios): worker retry tests (a second `submit-hours` for the same 
 - **Existing tests edited (say so in the PR):** `BPA50_theTaskIsNotCompletedFromThisScreen` replaced by `BPA53_theScreenSendsTheHoursToTheTimekeeper` (and three more BPA53 tests); `ProcessTestApplication` excludes the two new workers; `BookHoursFixture.reset()` also clears `hours_decision`.
 - **Proof (full `./mvnw -B verify`: 446 tests, 0 failures; frontend 88 tests, lint, Prettier, tsc, build clean; Redocly lint valid).** Local stack on WP-000011 (instance of model version 3): supervisor sent 5 lines (submission round 1, stage Timekeeper); timekeeper read it (supervisor 403); amend 7.5 to 8 with a reason (200; audit rows `hours` and `amend_reason`); amend without reason 400; a new line while in approval 409; production-supervisor completing the task 403; return without reason 400; return with reason: lines Returned, round 1 Closed/Returned, Book hours again with `hoursDecision` and `hoursReason` visible; a Welding line added, resent (round 2), validated: stage ProductionSupervisor, Operate shows the instance at `UserTask_ApproveHoursProduction`.
 - **Found, not fixed here:** `DELETE /api/v1/digital-timesheet-lines/{id}` answers 500 for a line that an upload created (FK `timesheet_file_row_timesheet_line_id_fkey`). It predates BPA-53 (BPA-50 delete, BPA-52 log) but a Returned upload line is now deletable from the screen (plan Q6), so it can be hit. Proposed as its own Jira item (no item created without a yes).
+- **Review fixes (18 Nov):** `DELETE` of an upload-created line no longer answers 500 (the result log's pointer is cleared first; test `aLineSavedByAnUploadCanBeDeletedWhenReturned`); `submit-hours` clears `hoursDecision` and `hoursReason`, so "Hours returned" shows only for the return that sent the hours back. Left as Nits: the amend state check runs outside the write transaction; an amend with unchanged hours writes only the reason row; `find` builds its header as an `Object[]`.
+- **Open for people (not applied):** plan Q6 (scenario 6 says the Supervisor "changes E1099's line to Welding"; the build deletes and re-adds, which removes a line from the Closed round-1 submission's list); the ASSUMPTION comments for Q1 to Q8 (drafted for a yes); the epic's intent/spec acceptance (Jira DoR box).

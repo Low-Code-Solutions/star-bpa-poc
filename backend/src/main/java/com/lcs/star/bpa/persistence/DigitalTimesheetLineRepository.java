@@ -202,6 +202,8 @@ public class DigitalTimesheetLineRepository {
     /** Deletes the line; every business column is audited with a null new value (ASSUMPTION, plan). */
     public void delete(Line old, String username, Instant now) {
         Timestamp at = Timestamp.from(now);
+        // BPA-53 review: an upload's result log points at the line it saved (timesheet_file_row, nullable); the log stays, without the pointer
+        jdbc.update("UPDATE bpa.timesheet_file_row SET timesheet_line_id = NULL WHERE timesheet_line_id = ?", old.id());
         jdbc.update("DELETE FROM bpa.digital_timesheet_line WHERE id = ?", old.id());
         audit(old.id(), "digital_timesheet_id", old.sheet().id().toString(), null, username, at);
         audit(old.id(), "work_date", old.workDate().toString(), null, username, at);

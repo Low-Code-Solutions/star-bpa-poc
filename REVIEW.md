@@ -573,3 +573,17 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Nits (5), left in the plan: an engine failure mid-file leaves the failing row and the file outcome unlogged; the global 20 MB swallow size and the portal's 8 MB nginx limit; the 5000-row cap counts non-blank rows; exact matching of Phase and Badge No and
   the reused `assignment-file` CSS classes; CSV row numbers count records (a quoted line break is one). BPA-12's CSV converter has the same formula gap: proposed as its own item.
 - Not verified by the reviewer: red-first runs (tests and code are one commit), test runs, CI, the local stack, a browser.
+
+### BPA-53 at 4495f58, 18 Nov 2026 (qa-reviewer)
+- Code: 0 High, 4 Important, 8 Nits. Reviewer read BPA-53 in Jira, the plan, spec.md, the diff and REVIEW.md; no test was run by the reviewer (author: `HoursValidationApiTest` first run before any production code, 9 of 10 red, all on the missing
+  `UserTask_ValidateHours` task, `BPA53_nothingToSendStaysWithSupervisor` green at once as planned; then green; full `./mvnw -B verify` 446 tests, 0 failures; frontend 88 tests, lint, Prettier, tsc, build; Redocly lint; local stack: send, amend,
+  return, correct, resend, validate on WP-000011, Operate at `UserTask_ApproveHoursProduction`).
+- Checks passed: security rules cover every method and do not widen the Supervisor's rule; allow-list and `TaskSummary` enum; idempotency keys (round and task key); the Timekeeper cannot reject; one in-approval rule and text for form and upload;
+  no schema change; the 10 DoD test names match Jira; no real personal data.
+- Important (4): (1) plan header older than Jira `updated`: story text re-read, unchanged (only the status moved): header bumped; (2) scenario 6 deletes and re-adds instead of changing the line's phase (plan Q6): left, open for Faraz or Khitaba,
+  to state in the PR; (3) delete of an upload-created line answered 500: fixed here with a test; (4) the epic's intent.md and spec.md are not accepted (Jira DoR box): left for the Product Owner, to state in the PR.
+- Nits (8): fixed: stale `hoursDecision` and `hoursReason` after a send (cleared in `submit-hours`); the plan's Files table. Left: the amend state check is outside the write transaction; an amend with unchanged hours writes only the reason row;
+  `find` builds its header as an `Object[]`; three comment and line-length points.
+- Edits to existing tests (said in the PR): `BPA50_theTaskIsNotCompletedFromThisScreen` replaced by four BPA53 tests of Book hours; `ProcessTestApplication` excludes the two workers; `BookHoursFixture.reset()` clears `hours_decision`.
+- Not verified by the reviewer: red-first runs, test runs, CI, the compose stack, a browser click-through (human gap), Jira comments.
+- After the review fixes the author re-ran `HoursValidationApiTest`, `BookHoursApiTest` and `TimesheetFileApiTest` (14, 28 and 21 tests, 0 failures); the full verify was not run again.

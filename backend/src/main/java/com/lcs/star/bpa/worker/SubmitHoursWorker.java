@@ -43,6 +43,11 @@ public class SubmitHoursWorker {
         Sent sent = submissions.send(job.getProcessInstanceKey(), UUID.fromString(workpackId), username);
         LOG.info("submit-hours job {}: submission {} round {} with {} line(s) newly sent by {}", job.getKey(), sent.submissionId(), sent.roundNo(), sent.lineCount(),
                 username);
-        client.newCompleteCommand(job.getKey()).variables(Map.of("hoursSubmissionId", sent.submissionId().toString())).send().join();
+        // hoursDecision and hoursReason are cleared: the Supervisor sees "Hours returned" only for the return that sent the hours back (BPA-53 review)
+        Map<String, Object> output = new java.util.HashMap<>();
+        output.put("hoursSubmissionId", sent.submissionId().toString());
+        output.put("hoursDecision", null);
+        output.put("hoursReason", null);
+        client.newCompleteCommand(job.getKey()).variables(output).send().join();
     }
 }

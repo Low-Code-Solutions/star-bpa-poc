@@ -338,6 +338,23 @@ class HoursValidationApiTest {
         assertThat(missing.statusCode()).isEqualTo(404);
     }
 
+    @Test
+    void aLineSavedByAnUploadCanBeDeletedWhenReturned() {
+        // BPA-53 review: the upload's result log points at the line; deleting the line used to answer 500 (foreign key)
+        UUID file = jdbc.queryForObject("""
+                INSERT INTO bpa.timesheet_file (file_name, sha256, uploaded_by, received_at, created_by, updated_by)
+                VALUES ('t.xlsx', 'x', 'supervisor', now(), 'test', 'test') RETURNING id""", UUID.class);
+        UUID line = fixture.line(ids.timesheet("E1099"), D16, "Cutting", new BigDecimal("7"), "Returned");
+        jdbc.update("""
+                INSERT INTO bpa.timesheet_file_row (timesheet_file_id, row_number, outcome, timesheet_line_id, created_by, updated_by)
+                VALUES (?, 1, 'Saved', ?, 'test', 'test')""", file, line);
+
+        HttpResponse<String> deleted = flow.loggedInAs("supervisor").delete("/api/v1/digital-timesheet-lines/" + line);
+
+        assertThat(deleted.statusCode()).as(deleted.body()).isEqualTo(204);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.timesheet_file_row WHERE outcome = 'Saved' AND timesheet_line_id IS NULL", Integer.class)).isEqualTo(1);
+    }
+
     // --- helpers ----------------------------------------------------------------------------------------------------------
 
     /** The Background's Draft lines: E1021 16 and 17 Nov Cutting 8 h, E1099 16 Nov Cutting 7 h. */
