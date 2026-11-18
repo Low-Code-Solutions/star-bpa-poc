@@ -20,3 +20,5 @@ export type DigitalTimesheetLine = Schemas['DigitalTimesheetLine'];
 export type TimesheetLines = Schemas['TimesheetLines'];
 export type NewDigitalTimesheetLine = Schemas['NewDigitalTimesheetLine'];
 export type DigitalTimesheetLineChange = Schemas['DigitalTimesheetLineChange'];
+export type TimesheetFileResult = Schemas['TimesheetFileResult'];
+export type TimesheetFileRow = Schemas['TimesheetFileRow'];

@@ -31,8 +31,10 @@ final class BookHoursFixture {
 
     /** Removes what an earlier test of this class left, then builds the Background. */
     Ids reset() {
-        for (String table : new String[] {"digital_timesheet_line", "digital_timesheet", "hour_journal_line", "hour_journal_header",
-                "worker_assignment", "assignment_file", "workpack_phase", "workpack", "progress_period", "audit_log"}) {
+        // BPA-52: a logged row points at its line, a line at its upload file and at its submission, so: rows, lines, files, submissions
+        for (String table : new String[] {"timesheet_file_row", "digital_timesheet_line", "timesheet_file", "hours_submission", "digital_timesheet",
+                "hour_journal_line", "hour_journal_header", "worker_assignment", "assignment_file", "workpack_phase", "workpack", "progress_period",
+                "audit_log"}) {
             jdbc.update("DELETE FROM bpa." + table);
         }
         UUID workpack = jdbc.queryForObject("""
@@ -91,6 +93,32 @@ final class BookHoursFixture {
             left = left.subtract(hours);
             day = day.plusDays(1);
         }
+    }
+
+    /**
+     * WP-000461 of the BPA-52 Background: Cutting 100 h and E1021 assigned, with a Draft time sheet and no lines; the time sheet's id comes back.
+     */
+    UUID workPack461() {
+        UUID workpack = jdbc.queryForObject("""
+                INSERT INTO bpa.workpack (workpack_number, activity_ref, drawing_ref, department_ref, completion_date, status, assignment_state,
+                                          process_instance_key, created_by, updated_by)
+                VALUES ('WP-000461', 'A-2201', 'DWG-118', 'Fabrication', DATE '2026-11-30', 'Released', 'Assigned', 9000000004, 'test', 'test')
+                RETURNING id""", UUID.class);
+        jdbc.update("INSERT INTO bpa.workpack_phase (workpack_id, phase, manhours, created_by, updated_by) VALUES (?, 'Cutting', 100, 'test', 'test')", workpack);
+        UUID header = jdbc.queryForObject("""
+                INSERT INTO bpa.hour_journal_header (workpack_id, estimated_manhours, created_by, updated_by) VALUES (?, 100, 'test', 'test') RETURNING id""",
+                UUID.class, workpack);
+        UUID file = jdbc.queryForObject("SELECT id FROM bpa.assignment_file LIMIT 1", UUID.class);
+        UUID worker = jdbc.queryForObject("SELECT id FROM bpa.worker WHERE employee_ref = 'E1021'", UUID.class);
+        UUID journalLine = jdbc.queryForObject("""
+                INSERT INTO bpa.hour_journal_line (header_id, worker_id, role, designation, estimated_hours, created_by, updated_by)
+                SELECT ?, w.id, w.role, w.designation, 100, 'test', 'test' FROM bpa.worker w WHERE w.id = ? RETURNING id""", UUID.class, header, worker);
+        jdbc.update("""
+                INSERT INTO bpa.worker_assignment (workpack_id, worker_id, estimated_hours, assignment_file_id, created_by, updated_by)
+                VALUES (?, ?, 100, ?, 'test', 'test')""", workpack, worker, file);
+        return jdbc.queryForObject("""
+                INSERT INTO bpa.digital_timesheet (worker_id, workpack_id, journal_line_id, project_ref, wbs_ref, activity_ref, created_by, updated_by)
+                VALUES (?, ?, ?, 'PRJ-139', '11031', 'A-2201', 'test', 'test') RETURNING id""", UUID.class, worker, workpack, journalLine);
     }
 
     /**

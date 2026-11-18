@@ -10,6 +10,7 @@ import { daysFrom, showDate } from '@/utils/dates';
 import { useBookHoursBoard } from '../../hooks/useBookHoursBoard';
 import { lineMessages } from '../../lineMessages';
 import { addLine, changeLine, deleteLine, type SaveResult } from '../../services/timesheetService';
+import { TimesheetFileUpload } from '../TimesheetFileUpload';
 
 type Selection = { timesheetId: string; phase: string; date: string };
 
@@ -179,6 +180,7 @@ export function BookHours({ api, taskKey, onDone, onClose }: TaskScreenProps) {
           )}
         </section>
       )}
+      <TimesheetFileUpload api={api} onSaved={() => void queryClient.invalidateQueries({ queryKey: ['timesheet-lines'] })} />
       {onClose && <Button onClick={onClose}>Back to my tasks</Button>}
     </TaskScreenShell>
   );

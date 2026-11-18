@@ -50,6 +50,8 @@ tags:
     description: Worker assignment file upload and result (BPA-12, BPA-13, BPA-22; S19 as D58)
   - name: timesheets
     description: Digital Time sheets (BPA-15)
+  - name: timesheet-files
+    description: Time sheet upload as .xlsx or .csv, result and template (BPA-52; E2-03b; D49, D58 pattern)
   - name: timesheet-lines
     description: Daily hour lines on Digital Time sheets (BPA-50; E2-03)
   - name: timesheet-processes
@@ -690,6 +692,137 @@ paths:
                 status: 404
                 title: Not Found
                 detail: Assignment file not found
+  /api/v1/timesheet-files:
+    post:
+      tags: [timesheet-files]
+      operationId: uploadTimesheetFile
+      summary: Upload a team's daily hours as an Excel or CSV time sheet
+      description: |
+        The Supervisor (or a Production Team member, C-E2-5) uploads an .xlsx or .csv with the columns Workpack number, Badge No,
+        Work date (dd/mm/yyyy), Phase, Hours and Remarks (BPA-52; E2-D4). Each row is checked on its own, in file order, with the
+        same rules as a form entry (BPA-50, BPA-51); a valid row is saved as a Draft line with entry source Upload even when other
+        rows are rejected, an existing line is never overwritten, and a later row sees the rows of the same file already saved.
+        The result comes back at once. A file that cannot be read, has no rows or has the wrong layout is still a successful call,
+        with one file-level line in `outcome`. Groups supervisor and production-team. 413 above 5 MB (ASSUMPTION, as assignment
+        files). Source: BPA-52; D49, D58, ADR 0009.
+      x-assumption: true
+      x-assumption-note: template layout, the 5 MB limit, the 400 text, a .csv's rules (comma, UTF-8, header row) and the 5000-row cap are ASSUMPTIONs of the story or the plan
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The time sheet (.xlsx first sheet, or .csv with a header row)
+      responses:
+        '201':
+          description: Upload recorded; the result per row or one file-level line
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimesheetFileResult'
+        '400':
+          description: The request has no file part
+          x-assumption: true
+          x-assumption-note: text not stated by any story
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 400, title: Bad Request, detail: File is required }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          description: The file is larger than 5 MB (BPA-52, ASSUMPTION)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 413, title: Content Too Large, detail: File is larger than 5 MB }
+  /api/v1/timesheet-files/template:
+    get:
+      tags: [timesheet-files]
+      operationId: downloadTimesheetTemplate
+      summary: The official time sheet upload template
+      description: |
+        The template for the portal's "Download template" (BPA-52; comment 10488): sheet "Timesheet" with the columns Workpack
+        number, Badge No, Work date, Phase, Hours and Remarks, and a README sheet that marks the layout as an ASSUMPTION. Groups
+        supervisor and production-team, as the upload.
+      x-assumption: true
+      x-assumption-note: the download endpoint (comment 10488); groups as the upload
+      responses:
+        '200':
+          description: The template (.xlsx)
+          headers:
+            Content-Disposition:
+              description: attachment; filename="timesheet-upload-template.xlsx"
+              schema:
+                type: string
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/timesheet-files/{timesheetFileId}/result:
+    parameters:
+      - name: timesheetFileId
+        in: path
+        required: true
+        description: timesheet_file.id
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [timesheet-files]
+      operationId: getTimesheetFileResult
+      summary: The result of an uploaded time sheet
+      description: |
+        Every row with its values as uploaded and its outcome (BPA-52 "The result can be downloaded"). JSON for the screen; CSV
+        for the download, chosen with the Accept header (the BPA-12 pattern). Groups supervisor and production-team.
+      x-assumption: true
+      x-assumption-note: CSV layout and file name follow the assignment file's result (BPA-12)
+      responses:
+        '200':
+          description: The result
+          headers:
+            Content-Disposition:
+              description: CSV only, attachment; filename="<file name>-result.csv"
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimesheetFileResult'
+            text/csv:
+              schema:
+                type: string
+              example: |
+                rowNumber,workpackNumber,badgeNo,workDate,phase,hours,remarks,outcome
+                2,WP-000457,E1021,16/11/2026,Cutting,8,,Saved
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No upload with this id
+          x-assumption: true
+          x-assumption-note: text not stated by any story
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 404, title: Not Found, detail: Upload not found }
   /api/v1/digital-timesheets:
     get:
       tags: [timesheets]
@@ -1629,6 +1762,62 @@ components:
         wpOutcome:
           type: string
           description: 'Only "Replacement not applied: file has rejected rows" (BPA-13, D71, B1)'
+    TimesheetFileResult:
+      type: object
+      description: timesheet_file and its timesheet_file_row rows (data model §13.2.3)
+      required: [id, fileName, receivedAt, rows]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fileName:
+          type: string
+          example: team-week47.xlsx
+        receivedAt:
+          type: string
+          format: date-time
+        outcome:
+          type: string
+          description: |
+            File-level line; absent when the rows carry the outcomes. "File has no rows", "File cannot be read", "File layout not
+            recognised" (data model §13.2.3), "File has too many rows" (more than 5000 rows; ASSUMPTION, as BPA-12).
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimesheetFileRow'
+    TimesheetFileRow:
+      type: object
+      description: One timesheet_file_row, the values as uploaded (raw text) and the outcome
+      required: [rowNumber, outcome]
+      properties:
+        rowNumber:
+          type: integer
+          description: Spreadsheet row, 1-based (row 1 is the header)
+        workpackNumber:
+          type: string
+        badgeNo:
+          type: string
+        workDate:
+          type: string
+          description: As written in the file, for example 16/11/2026
+        phase:
+          type: string
+        hours:
+          type: string
+          description: As written in the file
+        remarks:
+          type: string
+        outcome:
+          type: string
+          description: |
+            Row outcome. "Saved", or the reason (data model §13.2.3 and the BPA-50 and BPA-51 line rules, texts with values, so not
+            an enum): "Workpack number is required", "Badge No is required", "Work date is required", "Phase is required",
+            "Hours is required", "Work Pack not found", "Worker not assigned to this Work Pack", "Time sheet is Cancelled",
+            "Hours for <WP> are in approval; book them after the decision" (ASSUMPTION: detection), "Work date is not a valid date",
+            "Hours must be a number", "Hours must be greater than 0", "Hours can have at most 2 decimal places", "Work date cannot be
+            in the future", "Week ending <date> is closed", "Phase <phase> is not on this Work Pack", "Hours already booked for
+            <badge> on <date> for phase <phase>", "Worker <badge> would exceed <limit> hours on <date>", "Phase <phase> budget of
+            <budget> h would be exceeded", "Remarks can be at most 250 characters".
     DrawingRevisionEvent:
       type: object
       description: The event D365 Document Control would send (BPA-16 SOR Notes; D41)

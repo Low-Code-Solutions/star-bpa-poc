@@ -244,6 +244,16 @@ describe('BookHours', () => {
     expect(backend.calls.some((c) => c.path.endsWith('/complete'))).toBe(false);
   });
 
+  it('BPA52_theScreenOffersTheTimeSheetUpload', async () => {
+    await renderScreen();
+
+    // E2-03b: the upload section sits on the Book hours screen, below the grid (its own tests are in TimesheetFileUpload.test.tsx)
+    const upload = screen.getByRole('region', { name: 'Time sheet upload' });
+    expect(within(upload).getByRole('button', { name: 'Download template' })).toBeInTheDocument();
+    expect(within(upload).getByLabelText('Time sheet file')).toBeInTheDocument();
+    expect(within(upload).getByRole('button', { name: 'Upload time sheet' })).toBeInTheDocument();
+  });
+
   it('BPA50_theTaskIsNotCompletedFromThisScreen', async () => {
     await renderScreen();
 

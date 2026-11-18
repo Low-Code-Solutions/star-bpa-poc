@@ -561,3 +561,15 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Found while building (not by the reviewer): the business rule task had no input mappings, so the original model could never block a line; six `zeebe:input` mappings fixed it (plan, Progress and departures).
 - Edit to an existing test (said in the PR): `Epic2DecisionTablesProcessTest.hours(...)` passes `dailyHoursLimit` 16; `ProcessTestApplication` excludes the new worker.
 - Not verified by the reviewer: red-first runs (tests and code are one commit), test runs, `lint:bpmn`, deployed models against the repo files, CI, Operate.
+
+### BPA-52 at b4e53bb, 18 Nov 2026 (qa-reviewer)
+- Code: 0 High, 3 Important, 5 Nits. Reviewer read BPA-52 in Jira, the plan, the diff and REVIEW.md; no test was run by the reviewer (author: `TimesheetFileApiTest` first run, before any production code, 19 of 20 red with
+  404 "No static resource api/v1/timesheet-files" and one error on the oversize upload; React red on the missing import; then green; full `./mvnw -B verify` 427 tests; frontend 75 tests; local stack: the demo file
+  uploaded as supervisor, 3 rows Saved, again: duplicates, result as CSV, template, timekeeper 403).
+- Checks passed: row order and texts against the Gherkin and data model 13.2.3; no BPA-50 or BPA-51 rule copied (every row goes through `HourLineService.add`); the form's behaviour unchanged (entry source Form, no extra audit row);
+  in-approval detection matches the `hours_submission` stage CHECK; SQL parameterised; security rule covers every method; frontend follows frontend/CLAUDE.md; all 17 DoD test names, tests never use the demo files.
+- Important (3), fixed: an `Hours` text like `1E999999999` made `BigDecimal.add` build a billion-digit number in the budget sums (a stall from one authenticated row; the JSON form had the same weakness): refused in `HourLineChecks.hours` for both;
+  the result CSV did not neutralise cells that start with =, +, - or @ (CSV injection): apostrophe prefix, with a test; the added `BookHours.test.tsx` test was not in the plan: added to it.
+- Nits (5), left in the plan: an engine failure mid-file leaves the failing row and the file outcome unlogged; the global 20 MB swallow size and the portal's 8 MB nginx limit; the 5000-row cap counts non-blank rows; exact matching of Phase and Badge No and
+  the reused `assignment-file` CSS classes; CSV row numbers count records (a quoted line break is one). BPA-12's CSV converter has the same formula gap: proposed as its own item.
+- Not verified by the reviewer: red-first runs (tests and code are one commit), test runs, CI, the local stack, a browser.

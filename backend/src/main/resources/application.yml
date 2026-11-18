@@ -33,6 +33,10 @@ server:
         http-only: true
         same-site: lax
         secure: ${BPA_SESSION_COOKIE_SECURE:false}
+  tomcat:
+    # BPA-52: a refused upload (above 5 MB) is answered 413 only if the client can still read the answer. By default Tomcat stops swallowing a rejected
+    # body after 2 MB and drops the connection, so the client sees a reset instead of the 413; the limit is raised above the largest body worth refusing.
+    max-swallow-size: 20MB
 
 management:
   health:

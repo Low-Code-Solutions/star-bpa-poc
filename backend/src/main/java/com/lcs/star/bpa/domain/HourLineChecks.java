@@ -35,6 +35,11 @@ public final class HourLineChecks {
         if (hours.signum() <= 0) {
             return Optional.of("Hours must be greater than 0");
         }
+        // hours is numeric(7,2): more than 5 digits before the point cannot be stored, and a value like 1E999999999 would make BigDecimal.add build a
+        // number of a billion digits when the budget sums are formed (BPA-52 review). Not a number hours can be.
+        if (hours.precision() - hours.scale() > 5) {
+            return Optional.of("Hours must be a number");
+        }
         if (hours.stripTrailingZeros().scale() > 2) {
             return Optional.of("Hours can have at most 2 decimal places");
         }
