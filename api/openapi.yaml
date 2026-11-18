@@ -329,15 +329,28 @@ paths:
         '404':
           $ref: '#/components/responses/TaskNotFound'
         '409':
-          description: The task was already completed (BPA-26 "A completed task cannot be completed again")
+          description: |
+            The task was already completed (BPA-26 "A completed task cannot be completed again"), or (BPA-57) the PPC decider already decided the
+            same submission at an earlier step (segregation of duties; the task stays open).
+          x-assumption: true
+          x-assumption-note: BPA-57 earlier-decider rule (ASSUMPTION in the story, as BPA-56); status and text are Jira's scenario
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
-              example:
-                status: 409
-                title: Conflict
-                detail: Task is already completed
+              examples:
+                alreadyCompleted:
+                  summary: BPA-26 "A completed task cannot be completed again"
+                  value:
+                    status: 409
+                    title: Conflict
+                    detail: Task is already completed
+                earlierDecider:
+                  summary: BPA-57 ASSUMPTION; the PPC decider already decided these hours at an earlier step
+                  value:
+                    status: 409
+                    title: Conflict
+                    detail: You already decided these hours at an earlier step
         '503':
           $ref: '#/components/responses/EngineUnavailable'
   /api/v1/activities:
@@ -1169,7 +1182,7 @@ paths:
       tags: [timesheet-lines]
       operationId: getHoursSubmission
       summary: Read a submission of hours with its lines (the Timekeeper's screen)
-      description: BPA-53 (the shape is an ASSUMPTION). Groups timekeeper and production-supervisor (BPA-56); ppc-team joins with BPA-57.
+      description: BPA-53 (the shape is an ASSUMPTION). Groups timekeeper, production-supervisor (BPA-56) and ppc-team (BPA-57).
       x-assumption: true
       x-assumption-note: the endpoint and its shape are not stated by BPA-53
       responses:
@@ -1482,7 +1495,7 @@ components:
         elementId:
           type: string
           description: BPMN element ID of the user task
-          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction]
+          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction, UserTask_ApproveHoursPpc]
         processInstanceKey:
           $ref: '#/components/schemas/CamundaKey'
         workpackNumber:
