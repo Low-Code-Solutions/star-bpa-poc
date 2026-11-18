@@ -35,13 +35,18 @@ export function BookHours({ api, taskKey, onDone, onClose }: TaskScreenProps) {
   const [completion, setCompletion] = useState('');
   const [messages, setMessages] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
-  const [returnedReason, setReturnedReason] = useState('');
+  const [decisionNotice, setDecisionNotice] = useState('');
 
-  /** The Work Pack number, and the Timekeeper's reason when the hours came back (BPA-53; read allow-list hoursDecision and hoursReason). */
+  /**
+   * The Work Pack number, and the reason when the hours came back (read allow-list hoursDecision and hoursReason): "Hours returned: …" after a return by
+   * the Timekeeper or the Production Supervisor (BPA-53, BPA-56); "Hours rejected: …" after a reject (BPA-56, ASSUMPTION: Jira states it only for a return).
+   */
   function loaded(task: Task) {
     const v = (task.variables ?? {}) as Record<string, unknown>;
     setWorkpackNumber(task.workpackNumber ?? '');
-    setReturnedReason(v.hoursDecision === 'Returned' && typeof v.hoursReason === 'string' ? v.hoursReason : '');
+    const reason = typeof v.hoursReason === 'string' ? v.hoursReason : '';
+    const label = v.hoursDecision === 'Returned' ? 'Hours returned' : v.hoursDecision === 'Rejected' ? 'Hours rejected' : '';
+    setDecisionNotice(label !== '' && reason !== '' ? `${label}: ${reason}` : '');
   }
 
   const days = board.length > 0 ? daysFrom(board[0].openWeekStart, board[0].today) : [];
@@ -114,7 +119,7 @@ export function BookHours({ api, taskKey, onDone, onClose }: TaskScreenProps) {
       variables={() => ({})}
       completeLabel="Send to Timekeeper"
     >
-      {returnedReason !== '' && <p className="notice">{`Hours returned: ${returnedReason}`}</p>}
+      {decisionNotice !== '' && <p className="notice">{decisionNotice}</p>}
       <label className="field field--number">
         Workpack number
         <input value={workpackNumber} readOnly />

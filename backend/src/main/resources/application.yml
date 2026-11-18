@@ -95,6 +95,10 @@ bpa:
         # GET /api/v1/hours-submissions/{id} (hoursSubmissionId says which)
         write: [hoursDecision, hoursReason]
         read: [hoursSubmissionId, hoursDecision, hoursReason]
+      "[UserTask_ApproveHoursProduction]": # production-supervisor, BPA-56: Approved, Returned or Rejected and, for the last two, the reason. read leaves
+        # hoursDecision out so the Timekeeper's "Validated" is never offered back; the lines come from GET /api/v1/hours-submissions/{id}
+        write: [hoursDecision, hoursReason]
+        read: [hoursSubmissionId]
       "[UserTask_CreateWorkPack]": # time-method-analyst (G9), BPA-6
         write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
         read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]

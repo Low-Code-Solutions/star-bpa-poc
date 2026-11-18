@@ -587,3 +587,19 @@ Newest last. One entry per review; the full report goes in the PR description.
 - Edits to existing tests (said in the PR): `BPA50_theTaskIsNotCompletedFromThisScreen` replaced by four BPA53 tests of Book hours; `ProcessTestApplication` excludes the two workers; `BookHoursFixture.reset()` clears `hours_decision`.
 - Not verified by the reviewer: red-first runs, test runs, CI, the compose stack, a browser click-through (human gap), Jira comments.
 - After the review fixes the author re-ran `HoursValidationApiTest`, `BookHoursApiTest` and `TimesheetFileApiTest` (14, 28 and 21 tests, 0 failures); the full verify was not run again.
+
+### BPA-56 at 73e5914, 18 Nov 2026 (qa-reviewer)
+- Code: 0 High, 5 Important, 5 Nits. Reviewer read BPA-56 in Jira (evidence, changelog, comment 10547), the plan, spec.md, REVIEW.md, data model §13.2 and the full diff; ran `npx vitest run src/features/timesheets` (39 tests, all passed);
+  no backend test was run by the reviewer (author: `HoursProductionApprovalApiTest` red first, 10 of 11 failed, scenarios on 404 "Task not found" or the refused step; then green 11/11; full `./mvnw -B verify` 459 tests, 0 failures;
+  frontend 97 tests, lint, Prettier, tsc, build; Redocly lint; local stack: send, validate, reject, re-book, send, validate, approve, instance at `UserTask_ApproveHoursPpc`).
+- Checks passed: the 6 DoD test names; decision table per step against E2-D2; the decision row is inserted first, so a retry returns before the stage guard; `WrongStage` rolls the decision back; `decideAsTimekeeper` keeps BPA-53's audit values;
+  amend stays timekeeper-only and `hours-submissions/**` covers every method; the segregation check runs after group, state, allow-list and validity and before assign; no BPMN, DMN or migration change; the read allow-list leaves `hoursDecision` out;
+  the `SubmissionLines` extraction leaves the ValidateHours DOM and tests unchanged; Jira drift is status and assignee only.
+- Important (5): fixed: `TaskConfig.java` added to the plan's Files table; scenario 1 now asserts the Ppc task's candidate groups are exactly `ppc-team`; the contract documents the segregation 403 and the BPA-53 and BPA-56 decision 400 texts (x-assumption).
+  Recorded, history left as is (to state in the PR): two commits titled "plan unaffected" carried departures that the plan recorded one commit later; the React red run happened but tests and code share commit 90deb5b, and the `TaskValidityTest` row
+  went in with `TaskValidity`. Open: the Jira comment for the ASSUMPTIONs (plan Q1, Q2, Q4, Q6), to be shown to Ahsan first.
+- Nits (5): fixed: scenario 6 asserts the candidate-group text; the wrong-stage test matches the `WrongStage` message; `lineStatuses` is scoped to the instance; the plan header bumped (no content change). Left: a malformed `hoursSubmissionId` in
+  `HoursSegregationCheck` would answer 500 (engine-set variable); no test for the worker's unknown-decision and missing-reason fail paths or the TaskList "Decision recorded" branch; React tests named `BPA56_` that are not Jira scenarios.
+- Edits to existing tests (said in the PR): `TaskValidityTest` gained a row; `BookHours.test.tsx` gained `BPA56_rejectedHoursShowTheReason`; none changed.
+- After the review fixes the author re-ran `HoursProductionApprovalApiTest` (11, 0 failures) and the Redocly lint; the full verify (459) ran before them.
+- Not verified by the reviewer: backend test runs, the red-first output, CI, the local stack and a browser (Ahsan checked the screens in the portal, 18 Nov), the Jira dev-panel PR identity.

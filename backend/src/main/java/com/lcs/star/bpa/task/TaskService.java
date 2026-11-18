@@ -40,10 +40,12 @@ public class TaskService {
 
     private final CamundaTaskClient camunda;
     private final TaskAllowList allowList;
+    private final HoursSegregationCheck segregation;
 
-    public TaskService(CamundaTaskClient camunda, TaskAllowList allowList) {
+    public TaskService(CamundaTaskClient camunda, TaskAllowList allowList, HoursSegregationCheck segregation) {
         this.camunda = camunda;
         this.allowList = allowList;
+        this.segregation = segregation;
     }
 
     /** Open tasks whose candidate groups include one of the user's groups, oldest first. */
@@ -117,6 +119,12 @@ public class TaskService {
             TaskValidity.check(task.elementId(), submitted).ifPresent(message -> {
                 throw problem(HttpStatus.BAD_REQUEST, message);
             });
+            // BPA-56: segregation of duties for the hours approvals (ASSUMPTION status and text, plan Q1); the task stays open
+            if (segregation.appliesTo(task.elementId())) {
+                segregation.refusal(camunda.variables(task), username).ifPresent(message -> {
+                    throw problem(HttpStatus.FORBIDDEN, message);
+                });
+            }
             // D63 (BPA-6 plan, Ahsan 4 Nov): the save workers record who completed the task. Set here from the session, never
             // from the request: no allow-list holds "completedBy", so a client that sends it gets the 400 above.
             // BPA-9 (Ahsan, 5 Nov): likewise the key of the task being completed, which a job worker needs as its re-run key

@@ -46,6 +46,18 @@ class TaskValidityTest {
         assertThat(TaskValidity.check(validate, Map.of("hoursDecision", "Returned", "hoursReason", "Wrong phase"))).isEqualTo(Optional.empty());
         assertThat(TaskValidity.check(validate, Map.of("hoursDecision", "Validated"))).isEqualTo(Optional.empty());
     }
+
+    /** BPA-56: the Production Supervisor's decision; "Reason is required" (Returned, Rejected) is the story's text, the unknown-decision text an ASSUMPTION. */
+    @Test
+    void approveHoursProductionChecksDecisionAndReason() {
+        String production = "UserTask_ApproveHoursProduction";
+        assertThat(TaskValidity.check(production, Map.of())).contains("Decision is required");
+        assertThat(TaskValidity.check(production, Map.of("hoursDecision", "Validated"))).contains("Decision must be Approved, Returned or Rejected");
+        assertThat(TaskValidity.check(production, Map.of("hoursDecision", "Returned", "hoursReason", " "))).contains("Reason is required");
+        assertThat(TaskValidity.check(production, Map.of("hoursDecision", "Rejected"))).contains("Reason is required");
+        assertThat(TaskValidity.check(production, Map.of("hoursDecision", "Rejected", "hoursReason", "Not worked"))).isEqualTo(Optional.empty());
+        assertThat(TaskValidity.check(production, Map.of("hoursDecision", "Approved"))).isEqualTo(Optional.empty());
+    }
     @Test
     void validCompletionsAndOtherTasksPass() {
         assertThat(TaskValidity.check(SIGN_OFF, Map.of("signOffDecision", "Approved"))).isEqualTo(Optional.empty());

@@ -10,6 +10,7 @@ import { showDate } from '@/utils/dates';
 import { hoursDecisionMessages, type HoursDecision } from '../../hoursDecisionMessages';
 import { lineMessages } from '../../lineMessages';
 import { amendLine, getHoursSubmission } from '../../services/hoursSubmissionService';
+import { SubmissionLines } from '../SubmissionLines';
 
 /**
  * BPA-53: the Validate hours task screen (UserTask_ValidateHours) on the shared TaskScreenShell. The Timekeeper sees the hours the Supervisor sent for the
@@ -87,34 +88,7 @@ export function ValidateHours({ api, taskKey, onDone }: TaskScreenProps) {
         <input value={workpackNumber} readOnly />
       </label>
       {submission.data && <p>{`Round ${submission.data.roundNo}, sent by ${submission.data.submittedBy}`}</p>}
-      <table className="sign-table" aria-label="Hours sent">
-        <thead>
-          <tr>
-            <th scope="col">Badge No</th>
-            <th scope="col">Work date</th>
-            <th scope="col">Phase</th>
-            <th scope="col">Hours</th>
-            <th scope="col">Remarks</th>
-            <th scope="col">Amend</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(submission.data?.lines ?? []).map((l) => (
-            <tr key={l.id}>
-              <td>{l.badgeNo}</td>
-              <td>{showDate(l.workDate)}</td>
-              <td>{l.phase}</td>
-              <td>{l.hours}</td>
-              <td>{l.remarks ?? ''}</td>
-              <td>
-                <Button aria-label={`Amend ${l.badgeNo} ${showDate(l.workDate)} ${l.phase}`} onClick={() => startAmend(l)}>
-                  Amend
-                </Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <SubmissionLines lines={submission.data?.lines ?? []} onAmend={startAmend} />
       {amending && (
         <section
           aria-label="Amend hours"
