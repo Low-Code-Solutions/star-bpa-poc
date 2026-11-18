@@ -73,7 +73,9 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
     setNotice(
       done.elementId === USER_TASKS.bookHours
         ? 'Hours sent to the Timekeeper' // BPA-53 (ASSUMPTION text)
-        : done.elementId === USER_TASKS.validateHours || done.elementId === USER_TASKS.approveHoursProduction
+        : done.elementId === USER_TASKS.validateHours ||
+            done.elementId === USER_TASKS.approveHoursProduction ||
+            done.elementId === USER_TASKS.approveHoursPpc
           ? 'Decision recorded' // BPA-53 (ASSUMPTION text)
           : 'Task completed; the Work Pack is saved',
     );

@@ -16,4 +16,6 @@ export const USER_TASKS = {
   validateHours: 'UserTask_ValidateHours',
   // BPA-56
   approveHoursProduction: 'UserTask_ApproveHoursProduction',
+  // BPA-57
+  approveHoursPpc: 'UserTask_ApproveHoursPpc',
 } as const;

@@ -100,7 +100,9 @@ describe('ApproveHoursPpc', () => {
     await user.click(screen.getByRole('button', { name: 'Complete task' }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
-    expect(calls.find((c) => c.path === `/api/v1/tasks/${TASK}/complete`)?.body).toEqual({ variables: { hoursDecision: 'Approved' } });
+    expect(calls.find((c) => c.path === `/api/v1/tasks/${TASK}/complete`)?.body).toEqual({
+      variables: { hoursDecision: 'Approved' },
+    });
   });
 
   it('BPA57_rejectNeedsAReasonBeforeTheCallIsMade', async () => {
