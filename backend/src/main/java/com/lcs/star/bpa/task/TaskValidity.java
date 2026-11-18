@@ -22,11 +22,18 @@ public final class TaskValidity {
     static final String VALIDATE_HOURS = "UserTask_ValidateHours";
     static final String HOURS_DECISION_UNKNOWN = "Decision must be Validated or Returned";
 
+    /** BPA-56: the Production Supervisor's decision; the unknown-decision text is an ASSUMPTION, "Reason is required" the story's (Returned and Rejected). */
+    static final String APPROVE_PRODUCTION = "UserTask_ApproveHoursProduction";
+    static final String PRODUCTION_DECISION_UNKNOWN = "Decision must be Approved, Returned or Rejected";
+
     private TaskValidity() {
     }
 
     /** The message to answer with (400), or empty when the completion is valid for this task. */
     public static Optional<String> check(String elementId, Map<String, Object> submitted) {
+        if (APPROVE_PRODUCTION.equals(elementId)) {
+            return checkProductionDecision(submitted);
+        }
         if (VALIDATE_HOURS.equals(elementId)) {
             return checkHoursDecision(submitted);
         }
@@ -55,6 +62,20 @@ public final class TaskValidity {
             return Optional.of(HOURS_DECISION_UNKNOWN);
         }
         if ("Returned".equals(decision) && !(submitted.get("hoursReason") instanceof String reason && !reason.isBlank())) {
+            return Optional.of(REASON_REQUIRED);
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<String> checkProductionDecision(Map<String, Object> submitted) {
+        Object decision = submitted.get("hoursDecision");
+        if (decision == null || (decision instanceof String text && text.isBlank())) {
+            return Optional.of(DECISION_REQUIRED);
+        }
+        if (!"Approved".equals(decision) && !"Returned".equals(decision) && !"Rejected".equals(decision)) {
+            return Optional.of(PRODUCTION_DECISION_UNKNOWN);
+        }
+        if (!"Approved".equals(decision) && !(submitted.get("hoursReason") instanceof String reason && !reason.isBlank())) {
             return Optional.of(REASON_REQUIRED);
         }
         return Optional.empty();

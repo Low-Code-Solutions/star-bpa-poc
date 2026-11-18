@@ -36,7 +36,14 @@ public class HoursSubmissionRepository {
     }
 
     /** What a decision did, for the log. */
-    public enum Outcome { VALIDATED, RETURNED, ALREADY_RECORDED }
+    public enum Outcome { VALIDATED, APPROVED, RETURNED, REJECTED, ALREADY_RECORDED }
+
+    /** The submission is not at the step that decides on it (BPA-56): nothing is written; the job fails with no retries. */
+    public static final class WrongStage extends IllegalStateException {
+        WrongStage(String message) {
+            super(message);
+        }
+    }
 
     /** One line of a submission, for the Timekeeper's screen. */
     public record SubmissionLine(UUID id, String badgeNo, LocalDate workDate, String phase, java.math.BigDecimal hours, String status, String remarks) {
@@ -89,49 +96,78 @@ public class HoursSubmissionRepository {
         return new Sent(id, round, moving.size());
     }
 
-    /**
-     * Records the Timekeeper's decision once per user task ({@code hours_decision.task_key} is UNIQUE; checked first, so a retried job writes nothing
-     * more). Validated moves the submission to stage ProductionSupervisor; Returned moves its lines to Returned and closes it with outcome Returned
-     * (the table's CHECK: Closed if and only if an outcome is set).
-     */
+    /** BPA-53's Timekeeper decision; kept for its callers, the same as {@code decide("Timekeeper", ...)}. Transactional itself: a call inside the bean skips the proxy. */
     @Transactional
     public Outcome decideAsTimekeeper(UUID submissionId, long taskKey, boolean validated, String reason, String username) {
+        return decide("Timekeeper", submissionId, taskKey, validated ? "Validated" : "Returned", reason, username);
+    }
+
+    /**
+     * Records a decision at an approval step once per user task ({@code hours_decision.task_key} is UNIQUE; checked first, so a retried job writes nothing
+     * more), in one transaction (BPA-53, BPA-56):
+     * <ul>
+     * <li>Timekeeper Validated: stage ProductionSupervisor. ProductionSupervisor Approved: stage Ppc. The lines stay Submitted.</li>
+     * <li>Returned (any step): the lines go back to Returned; the submission is Closed with outcome Returned.</li>
+     * <li>Rejected (ProductionSupervisor): the lines become Rejected for good (never resent, never counted, BPA-48 and BPA-51); Closed with outcome Rejected.</li>
+     * </ul>
+     * Every stage change is guarded by {@code WHERE stage = <step>}: a submission that is not at the step throws {@link WrongStage} and the transaction
+     * (the decision row included) rolls back. The table's CHECKs hold the rest: Closed if and only if an outcome is set; Validated only at Timekeeper;
+     * Rejected never at Timekeeper; a reason for Returned and Rejected.
+     */
+    @Transactional
+    public Outcome decide(String step, UUID submissionId, long taskKey, String decision, String reason, String username) {
         Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
         Timestamp at = Timestamp.from(now);
-        String decision = validated ? "Validated" : "Returned";
-        String storedReason = validated ? null : reason.trim();
+        boolean closes = "Returned".equals(decision) || "Rejected".equals(decision);
+        String storedReason = closes ? reason.trim() : null;
         List<UUID> inserted = jdbc.queryForList("""
                 INSERT INTO bpa.hours_decision (hours_submission_id, step, decision, reason, task_key, decided_by, decided_at,
                                                 created_at, created_by, updated_at, updated_by)
-                VALUES (?, 'Timekeeper', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (task_key) DO NOTHING
-                RETURNING id""", UUID.class, submissionId, decision, storedReason, taskKey, username, at, at, username, at, username);
+                RETURNING id""", UUID.class, submissionId, step, decision, storedReason, taskKey, username, at, at, username, at, username);
         if (inserted.isEmpty()) {
             return Outcome.ALREADY_RECORDED;
         }
         UUID id = inserted.get(0);
         audit("hours_decision", id, "hours_submission_id", null, submissionId.toString(), username, at);
-        audit("hours_decision", id, "step", null, "Timekeeper", username, at);
+        audit("hours_decision", id, "step", null, step, username, at);
         audit("hours_decision", id, "decision", null, decision, username, at);
         if (storedReason != null) {
             audit("hours_decision", id, "reason", null, storedReason, username, at);
         }
         audit("hours_decision", id, "task_key", null, Long.toString(taskKey), username, at);
-        if (validated) {
-            jdbc.update("UPDATE bpa.hours_submission SET stage = 'ProductionSupervisor', updated_at = ?, updated_by = ? WHERE id = ?", at, username, submissionId);
-            audit("hours_submission", submissionId, "stage", "Timekeeper", "ProductionSupervisor", username, at);
-            return Outcome.VALIDATED;
+        if (!closes) {
+            String next = "Timekeeper".equals(step) ? "ProductionSupervisor" : "Ppc";
+            moveStage(submissionId, step, next, null, username, at);
+            return "Validated".equals(decision) ? Outcome.VALIDATED : Outcome.APPROVED;
         }
-        List<UUID> returned = jdbc.queryForList("""
-                UPDATE bpa.digital_timesheet_line SET status = 'Returned', updated_at = ?, updated_by = ?
-                WHERE hours_submission_id = ? AND status = 'Submitted' RETURNING id""", UUID.class, at, username, submissionId);
-        for (UUID lineId : returned) {
-            audit("digital_timesheet_line", lineId, "status", "Submitted", "Returned", username, at);
+        moveStage(submissionId, step, "Closed", decision, username, at);
+        List<UUID> moved = jdbc.queryForList("""
+                UPDATE bpa.digital_timesheet_line SET status = ?, updated_at = ?, updated_by = ?
+                WHERE hours_submission_id = ? AND status = 'Submitted' RETURNING id""", UUID.class, decision, at, username, submissionId);
+        for (UUID lineId : moved) {
+            audit("digital_timesheet_line", lineId, "status", "Submitted", decision, username, at);
         }
-        jdbc.update("UPDATE bpa.hours_submission SET stage = 'Closed', outcome = 'Returned', updated_at = ?, updated_by = ? WHERE id = ?", at, username, submissionId);
-        audit("hours_submission", submissionId, "stage", "Timekeeper", "Closed", username, at);
-        audit("hours_submission", submissionId, "outcome", null, "Returned", username, at);
-        return Outcome.RETURNED;
+        return "Returned".equals(decision) ? Outcome.RETURNED : Outcome.REJECTED;
+    }
+
+    /** Moves the submission from {@code step} to {@code next} (with the outcome when it closes), or throws {@link WrongStage} when it is not at that step. */
+    private void moveStage(UUID submissionId, String step, String next, String outcome, String username, Timestamp at) {
+        int changed = jdbc.update("UPDATE bpa.hours_submission SET stage = ?, outcome = ?, updated_at = ?, updated_by = ? WHERE id = ? AND stage = ?",
+                next, outcome, at, username, submissionId, step);
+        if (changed == 0) {
+            throw new WrongStage("Submission " + submissionId + " is not at stage " + step + "; the " + step + " decision is not recorded");
+        }
+        audit("hours_submission", submissionId, "stage", step, next, username, at);
+        if (outcome != null) {
+            audit("hours_submission", submissionId, "outcome", null, outcome, username, at);
+        }
+    }
+
+    /** Who sent the submission (segregation of duties, BPA-56); empty when there is no such submission. */
+    public Optional<String> submittedBy(UUID submissionId) {
+        return jdbc.queryForList("SELECT submitted_by FROM bpa.hours_submission WHERE id = ?", String.class, submissionId).stream().findFirst();
     }
 
     /** The submission with its lines, by Badge No, date and phase; empty when there is none. */
