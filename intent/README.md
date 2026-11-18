@@ -64,4 +64,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-51](BPA-4-timesheet-to-progress/plans/BPA-51.md) | Supervisor can only book hours within the phase budget and the daily limit | Closed (17 Nov 2026) |
 | [BPA-52](BPA-4-timesheet-to-progress/plans/BPA-52.md) | Supervisor can upload a team's daily hours as an Excel or CSV time sheet | Closed (18 Nov 2026) |
 | [BPA-53](BPA-4-timesheet-to-progress/plans/BPA-53.md) | Timekeeper can validate or return the hours sent for a Work Pack | Closed (18 Nov 2026) |
+| [BPA-56](BPA-4-timesheet-to-progress/plans/BPA-56.md) | Production Supervisor can approve, return or reject a Work Pack's validated hours | Approved (Ahsan, Build Lead, 18 Nov 2026) |
 
