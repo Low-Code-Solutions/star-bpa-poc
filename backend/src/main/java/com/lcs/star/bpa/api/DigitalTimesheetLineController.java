@@ -76,6 +76,17 @@ public class DigitalTimesheetLineController implements TimesheetLinesApi {
         return ResponseEntity.noContent().build();
     }
 
+    // BPA-53 red-run stubs: replaced by the real implementation in the next step
+    @Override
+    public ResponseEntity<DigitalTimesheetLine> amendTimesheetLine(UUID lineId, com.lcs.star.bpa.api.generated.model.LineAmendment body) {
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    }
+
+    @Override
+    public ResponseEntity<com.lcs.star.bpa.api.generated.model.HoursSubmission> getHoursSubmission(UUID submissionId) {
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    }
+
     // --- problems ---------------------------------------------------------------------------------------------------------
 
     @ExceptionHandler(Refused.class)

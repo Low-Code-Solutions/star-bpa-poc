@@ -1077,6 +1077,86 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
               example: { status: 409, title: Conflict, detail: Line is not editable (status Submitted) }
+  /api/v1/digital-timesheet-lines/{lineId}/amendments:
+    parameters:
+      - $ref: '#/components/parameters/LineId'
+    post:
+      tags: [timesheet-lines]
+      operationId: amendTimesheetLine
+      summary: The Timekeeper amends the hours of a sent line on request
+      description: |
+        FRD-5-12 §5.12.5.5 (BPA-53). Only while the line is Submitted and its submission waits at the Timekeeper (UserTask_ValidateHours
+        is open), else 409 "Line is not editable (status ...)". `reason` is required (at most 250 characters). Only `hours` changes; date,
+        phase and Worker cannot. The budget is checked again with the line's old hours left out (BPA-51). One audit row for `hours` and one
+        for `amend_reason` (D64; ASSUMPTION: the reason has no column of its own). Group timekeeper.
+      x-assumption: true
+      x-assumption-note: the path, the body and where the reason is stored are not stated by BPA-53
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LineAmendment'
+      responses:
+        '200':
+          description: Line amended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DigitalTimesheetLine'
+        '400':
+          description: A rule failed (reason, hours, budget)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 400, title: Bad Request, detail: Phase Cutting budget of 300 h would be exceeded }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/LineNotFound'
+        '409':
+          description: The line is not Submitted at the Timekeeper
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 409, title: Conflict, detail: Line is not editable (status Draft) }
+  /api/v1/hours-submissions/{submissionId}:
+    parameters:
+      - name: submissionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [timesheet-lines]
+      operationId: getHoursSubmission
+      summary: Read a submission of hours with its lines (the Timekeeper's screen)
+      description: BPA-53 (the shape is an ASSUMPTION). Group timekeeper now; production-supervisor and ppc-team join with BPA-56 and BPA-57.
+      x-assumption: true
+      x-assumption-note: the endpoint and its shape are not stated by BPA-53
+      responses:
+        '200':
+          description: The submission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HoursSubmission'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No submission with this id
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 404, title: Not Found, detail: Submission not found }
   /api/v1/timesheet-processes:
     post:
       tags: [timesheet-processes]
@@ -1369,7 +1449,7 @@ components:
         elementId:
           type: string
           description: BPMN element ID of the user task
-          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours]
+          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours]
         processInstanceKey:
           $ref: '#/components/schemas/CamundaKey'
         workpackNumber:
@@ -1672,6 +1752,62 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DigitalTimesheetLine'
+    LineAmendment:
+      type: object
+      required: [hours, reason]
+      properties:
+        hours:
+          type: number
+          example: 7.5
+        reason:
+          type: string
+          maxLength: 250
+          example: Supervisor request
+    HoursSubmissionLine:
+      type: object
+      required: [id, badgeNo, workDate, phase, hours, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        badgeNo:
+          type: string
+        workDate:
+          type: string
+          format: date
+        phase:
+          $ref: '#/components/schemas/TimesheetPhase'
+        hours:
+          type: number
+        status:
+          type: string
+          enum: [Draft, Submitted, Approved, Returned, Rejected]
+        remarks:
+          type: string
+    HoursSubmission:
+      type: object
+      description: hours_submission with its lines (data model §13.2.1; BPA-53, x-assumption)
+      required: [id, workpackNumber, roundNo, stage, submittedBy, submittedAt, lines]
+      properties:
+        id:
+          type: string
+          format: uuid
+        workpackNumber:
+          $ref: '#/components/schemas/WorkpackNumber'
+        roundNo:
+          type: integer
+        stage:
+          type: string
+          enum: [Timekeeper, ProductionSupervisor, Ppc, Closed]
+        submittedBy:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/HoursSubmissionLine'
     DigitalTimesheet:
       type: object
       description: digital_timesheet (data model §5.7), joined to worker and workpack
