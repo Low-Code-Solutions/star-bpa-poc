@@ -99,6 +99,10 @@ bpa:
         # hoursDecision out so the Timekeeper's "Validated" is never offered back; the lines come from GET /api/v1/hours-submissions/{id}
         write: [hoursDecision, hoursReason]
         read: [hoursSubmissionId]
+      "[UserTask_ApproveHoursPpc]": # ppc-team, BPA-57: as the Production approval (BPA-56): the decision and, for Returned or Rejected, the reason; read leaves
+        # hoursDecision out so an earlier decision is never offered back
+        write: [hoursDecision, hoursReason]
+        read: [hoursSubmissionId]
       "[UserTask_CreateWorkPack]": # time-method-analyst (G9), BPA-6
         write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
         read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]

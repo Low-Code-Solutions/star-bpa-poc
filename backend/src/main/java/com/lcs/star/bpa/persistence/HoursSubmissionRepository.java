@@ -107,8 +107,9 @@ public class HoursSubmissionRepository {
      * more), in one transaction (BPA-53, BPA-56):
      * <ul>
      * <li>Timekeeper Validated: stage ProductionSupervisor. ProductionSupervisor Approved: stage Ppc. The lines stay Submitted.</li>
+     * <li>Ppc Approved (BPA-57): the lines become Approved, final (FRD-5-12 §5.12.8.1); the submission is Closed with outcome Approved.</li>
      * <li>Returned (any step): the lines go back to Returned; the submission is Closed with outcome Returned.</li>
-     * <li>Rejected (ProductionSupervisor): the lines become Rejected for good (never resent, never counted, BPA-48 and BPA-51); Closed with outcome Rejected.</li>
+     * <li>Rejected (ProductionSupervisor, Ppc): the lines become Rejected for good (never resent, never counted, BPA-48 and BPA-51); Closed with outcome Rejected.</li>
      * </ul>
      * Every stage change is guarded by {@code WHERE stage = <step>}: a submission that is not at the step throws {@link WrongStage} and the transaction
      * (the decision row included) rolls back. The table's CHECKs hold the rest: Closed if and only if an outcome is set; Validated only at Timekeeper;
@@ -118,8 +119,10 @@ public class HoursSubmissionRepository {
     public Outcome decide(String step, UUID submissionId, long taskKey, String decision, String reason, String username) {
         Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
         Timestamp at = Timestamp.from(now);
-        boolean closes = "Returned".equals(decision) || "Rejected".equals(decision);
-        String storedReason = closes ? reason.trim() : null;
+        boolean needsReason = "Returned".equals(decision) || "Rejected".equals(decision);
+        // the PPC approval is the last step: it closes the round too (BPA-57), with its lines Approved and final
+        boolean closes = needsReason || ("Ppc".equals(step) && "Approved".equals(decision));
+        String storedReason = needsReason ? reason.trim() : null;
         List<UUID> inserted = jdbc.queryForList("""
                 INSERT INTO bpa.hours_decision (hours_submission_id, step, decision, reason, task_key, decided_by, decided_at,
                                                 created_at, created_by, updated_at, updated_by)
@@ -149,7 +152,19 @@ public class HoursSubmissionRepository {
         for (UUID lineId : moved) {
             audit("digital_timesheet_line", lineId, "status", "Submitted", decision, username, at);
         }
-        return "Returned".equals(decision) ? Outcome.RETURNED : Outcome.REJECTED;
+        return switch (decision) {
+            case "Returned" -> Outcome.RETURNED;
+            case "Rejected" -> Outcome.REJECTED;
+            default -> Outcome.APPROVED;
+        };
+    }
+
+    /**
+     * Who decided the submission at a step other than {@code step}, whatever the decision (segregation of duties, BPA-57: "an earlier decider"). The
+     * decisions of the step itself are left out: a retried job of the same step must find its own decision, not refuse it (idempotency, D65).
+     */
+    public List<String> earlierDeciders(UUID submissionId, String step) {
+        return jdbc.queryForList("SELECT decided_by FROM bpa.hours_decision WHERE hours_submission_id = ? AND step <> ?", String.class, submissionId, step);
     }
 
     /** Moves the submission from {@code step} to {@code next} (with the outcome when it closes), or throws {@link WrongStage} when it is not at that step. */

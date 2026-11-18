@@ -93,8 +93,8 @@ public class SecurityConfig {
                         // BPA-53: the Timekeeper amends a sent line and reads the submission; every method (the BPA-10 lesson). Listed before the
                         // lines rule: "digital-timesheet-lines/*" matches one segment, so "/{id}/amendments" is not caught by it.
                         .requestMatchers("/api/v1/digital-timesheet-lines/*/amendments").hasAuthority(TIMEKEEPER)
-                        // BPA-56: the Production Supervisor reads the submission too, but does not amend hours (Jira: "does not edit hours")
-                        .requestMatchers("/api/v1/hours-submissions/**").hasAnyAuthority(TIMEKEEPER, PRODUCTION_SUPERVISOR)
+                        // BPA-56, BPA-57: the Production Supervisor and the PPC Team read the submission too, but do not amend hours (Jira: "does not edit hours")
+                        .requestMatchers("/api/v1/hours-submissions/**").hasAnyAuthority(TIMEKEEPER, PRODUCTION_SUPERVISOR, PPC_TEAM)
                         .anyRequest().authenticated())
                 // S26: token in the XSRF-TOKEN cookie (readable by React), sent back as X-XSRF-TOKEN on every state-changing call,
                 // the login included. The plain handler lets React send the cookie value unchanged.
