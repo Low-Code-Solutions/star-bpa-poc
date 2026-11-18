@@ -85,6 +85,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/digital-timesheets/*/lines", "/api/v1/digital-timesheet-lines/*").hasAnyAuthority(SUPERVISOR, PRODUCTION_TEAM)
                         // BPA-49: the one-off start of a timesheet process is the PPC Team's (group ASSUMPTION in the story); every method (the BPA-10 lesson).
                         .requestMatchers("/api/v1/timesheet-processes").hasAuthority(PPC_TEAM)
+                        // BPA-52 (C-E2-5): the time sheet upload, its result and its template are the Supervisor's and a Production Team member's (the
+                        // Jira SOR Notes say "403 outside supervisor", the Gherkin lets production-team upload); every method, so HEAD cannot skip it.
+                        .requestMatchers("/api/v1/timesheet-files", "/api/v1/timesheet-files/**").hasAnyAuthority(SUPERVISOR, PRODUCTION_TEAM)
                         .anyRequest().authenticated())
                 // S26: token in the XSRF-TOKEN cookie (readable by React), sent back as X-XSRF-TOKEN on every state-changing call,
                 // the login included. The plain handler lets React send the cookie value unchanged.

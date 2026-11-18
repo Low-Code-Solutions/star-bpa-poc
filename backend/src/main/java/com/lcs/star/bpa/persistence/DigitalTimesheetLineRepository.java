@@ -141,20 +141,28 @@ public class DigitalTimesheetLineRepository {
                 WHERE t.workpack_id = ? AND l.phase = ? AND l.status <> 'Rejected' AND l.id IS DISTINCT FROM ?""", BigDecimal.class, workpackId, phase, exceptLine);
     }
 
-    /** Inserts a Draft line from the form and audits every business column; the id comes back. */
-    public UUID insert(UUID timesheetId, LocalDate date, String phase, BigDecimal hours, String remarks, BigDecimal completion, String username, Instant now) {
+    /**
+     * Inserts a Draft line and audits every business column; the id comes back. {@code timesheetFileId} null is a line from the form (entry source
+     * Form); a time sheet upload (BPA-52) passes its file's id and the line gets entry source Upload.
+     */
+    public UUID insert(UUID timesheetId, LocalDate date, String phase, BigDecimal hours, String remarks, BigDecimal completion, UUID timesheetFileId,
+            String username, Instant now) {
         Timestamp at = Timestamp.from(now);
+        String source = timesheetFileId == null ? "Form" : "Upload";
         UUID id = jdbc.queryForObject("""
-                INSERT INTO bpa.digital_timesheet_line (digital_timesheet_id, work_date, phase, hours, status, entry_source, remarks, reported_completion_pct,
-                                                        created_at, created_by, updated_at, updated_by)
-                VALUES (?, ?, ?, ?, 'Draft', 'Form', ?, ?, ?, ?, ?, ?) RETURNING id""", UUID.class,
-                timesheetId, Date.valueOf(date), phase, hours, remarks, completion, at, username, at, username);
+                INSERT INTO bpa.digital_timesheet_line (digital_timesheet_id, work_date, phase, hours, status, entry_source, timesheet_file_id, remarks,
+                                                        reported_completion_pct, created_at, created_by, updated_at, updated_by)
+                VALUES (?, ?, ?, ?, 'Draft', ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""", UUID.class,
+                timesheetId, Date.valueOf(date), phase, hours, source, timesheetFileId, remarks, completion, at, username, at, username);
         audit(id, "digital_timesheet_id", null, timesheetId.toString(), username, at);
         audit(id, "work_date", null, date.toString(), username, at);
         audit(id, "phase", null, phase, username, at);
         audit(id, "hours", null, HourLineChecks.plain(hours), username, at);
         audit(id, "status", null, "Draft", username, at);
-        audit(id, "entry_source", null, "Form", username, at);
+        audit(id, "entry_source", null, source, username, at);
+        if (timesheetFileId != null) {
+            audit(id, "timesheet_file_id", null, timesheetFileId.toString(), username, at);
+        }
         if (remarks != null) {
             audit(id, "remarks", null, remarks, username, at);
         }

@@ -109,6 +109,30 @@ Expected red for all: 404 "No static resource api/v1/timesheet-files" (no path y
 | 17 | A Production Team member can upload (C-E2-5) | `BPA52_aProductionTeamMemberCanAlsoUploadTheTimeSheet` | a file like `timesheet-demo-good.xlsx` but for WP-000457, built by the builder (tests never use demo files) → Draft lines `created_by` production-team |
 Extra (not scenarios): `TimesheetTemplateTest` (committed template's headers equal the reader's); a "File layout not recognised" test; React tests: upload shows the row table, a file outcome, the server's 413/403 message, template and result download links.
 
+## Progress and departures (18 Nov 2026)
+Steps 1-4 done. Answers: Ahsan, "Go with recommendations" (18 Nov): Q1 header matching ignores case and order; Q2 the demos stay as staged (WP-000001, documented in `templates/README.md`);
+Q3 the endpoint `GET /api/v1/timesheet-files/template`; Q4 the in-approval detection is an `hours_submission` at an approval stage; Q5 CBS and leave stay false; Q7 the upload uses its two own texts;
+Q8 the 413 advice is global. Q6 (no Jira move) and Q9 (Jira ASSUMPTION comment, after a yes) stay open.
+- **Red first:** `TimesheetFileApiTest` first run, before any production code: 19 of 20 failed with 404 "No static resource api/v1/timesheet-files" (the 20th, `BPA52_fileAbove5MbIsRefused`, errored in the
+  HTTP client, see below); `BPA52_resultCanBeDownloaded` failed on an empty id. React: `Failed to resolve import "./TimesheetFileUpload"`. Then green.
+- **Tests:** `TimesheetFileApiTest` 20 (the 17 DoD names and three non-scenario tests: headers matched without regard to case or order, a file without the Hours column, the template download), all green;
+  `TimesheetFileReaderTest` 4 (the committed template's header row and "File has no rows", CSV quoting and byte order mark, a real Excel date cell, an unknown extension or broken file);
+  `AssignmentFileApiTest` still 22 of 22 with the new 413 advice. React: 6 in `TimesheetFileUpload.test.tsx` and 1 in `BookHours.test.tsx`; lint, format, 75 tests, build clean.
+- **Departures from the plan:**
+  1. **A second setting was needed for the 413.** With `spring.servlet.multipart.max-request-size: 6MB` Tomcat rejects the body and, after swallowing 2 MB, drops the connection, so the client got a reset, not the 413 (the
+     20th test errored on a connection error). `server.tomcat.max-swallow-size: 20MB` was added to `application.yml`; it applies to every upload.
+  2. **`UploadLimitAdvice` is `@Order(HIGHEST_PRECEDENCE)`:** Spring's problem-detail handler (`spring.mvc.problemdetails.enabled`) otherwise answers "Maximum upload size exceeded" before the advice.
+  3. **A CSV blank line keeps its line number** (an empty record, skipped as a row), so row numbers are the file's lines, as for a spreadsheet.
+  4. **The upload shares the form's code** through a second `HourLineService.add` with the upload's file id (the repository writes `entry_source` and `timesheet_file_id`); `DigitalTimesheetLineRepository.insert` gained that parameter.
+  5. **Test fixture:** `BookHoursFixture.reset` now clears the upload log, lines, files and submissions in that order (a logged row points at its line and a line at its file); `workPack461()` and `fill(...)` are new.
+  6. `TimesheetTemplateTest` became `TimesheetFileReaderTest` (it also covers the reader's CSV and date rules).
+- **Existing tests edited:** none beyond the fixture (a BPA-50/BPA-51 helper class); `AssignmentFileApiTest` was only run.
+- **Local stack (18 Nov; both images rebuilt with plain `docker build`; the app container had exited 17 hours earlier):** a copy of `timesheet-demo-good.xlsx` with `WP-000001` replaced by **WP-000011** (Assigned, Cutting 150 h and
+  Welding 250 h, Workers E1099, E2001, E1021, E1201) was uploaded through the portal proxy as supervisor: 201, three rows "Saved", three Draft lines with entry source Upload created by supervisor, the Work Pack went Released to In
+  Progress; the same file again: each row "Hours already booked for <badge> on <date> for phase <phase>" (never overwritten); `Accept: text/csv` on the result gave the attachment `wp11-result.csv` with the header and the three rows;
+  the template downloaded as production-team (200, 6514 bytes); timekeeper 403. **The three lines and the two logged uploads are left on WP-000011** so they show in the Book hours grid. Not done by Claude: a click-through of the
+  upload section in a browser (human gap); a look at Operate (no model change).
+
 ## Proof (one command per Definition of Done line)
 | DoD line | Command / evidence |
 |---|---|

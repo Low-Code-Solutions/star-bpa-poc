@@ -80,6 +80,15 @@ public class HourLineService {
     }
 
     public Line add(UUID timesheetId, LocalDate date, String phase, BigDecimal hours, String remarks, BigDecimal completion, String username) {
+        return add(timesheetId, date, phase, hours, remarks, completion, null, username);
+    }
+
+    /**
+     * The same save for a row of a time sheet upload (BPA-52): {@code timesheetFileId} is the upload's file, which makes the line's entry source Upload
+     * (null is a form entry). Every rule and the decision are exactly the form's, so a row is checked as a form entry is (E2-D4).
+     */
+    public Line add(UUID timesheetId, LocalDate date, String phase, BigDecimal hours, String remarks, BigDecimal completion, UUID timesheetFileId,
+            String username) {
         Sheet sheet = sheet(timesheetId);
         if ("Cancelled".equals(sheet.submissionStatus())) {
             throw new Refused(409, "Time sheet for " + sheet.employeeRef() + " on " + sheet.workpackNumber() + " is Cancelled");
@@ -99,7 +108,7 @@ public class HourLineService {
         Instant now = clock.instant();
         try {
             UUID id = transaction.execute(tx -> {
-                UUID saved = lines.insert(timesheetId, date, phase, hours, remarks, completion, username, now);
+                UUID saved = lines.insert(timesheetId, date, phase, hours, remarks, completion, timesheetFileId, username, now);
                 lines.startWorkPack(sheet.workpackId(), username, now);
                 return saved;
             });
