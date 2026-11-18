@@ -88,9 +88,13 @@ bpa:
     process-ids: [Process_PPC_WorkPackAssignment, Process_PPC_TimesheetToProgress]
     allow-lists:
       "[UserTask_BookHours]": # supervisor (and production-team, C-E2-5), BPA-50: hours are saved line by line through the lines API, not as
-        # variables of the completion, so both lists are empty; completing the task ("Send to Timekeeper") waits for the story that builds it
+        # variables of the completion, so both lists are empty; completing the task is "Send to Timekeeper" (BPA-53)
         write: []
-        read: []
+        read: [hoursDecision, hoursReason] # BPA-53: why the Timekeeper returned the hours
+      "[UserTask_ValidateHours]": # timekeeper, BPA-53: the decision (Validated or Returned) and, for a return, the reason; the lines are read through
+        # GET /api/v1/hours-submissions/{id} (hoursSubmissionId says which)
+        write: [hoursDecision, hoursReason]
+        read: [hoursSubmissionId, hoursDecision, hoursReason]
       "[UserTask_CreateWorkPack]": # time-method-analyst (G9), BPA-6
         write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
         read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]

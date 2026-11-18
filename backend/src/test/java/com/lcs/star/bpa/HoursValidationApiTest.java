@@ -286,6 +286,58 @@ class HoursValidationApiTest {
         assertThat(jdbc.queryForObject("SELECT hours FROM bpa.digital_timesheet_line WHERE id = ?", BigDecimal.class, line)).isEqualByComparingTo("7");
     }
 
+    // --- not scenarios: a retried job changes nothing (ADR 0007, D65) ---------------------------------------------------------
+
+    @Autowired
+    com.lcs.star.bpa.persistence.HoursSubmissionRepository submissions;
+
+    @Test
+    void aRetriedSendCreatesNoSecondSubmissionAndNoSecondAudit() {
+        draftLines();
+        var first = submissions.send(9100000001L, ids.workpackId(), "supervisor");
+        long auditAfterFirst = jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log", Long.class);
+
+        var again = submissions.send(9100000001L, ids.workpackId(), "supervisor");
+
+        assertThat(again.submissionId()).isEqualTo(first.submissionId());
+        assertThat(first.lineCount()).isEqualTo(3);
+        assertThat(again.lineCount()).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.hours_submission", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log", Long.class)).isEqualTo(auditAfterFirst);
+    }
+
+    @Test
+    void aRetriedDecisionWritesNothingMore() {
+        draftLines();
+        var sent = submissions.send(9100000002L, ids.workpackId(), "supervisor");
+
+        var first = submissions.decideAsTimekeeper(sent.submissionId(), 777L, false, "Wrong phase", "timekeeper");
+        long auditAfterFirst = jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log", Long.class);
+        var again = submissions.decideAsTimekeeper(sent.submissionId(), 777L, false, "Wrong phase", "timekeeper");
+
+        assertThat(first).isEqualTo(com.lcs.star.bpa.persistence.HoursSubmissionRepository.Outcome.RETURNED);
+        assertThat(again).isEqualTo(com.lcs.star.bpa.persistence.HoursSubmissionRepository.Outcome.ALREADY_RECORDED);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.hours_decision", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log", Long.class)).isEqualTo(auditAfterFirst);
+    }
+
+    @Test
+    void theSubmissionIsReadByTheTimekeeperOnly() {
+        draftLines();
+        var sent = submissions.send(9100000003L, ids.workpackId(), "supervisor");
+
+        HttpResponse<String> read = flow.loggedInAs("timekeeper").get("/api/v1/hours-submissions/" + sent.submissionId());
+        HttpResponse<String> refused = flow.loggedInAs("supervisor").get("/api/v1/hours-submissions/" + sent.submissionId());
+        HttpResponse<String> missing = flow.loggedInAs("timekeeper").get("/api/v1/hours-submissions/" + UUID.randomUUID());
+
+        assertThat(read.statusCode()).as(read.body()).isEqualTo(200);
+        assertThat(json(read.body()).path("workpackNumber").asText()).isEqualTo("WP-000457");
+        assertThat(json(read.body()).path("stage").asText()).isEqualTo("Timekeeper");
+        assertThat(json(read.body()).path("lines")).hasSize(3);
+        assertThat(refused.statusCode()).isEqualTo(403);
+        assertThat(missing.statusCode()).isEqualTo(404);
+    }
+
     // --- helpers ----------------------------------------------------------------------------------------------------------
 
     /** The Background's Draft lines: E1021 16 and 17 Nov Cutting 8 h, E1099 16 Nov Cutting 7 h. */

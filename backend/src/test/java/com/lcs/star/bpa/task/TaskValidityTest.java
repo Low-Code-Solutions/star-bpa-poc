@@ -34,6 +34,18 @@ class TaskValidityTest {
         assertThat(TaskValidity.check(SIGN_OFF, Map.of("signOffDecision", "Declined", "declineReason", "  \t "))).contains("Reason is required");
     }
 
+
+    /** BPA-53: the Timekeeper's decision; "Reason is required" is the story's text, the unknown-decision text is an ASSUMPTION. */
+    @Test
+    void validateHoursChecksDecisionAndReason() {
+        String validate = "UserTask_ValidateHours";
+        assertThat(TaskValidity.check(validate, Map.of())).contains("Decision is required");
+        assertThat(TaskValidity.check(validate, Map.of("hoursDecision", "Rejected"))).contains("Decision must be Validated or Returned");
+        assertThat(TaskValidity.check(validate, Map.of("hoursDecision", "Returned"))).contains("Reason is required");
+        assertThat(TaskValidity.check(validate, Map.of("hoursDecision", "Returned", "hoursReason", "  "))).contains("Reason is required");
+        assertThat(TaskValidity.check(validate, Map.of("hoursDecision", "Returned", "hoursReason", "Wrong phase"))).isEqualTo(Optional.empty());
+        assertThat(TaskValidity.check(validate, Map.of("hoursDecision", "Validated"))).isEqualTo(Optional.empty());
+    }
     @Test
     void validCompletionsAndOtherTasksPass() {
         assertThat(TaskValidity.check(SIGN_OFF, Map.of("signOffDecision", "Approved"))).isEqualTo(Optional.empty());

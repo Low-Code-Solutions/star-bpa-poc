@@ -101,9 +101,6 @@ public class TimesheetFileService {
         if ("Cancelled".equals(sheet.submissionStatus())) {
             return rejected("Time sheet is Cancelled");
         }
-        if (files.inApproval(workpack.get())) {
-            return rejected("Hours for " + row.workpackNumber() + " are in approval; book them after the decision");
-        }
         try {
             Line saved = lineService.add(timesheet.get(), date.get(), row.phase(), hours.get(), row.remarks(), null, fileId, username);
             return new Outcome(SAVED, saved.id());

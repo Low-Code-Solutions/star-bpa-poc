@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.lcs.star.bpa.adapter.CamundaDecisionClient;
 import com.lcs.star.bpa.domain.HourLineChecks;
 import com.lcs.star.bpa.persistence.DigitalTimesheetLineRepository;
+import com.lcs.star.bpa.persistence.HoursSubmissionRepository;
 import com.lcs.star.bpa.persistence.DigitalTimesheetLineRepository.Line;
 import com.lcs.star.bpa.persistence.DigitalTimesheetLineRepository.Sheet;
 import java.math.BigDecimal;
@@ -57,15 +58,17 @@ public class HourLineService {
     }
 
     private final DigitalTimesheetLineRepository lines;
+    private final HoursSubmissionRepository submissions;
     private final CamundaDecisionClient decisions;
     private final TransactionTemplate transaction;
     private final Clock clock;
     private final ZoneId businessZone;
     private final BigDecimal dailyHoursLimit;
 
-    public HourLineService(DigitalTimesheetLineRepository lines, CamundaDecisionClient decisions, TransactionTemplate transaction, Clock clock,
+    public HourLineService(DigitalTimesheetLineRepository lines, HoursSubmissionRepository submissions, CamundaDecisionClient decisions, TransactionTemplate transaction, Clock clock,
             ZoneId businessZone, @Value("${app.daily-hours-limit}") BigDecimal dailyHoursLimit) {
         this.lines = lines;
+        this.submissions = submissions;
         this.decisions = decisions;
         this.transaction = transaction;
         this.clock = clock;
@@ -77,6 +80,11 @@ public class HourLineService {
         Sheet sheet = sheet(timesheetId);
         LocalDate today = today();
         return new View(sheet, lines.phases(sheet.workpackId()), HourLineChecks.openWeekStart(today, lines.latestClosedWeekEnding()), today, lines.lines(timesheetId));
+    }
+
+    /** The submission with its lines for the Timekeeper's screen (BPA-53); 404 "Submission not found". */
+    public HoursSubmissionRepository.Submission submission(UUID id) {
+        return submissions.find(id).orElseThrow(() -> new Refused(404, "Submission not found"));
     }
 
     public Line add(UUID timesheetId, LocalDate date, String phase, BigDecimal hours, String remarks, BigDecimal completion, String username) {
@@ -92,6 +100,10 @@ public class HourLineService {
         Sheet sheet = sheet(timesheetId);
         if ("Cancelled".equals(sheet.submissionStatus())) {
             throw new Refused(409, "Time sheet for " + sheet.employeeRef() + " on " + sheet.workpackNumber() + " is Cancelled");
+        }
+        // BPA-53 (plan Q2): one rule for the form (409) and, through here, for each row of an upload (its outcome text)
+        if (submissions.inApproval(sheet.workpackId())) {
+            throw new Refused(409, "Hours for " + sheet.workpackNumber() + " are in approval; book them after the decision");
         }
         checkValues(hours, remarks, completion);
         refuse(HourLineChecks.notInTheFuture(date, today()));
@@ -128,6 +140,33 @@ public class HourLineService {
         checkBudget(old.sheet(), old.workDate(), old.phase(), hours, budget, old.id());
         Instant now = clock.instant();
         transaction.executeWithoutResult(tx -> lines.update(old, hours, remarks, completion, username, now));
+        return lines.line(lineId).orElseThrow();
+    }
+
+    /**
+     * The Timekeeper amends the hours of a sent line on request (BPA-53; FRD-5-12 §5.12.5.5). Only while the line is Submitted and its submission waits
+     * at the Timekeeper, because that is when UserTask_ValidateHours is open (ASSUMPTION: the story gives no other state). Checked in order: line found,
+     * state (409, the BPA-50 text), reason required and at most 250 characters (ASSUMPTION text), hours, then Decision_HoursWithinBudget with the line's
+     * old hours left out (BPA-51). Only hours change; the line stays Submitted. Audit rows: hours, and the reason as column {@code amend_reason}
+     * (ASSUMPTION, plan Q1: no column holds it).
+     */
+    public Line amend(UUID lineId, BigDecimal hours, String reason, String username) {
+        Line old = line(lineId);
+        if (!"Submitted".equals(old.status()) || !submissions.stageOfLine(lineId).map("Timekeeper"::equals).orElse(false)) {
+            throw new Refused(409, "Line is not editable (status " + old.status() + ")");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new Refused(400, "Reason is required");
+        }
+        if (reason.trim().length() > 250) {
+            throw new Refused(400, "Reason can be at most 250 characters");
+        }
+        refuse(HourLineChecks.hours(hours));
+        BigDecimal budget = lines.phaseBudget(old.sheet().workpackId(), old.phase())
+                .orElseThrow(() -> new Refused(400, "Phase " + old.phase() + " is not on this Work Pack"));
+        checkBudget(old.sheet(), old.workDate(), old.phase(), hours, budget, old.id());
+        Instant now = clock.instant();
+        transaction.executeWithoutResult(tx -> lines.amend(old, hours, reason.trim(), username, now));
         return lines.line(lineId).orElseThrow();
     }
 

@@ -189,6 +189,16 @@ public class DigitalTimesheetLineRepository {
         }
     }
 
+    /** The Timekeeper's amendment (BPA-53): hours only, with an audit row for hours and one for the reason (column amend_reason; ASSUMPTION, plan Q1). */
+    public void amend(Line old, BigDecimal hours, String reason, String username, Instant now) {
+        Timestamp at = Timestamp.from(now);
+        jdbc.update("UPDATE bpa.digital_timesheet_line SET hours = ?, updated_at = ?, updated_by = ? WHERE id = ?", hours, at, username, old.id());
+        if (old.hours().compareTo(hours) != 0) {
+            audit(old.id(), "hours", HourLineChecks.plain(old.hours()), HourLineChecks.plain(hours), username, at);
+        }
+        audit(old.id(), "amend_reason", null, reason, username, at);
+    }
+
     /** Deletes the line; every business column is audited with a null new value (ASSUMPTION, plan). */
     public void delete(Line old, String username, Instant now) {
         Timestamp at = Timestamp.from(now);

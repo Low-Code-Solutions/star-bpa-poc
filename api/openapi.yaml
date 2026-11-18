@@ -1754,14 +1754,14 @@ components:
             $ref: '#/components/schemas/DigitalTimesheetLine'
     LineAmendment:
       type: object
-      required: [hours, reason]
+      required: [hours]
       properties:
         hours:
           type: number
           example: 7.5
         reason:
+          description: Required, at most 250 characters (checked by the service so the answers are the story's problem texts, not a validation error)
           type: string
-          maxLength: 250
           example: Supervisor request
     HoursSubmissionLine:
       type: object

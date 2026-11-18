@@ -4,6 +4,9 @@ import com.lcs.star.bpa.adapter.CamundaTaskClient.EngineUnavailableException;
 import com.lcs.star.bpa.api.generated.TimesheetLinesApi;
 import com.lcs.star.bpa.api.generated.model.DigitalTimesheetLine;
 import com.lcs.star.bpa.api.generated.model.DigitalTimesheetLineChange;
+import com.lcs.star.bpa.api.generated.model.HoursSubmission;
+import com.lcs.star.bpa.api.generated.model.HoursSubmissionLine;
+import com.lcs.star.bpa.api.generated.model.LineAmendment;
 import com.lcs.star.bpa.api.generated.model.NewDigitalTimesheetLine;
 import com.lcs.star.bpa.api.generated.model.TimesheetLines;
 import com.lcs.star.bpa.api.generated.model.TimesheetPhase;
@@ -26,7 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Hour lines on Digital Time sheets (BPA-50; E2-03): {@code GET} and {@code POST /api/v1/digital-timesheets/{id}/lines}, {@code PUT} and
- * {@code DELETE /api/v1/digital-timesheet-lines/{id}}. SecurityConfig lets the supervisor and production-team groups through (C-E2-5; 403
+ * {@code DELETE /api/v1/digital-timesheet-lines/{id}}, and (BPA-53) {@code POST .../{id}/amendments} and {@code GET /api/v1/hours-submissions/{id}} for the
+ * timekeeper group. SecurityConfig lets the supervisor and production-team groups through (C-E2-5; 403
  * otherwise). Every rule and its message is in {@link HourLineService}; a refusal becomes the problem the story names (400, 404 or 409), and an
  * engine that cannot evaluate Decision_HoursWithinBudget becomes 503 with nothing saved.
  */
@@ -76,15 +80,35 @@ public class DigitalTimesheetLineController implements TimesheetLinesApi {
         return ResponseEntity.noContent().build();
     }
 
-    // BPA-53 red-run stubs: replaced by the real implementation in the next step
+    /** BPA-53: the Timekeeper amends the hours of a sent line; SecurityConfig lets only the timekeeper group through. */
     @Override
-    public ResponseEntity<DigitalTimesheetLine> amendTimesheetLine(UUID lineId, com.lcs.star.bpa.api.generated.model.LineAmendment body) {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    public ResponseEntity<DigitalTimesheetLine> amendTimesheetLine(UUID lineId, LineAmendment body) {
+        return ResponseEntity.ok(map(service.amend(lineId, body.getHours(), body.getReason(), username())));
     }
 
+    /** BPA-53: a submission with its lines, for the Timekeeper's screen. */
     @Override
-    public ResponseEntity<com.lcs.star.bpa.api.generated.model.HoursSubmission> getHoursSubmission(UUID submissionId) {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).build();
+    public ResponseEntity<HoursSubmission> getHoursSubmission(UUID submissionId) {
+        var submission = service.submission(submissionId);
+        HoursSubmission out = new HoursSubmission();
+        out.setId(submission.id());
+        out.setWorkpackNumber(submission.workpackNumber());
+        out.setRoundNo(submission.roundNo());
+        out.setStage(HoursSubmission.StageEnum.fromValue(submission.stage()));
+        out.setSubmittedBy(submission.submittedBy());
+        out.setSubmittedAt(submission.submittedAt().atOffset(java.time.ZoneOffset.UTC));
+        out.setLines(submission.lines().stream().map(line -> {
+            HoursSubmissionLine l = new HoursSubmissionLine();
+            l.setId(line.id());
+            l.setBadgeNo(line.badgeNo());
+            l.setWorkDate(line.workDate());
+            l.setPhase(TimesheetPhase.fromValue(line.phase()));
+            l.setHours(line.hours());
+            l.setStatus(HoursSubmissionLine.StatusEnum.fromValue(line.status()));
+            l.setRemarks(line.remarks());
+            return l;
+        }).toList());
+        return ResponseEntity.ok(out);
     }
 
     // --- problems ---------------------------------------------------------------------------------------------------------
