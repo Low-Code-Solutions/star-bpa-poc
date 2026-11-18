@@ -21,7 +21,8 @@ import org.springframework.stereotype.Component;
  * <li>Timekeeper (BPA-53): Validated or Returned.</li>
  * <li>ProductionSupervisor (BPA-56): Approved, Returned or Rejected; the decider must not be the user who sent the hours (segregation of duties, data
  * model §13.2.2 "worker-checked", ASSUMPTION for hours). The task API refuses the same case first (HoursSegregationCheck), so this is the backstop.</li>
- * <li>Ppc: BPA-57. Until then a job for it fails with no retries, so Operate shows an incident that says so.</li>
+ * <li>Ppc (BPA-57): Approved (lines Approved and final, submission Closed/Approved), Returned or Rejected; the decider must be neither the sender nor an
+ * earlier decider of the submission (the Timekeeper included; ASSUMPTION, plan Q1 and Q2).</li>
  * </ul>
  * Re-run key: the user task's key ({@code completedTaskKey}, hours_decision.task_key UNIQUE, D65). The decision and the reason were checked by the task API
  * (09 S14); anything missing, unknown for the step, a submission at another stage, or a segregation breach fails the job with no retries (a retry cannot
@@ -35,9 +36,13 @@ public class RecordHoursDecisionWorker {
         return "Segregation of duties: " + username + " sent these hours and cannot decide on them";
     }
 
+    /** Jira BPA-57 scenario text (ASSUMPTION rule, as BPA-56); the task API answers 409 with it. */
+    public static final String EARLIER_DECIDER = "You already decided these hours at an earlier step";
+
     private static final Map<String, Set<String>> DECISIONS = Map.of(
             "Timekeeper", Set.of("Validated", "Returned"),
-            "ProductionSupervisor", Set.of("Approved", "Returned", "Rejected"));
+            "ProductionSupervisor", Set.of("Approved", "Returned", "Rejected"),
+            "Ppc", Set.of("Approved", "Returned", "Rejected"));
 
     private static final Logger LOG = LoggerFactory.getLogger(RecordHoursDecisionWorker.class);
 
@@ -51,7 +56,7 @@ public class RecordHoursDecisionWorker {
     public void handle(JobClient client, ActivatedJob job) {
         String step = job.getCustomHeaders().get("step");
         if (!DECISIONS.containsKey(step)) {
-            fail(client, job, "Step " + step + " of record-hours-decision is not built yet (BPA-57)");
+            fail(client, job, "Unknown step " + step + " of record-hours-decision");
             return;
         }
         Map<String, Object> variables = job.getVariablesAsMap();
@@ -75,6 +80,10 @@ public class RecordHoursDecisionWorker {
         }
         if (!"Timekeeper".equals(step) && submissions.submittedBy(submissionId).map(username::equals).orElse(false)) {
             fail(client, job, segregationMessage(username));
+            return;
+        }
+        if ("Ppc".equals(step) && submissions.earlierDeciders(submissionId, "Ppc").contains(username)) {
+            fail(client, job, EARLIER_DECIDER);
             return;
         }
         Outcome outcome;

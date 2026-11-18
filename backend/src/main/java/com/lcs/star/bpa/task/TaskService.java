@@ -119,10 +119,10 @@ public class TaskService {
             TaskValidity.check(task.elementId(), submitted).ifPresent(message -> {
                 throw problem(HttpStatus.BAD_REQUEST, message);
             });
-            // BPA-56: segregation of duties for the hours approvals (ASSUMPTION status and text, plan Q1); the task stays open
+            // BPA-56, BPA-57: segregation of duties for the hours approvals (ASSUMPTION status and text, plan Q1): 403 for the sender, 409 for an earlier decider at PPC; the task stays open
             if (segregation.appliesTo(task.elementId())) {
-                segregation.refusal(camunda.variables(task), username).ifPresent(message -> {
-                    throw problem(HttpStatus.FORBIDDEN, message);
+                segregation.refusal(task.elementId(), camunda.variables(task), username).ifPresent(refusal -> {
+                    throw problem(refusal.status(), refusal.message());
                 });
             }
             // D63 (BPA-6 plan, Ahsan 4 Nov): the save workers record who completed the task. Set here from the session, never

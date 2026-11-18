@@ -58,6 +58,19 @@ class TaskValidityTest {
         assertThat(TaskValidity.check(production, Map.of("hoursDecision", "Rejected", "hoursReason", "Not worked"))).isEqualTo(Optional.empty());
         assertThat(TaskValidity.check(production, Map.of("hoursDecision", "Approved"))).isEqualTo(Optional.empty());
     }
+
+    /** BPA-57: the PPC decision follows the Production rules ("Reason is required" unless Approved). */
+    @Test
+    void approveHoursPpcChecksDecisionAndReason() {
+        String ppc = "UserTask_ApproveHoursPpc";
+        assertThat(TaskValidity.check(ppc, Map.of())).contains("Decision is required");
+        assertThat(TaskValidity.check(ppc, Map.of("hoursDecision", "Validated"))).contains("Decision must be Approved, Returned or Rejected");
+        assertThat(TaskValidity.check(ppc, Map.of("hoursDecision", "Returned"))).contains("Reason is required");
+        assertThat(TaskValidity.check(ppc, Map.of("hoursDecision", "Rejected", "hoursReason", " "))).contains("Reason is required");
+        assertThat(TaskValidity.check(ppc, Map.of("hoursDecision", "Rejected", "hoursReason", "Duplicate of WP-000461"))).isEqualTo(Optional.empty());
+        assertThat(TaskValidity.check(ppc, Map.of("hoursDecision", "Approved"))).isEqualTo(Optional.empty());
+    }
+
     @Test
     void validCompletionsAndOtherTasksPass() {
         assertThat(TaskValidity.check(SIGN_OFF, Map.of("signOffDecision", "Approved"))).isEqualTo(Optional.empty());

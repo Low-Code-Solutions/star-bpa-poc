@@ -24,6 +24,7 @@ public final class TaskValidity {
 
     /** BPA-56: the Production Supervisor's decision; the unknown-decision text is an ASSUMPTION, "Reason is required" the story's (Returned and Rejected). */
     static final String APPROVE_PRODUCTION = "UserTask_ApproveHoursProduction";
+    static final String APPROVE_PPC = "UserTask_ApproveHoursPpc"; // BPA-57: the same decision and reason rules
     static final String PRODUCTION_DECISION_UNKNOWN = "Decision must be Approved, Returned or Rejected";
 
     private TaskValidity() {
@@ -31,7 +32,7 @@ public final class TaskValidity {
 
     /** The message to answer with (400), or empty when the completion is valid for this task. */
     public static Optional<String> check(String elementId, Map<String, Object> submitted) {
-        if (APPROVE_PRODUCTION.equals(elementId)) {
+        if (APPROVE_PRODUCTION.equals(elementId) || APPROVE_PPC.equals(elementId)) {
             return checkProductionDecision(submitted);
         }
         if (VALIDATE_HOURS.equals(elementId)) {
