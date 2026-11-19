@@ -1595,7 +1595,7 @@ components:
             line's id, data model §6.3); UserTask_SignOffRelease takes signOffDecision (Approved or Declined) and
             declineReason; UserTask_ScheduleWorkPack takes plannedStartDate and plannedEndDate; UserTask_SendHoursToFms
             (BPA-58) takes fmsHandOffs [{fmsHoursExportId, outcome (Sent to FMS or Rejected by FMS), reason}], one entry for
-            each file of the task (the reason is required, at most 250 characters, for Rejected by FMS).
+            each file of the task (the reason is required, at most 250 characters, for Rejected by FMS). The 400 texts "Outcome is required for each file", "Outcome must be Sent to FMS or Rejected by FMS", "Reason can be at most 250 characters" and "File is not part of this task" are ASSUMPTIONs ("Reason is required" is the story's).
             The backend adds `completedBy`, the session user's Camunda username, to every completion, so the save workers
             record who did the work (D63; BPA-6). It is on no allow-list: a request that sends it is refused with 400.
             Likewise it adds `completedTaskKey`, the key of the task being completed, the re-run key of a worker that records a

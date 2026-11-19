@@ -1,7 +1,7 @@
 # Plan: BPA-58 PPC Team can download each week's approved hours as an FMS timesheet file
 Jira: BPA-58 (Story, epic BPA-4)
 Story last updated: 2026-11-19T14:08:54.283+0400
-Status: Approved (Ahsan, Build Lead, 19 Nov 2026)
+Status: Closed (19 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-58-fms-hours-export, from main a9840f0 (plus the inputs commit 0c204ce)
 
@@ -134,12 +134,12 @@ The BPMN documentation of this task says E2-16, but BPA-58's BPMN Reference name
 |---|---|
 | Contract | `api/openapi.yaml`: new path `/api/v1/fms-hours-exports/{id}/file`; `TaskSummary.elementId` + `UserTask_SendHoursToFms`; complete-variables description |
 | Model | `models/bpmn/Process_PPC_WeeklyProgressPeriod.bpmn`: documentation of `ServiceTask_GenerateFmsHoursFile` gains Employment Type (Q2); `ServiceTask_RecordFmsHandOff` if Q7 A |
-| Workers | `worker/OpenProgressPeriodWorker.java`, `worker/GenerateFmsHoursFileWorker.java`, `worker/RecordFmsHandOffWorker.java` (Q7 A) |
+| Workers | `worker/OpenProgressPeriodWorker.java`, `worker/GenerateFmsHoursFileWorker.java`, `worker/RecordFmsHandOffWorker.java` (Q7 A); `fms/FmsHoursExportService.java` (the transactions); `config/PersonaSync.java` (bpa-service authorised on the weekly process) |
 | Persistence | `persistence/ProgressPeriodRepository.java`, `persistence/FmsHoursExportRepository.java` |
 | File | `fms/FmsHoursFileWriter.java` (POI; same package style as `print/`) |
-| API, task, security | `api/FmsHoursExportController.java`; `task/TaskValidity.java`; `application.yml` allow-list; `config/SecurityConfig.java` |
+| API, task, security | `api/FmsHoursExportController.java`; `task/TaskValidity.java`, `task/FmsHandOffCheck.java`, `task/TaskService.java`, `task/TaskConfig.java`; `application.yml` allow-list and process-ids; `config/SecurityConfig.java` |
 | Frontend | `SendHoursToFms/*` (+ test), `services/fmsHoursExportService.ts`, `taskScreens.ts`, `utils/constants.ts`, `TaskList.tsx`; `npm run gen:api` |
-| Tests | new `FmsHoursExportApiTest` (13 BPA58_ + extras); `FmsHoursFileWriterTest`; `FmsHoursTemplateTest`; `TaskValidityTest` row; `BookHoursFixture` (reset also clears `fms_hours_export`; new `fmsBackground()` sets CBS-139-PIP-01 on WP-000457's time sheets and adds WP-000470 (A-2299, Fabrication) with E1150's time sheet and E2001's time sheet on WP-000457) |
+| Tests | new `FmsHoursExportApiTest` (13 BPA58_ + extras); `FmsHoursFileWriterTest` (with the template check); `TaskValidityTest` row; existing test support edited: `PersonaSyncTest` (expected permission), `bpatest/ProcessTestApplication` (scan exclusions); `BookHoursFixture` (reset also clears `fms_hours_export`; new `fmsBackground()` sets CBS-139-PIP-01 on WP-000457's time sheets and adds WP-000470 (A-2299, Fabrication) with E1150's time sheet and E2001's time sheet on WP-000457) |
 | Docs | `templates/README.md`; `docs/data-model.md` notes; plan; REVIEW.md; `intent/README.md` |
 
 Not changed: database schema, seed, DMN, `HourLineService` (the BPA-50 rule picks up the new rows by itself).
@@ -306,3 +306,10 @@ Approved on 19 Nov 2026 with the recommended answers: Q1 one task for all the we
 - Completing with "Rejected by FMS" and no reason: 400 "Reason is required". "Sent to FMS": 204; `sent_by` ppc-team, `sent_at` set, no rejection; the instance waits at `UserTask_UploadCompletionReport`.
 - Not run by hand: the rejection path and the month-end split (covered by `BPA58_fmsRejectionReleasesLinesToNextFile` and `BPA58_weekAcrossMonthEndGivesTwoFiles`).
 - Side effect on the local stack: week ending 19 Nov is now cut off, so bookings dated on or before 19 Nov are closed there (BPA-50 rule). Tonight's cron fire (20:59 UTC) will start a second instance for the same week, which fails with the "already has a progress period" incident.
+
+**After the `qa-reviewer` pass (19 Nov 2026; REVIEW.md "BPA-58 at 77fff3c"):**
+- **Stale weekly instances are a deploy step, for the PR description.** `week_ending` comes from the clock when the job runs, not from when the instance started, so on a stack with old instances the first one to run opens the *current* week's period and exports every Approved line, whatever week it was meant for; the others raise incidents. Old instances sit on process version 3 (no `ServiceTask_RecordFmsHandOff`): completing their Send task records nothing, without an error. And `PersonaSync` takes effect only when `bpa-app` restarts, so a deploy without a restart leaves the jobs unauthorised. Deploy order for any stack with the weekly process already deployed: cancel its active instances, then start the new `bpa-app`. **The QA server's count and clean-up are still open (Ahsan, at deploy time).**
+- **Q11 texts, added:** "Outcome must be Sent to FMS or Rejected by FMS", "File is not part of this task", and the worker's fault messages ("Unknown outcome …", "No fmsHandOffs on the hand-off to FMS"); the first two are now marked ASSUMPTION in `api/openapi.yaml`.
+- **Test-first, stated plainly:** the three re-run tests and `FmsHoursFileWriterTest` were written with the implementation, with no red run (they need the new classes; departure 5). Nothing tests the "one transaction" claim with a rollback or concurrent run: the stamp is guarded by `FOR UPDATE` and the re-run key, and the (period, month) UNIQUE is the backstop.
+- **Known, accepted (POC):** a file that already has an outcome is skipped silently on a re-run even if the new outcome differs; duplicate entries for one file are not refused by the task API (first wins); the download has no project scope for ppc-team (BPA-76 to BPA-79).
+- **Open Jira items:** the ASSUMPTION comment (Q8 to Q13, to be shown first); Q12 (comment on E2-16's item?); the epic's `intent.md` and `spec.md` are not yet accepted by the Product Owner (Definition of Ready box). The "BPMN matches deployed" check passed: the deployed definition (version 4, key 2251799814107299) equals `models/bpmn/Process_PPC_WeeklyProgressPeriod.bpmn` after whitespace normalisation.

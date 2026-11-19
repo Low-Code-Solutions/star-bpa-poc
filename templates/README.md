@@ -79,7 +79,7 @@ that is Assigned (it has Digital Time sheets) and, if needed, the Badge Nos with
 
 ## fms-hours-export-template.xlsx
 
-The layout of the weekly FMS hours file (BPA-58; E2-08; FRD-10-1 §10.1.3.3). **It is not a download template:** nobody fills it in. The backend writes each weekly file at the cut-off (`FmsHoursFileWriter`), PPC downloads it from `GET /api/v1/fms-hours-exports/{id}/file` and uploads it to FMS by hand (FLOW-FMS-D365 p1, FLOW-CCR p3). This file is the committed picture of the layout, and `FmsHoursTemplateTest` checks its header row against the writer.
+The layout of the weekly FMS hours file (BPA-58; E2-08; FRD-10-1 §10.1.3.3). **It is not a download template:** nobody fills it in. The backend writes each weekly file at the cut-off (`FmsHoursFileWriter`), PPC downloads it from `GET /api/v1/fms-hours-exports/{id}/file` and uploads it to FMS by hand (FLOW-FMS-D365 p1, FLOW-CCR p3). This file is the committed picture of the layout, and `FmsHoursFileWriterTest` (`theCommittedTemplateHasTheWritersHeader`) checks its header row against the writer.
 
 - **ASSUMPTION.** The layout is a working assumption until STAR sends its FMS upload template (Faraz asked STAR, S1). The workbook says so in its `README` sheet; the generated files have only the `FMS Hours` sheet.
 - Sheet `FMS Hours`, header in row 1, one row per Approved line not yet exported, sorted by Date, Badge No., Project, Activity. A week with no such line gets a file with the header row only (Q-DM19). A week that spans a month-end gets one file per calendar month of the work dates (S5).
