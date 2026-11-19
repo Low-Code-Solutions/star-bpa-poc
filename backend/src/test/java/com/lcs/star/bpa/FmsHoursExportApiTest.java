@@ -8,6 +8,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.lcs.star.bpa.BookHoursFixture.FmsIds;
 import com.lcs.star.bpa.CamundaRest.Reply;
+import com.lcs.star.bpa.fms.FmsHoursExportService;
+import com.lcs.star.bpa.persistence.ProgressPeriodRepository;
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.net.http.HttpResponse;
@@ -88,6 +90,12 @@ class FmsHoursExportApiTest {
 
     @Autowired
     AssignmentFileApiTest.TestClock clock;
+
+    @Autowired
+    ProgressPeriodRepository periods;
+
+    @Autowired
+    FmsHoursExportService exportService;
 
     private BookHoursFixture fixture;
     private FmsIds fms;
@@ -338,6 +346,50 @@ class FmsHoursExportApiTest {
         assertThat(download("ppc-team", exportOf(W19, null))).noneMatch(r -> r.get(1).equals("20/11/2026"));
         cutOff(W26);
         assertThat(download("ppc-team", exportOf(W26, null))).anyMatch(r -> r.get(1).equals("20/11/2026"));
+    }
+
+    /** Re-run keys (ADR 0007, D65): a retried job runs the same service call again; it must find what the first run wrote and write nothing more. */
+    @Test
+    void aRerunOfOpenProgressPeriodReturnsThePeriodItOpened() {
+        Instant cutOffAt = Instant.parse("2026-11-19T20:59:00Z");
+
+        ProgressPeriodRepository.Period first = periods.open(7_000_001L, W19, cutOffAt, "bpa-service");
+        ProgressPeriodRepository.Period again = periods.open(7_000_001L, W19, cutOffAt, "bpa-service");
+
+        assertThat(again).isEqualTo(first);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.progress_period WHERE week_ending = ?", Integer.class, java.sql.Date.valueOf(W19))).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'progress_period' AND record_id = ?", Integer.class, first.id()))
+                .as("audited once, one row per column").isEqualTo(4);
+    }
+
+    @Test
+    void aRerunOfGenerateBuildsNoSecondFileAndStampsNoLineTwice() {
+        cutOff(W19);
+        UUID period = jdbc.queryForObject("SELECT id FROM bpa.progress_period WHERE week_ending = ?", UUID.class, java.sql.Date.valueOf(W19));
+        UUID file = exportOf(W19, null);
+
+        List<com.lcs.star.bpa.persistence.FmsHoursExportRepository.Export> again = exportService.generate(period, W19, "bpa-service");
+
+        assertThat(again).extracting(e -> e.id()).containsExactly(file);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.fms_hours_export", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.digital_timesheet_line WHERE fms_hours_export_id = ?", Integer.class, file)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'digital_timesheet_line' AND column_name = 'exported_at'",
+                Integer.class)).as("each line audited once").isEqualTo(3);
+    }
+
+    @Test
+    void aRerunOfRecordHandOffLeavesTheFirstOutcome() {
+        cutOff(W19);
+        UUID file = exportOf(W19, null);
+
+        exportService.recordHandOffs(List.of(new FmsHoursExportService.Outcome(file, SENT, null)), "ppc-team");
+        exportService.recordHandOffs(List.of(new FmsHoursExportService.Outcome(file, REJECTED, "late duplicate")), "ppc-team");
+
+        Map<String, Object> row = jdbc.queryForMap("SELECT * FROM bpa.fms_hours_export WHERE id = ?", file);
+        assertThat(row.get("sent_by")).isEqualTo("ppc-team");
+        assertThat(row.get("fms_rejected_at")).as("the second run changed nothing").isNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.digital_timesheet_line WHERE fms_hours_export_id = ?", Integer.class, file))
+                .as("no line was released").isEqualTo(3);
     }
 
     // --- helpers ----------------------------------------------------------------------------------------------------------------

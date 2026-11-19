@@ -16,6 +16,9 @@ import com.lcs.star.bpa.worker.PrepareHoursSubmissionWorker;
 import com.lcs.star.bpa.worker.PublishWorkPackAssignedWorker;
 import com.lcs.star.bpa.worker.RecordHoursDecisionWorker;
 import com.lcs.star.bpa.worker.SubmitHoursWorker;
+import com.lcs.star.bpa.worker.OpenProgressPeriodWorker;
+import com.lcs.star.bpa.worker.GenerateFmsHoursFileWorker;
+import com.lcs.star.bpa.worker.RecordFmsHandOffWorker;
 import io.camunda.client.annotation.Deployment;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -27,12 +30,12 @@ import org.springframework.context.annotation.FilterType;
 /**
  * Camunda Process Test application: only the job workers and the models, no database. It sits in a package of its own, as the
  * Camunda Process Test documentation asks, and lists the worker packages it needs. Workers that need the database are left out
- * (BPA-6: SaveWorkPackWorker; BPA-7: HourJournalHeaderWorker; BPA-8: EvaluateReleaseInputsWorker; BPA-9: RecordSignOffWorker; BPA-11: SaveWorkPackScheduleWorker; BPA-10: GenerateWorkPackPrintWorker; BPA-12, BPA-22: ValidateWorkerAssignmentWorker; BPA-14: CreateHourJournalLinesWorker; BPA-15: CreateDigitalTimesheetsWorker; BPA-49: PublishWorkPackAssignedWorker; BPA-51: PrepareHoursSubmissionWorker; BPA-53: SubmitHoursWorker and RecordHoursDecisionWorker; BPA-13: ReplaceWorkerAssignmentWorker; BPA-16: FindRevisionRecipientsWorker and SendRevisionNoticeWorker, which need the database, the Camunda group client and the mail sender); the tests that use this app complete those jobs themselves.
+ * (BPA-6: SaveWorkPackWorker; BPA-7: HourJournalHeaderWorker; BPA-8: EvaluateReleaseInputsWorker; BPA-9: RecordSignOffWorker; BPA-11: SaveWorkPackScheduleWorker; BPA-10: GenerateWorkPackPrintWorker; BPA-12, BPA-22: ValidateWorkerAssignmentWorker; BPA-14: CreateHourJournalLinesWorker; BPA-15: CreateDigitalTimesheetsWorker; BPA-49: PublishWorkPackAssignedWorker; BPA-51: PrepareHoursSubmissionWorker; BPA-53: SubmitHoursWorker and RecordHoursDecisionWorker; BPA-13: ReplaceWorkerAssignmentWorker; BPA-16: FindRevisionRecipientsWorker and SendRevisionNoticeWorker, which need the database, the Camunda group client and the mail sender; BPA-58: OpenProgressPeriodWorker, GenerateFmsHoursFileWorker and RecordFmsHandOffWorker); the tests that use this app complete those jobs themselves.
  */
 @SpringBootConfiguration
 @EnableAutoConfiguration(exclude = {DataSourceAutoConfiguration.class, FlywayAutoConfiguration.class})
 @ComponentScan(basePackages = "com.lcs.star.bpa.worker",
-        excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {SaveWorkPackWorker.class, HourJournalHeaderWorker.class, EvaluateReleaseInputsWorker.class, RecordSignOffWorker.class, SaveWorkPackScheduleWorker.class, GenerateWorkPackPrintWorker.class, ValidateWorkerAssignmentWorker.class, CreateHourJournalLinesWorker.class, CreateDigitalTimesheetsWorker.class, PublishWorkPackAssignedWorker.class, PrepareHoursSubmissionWorker.class, SubmitHoursWorker.class, RecordHoursDecisionWorker.class, ReplaceWorkerAssignmentWorker.class, FindRevisionRecipientsWorker.class, SendRevisionNoticeWorker.class}))
+        excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {SaveWorkPackWorker.class, HourJournalHeaderWorker.class, EvaluateReleaseInputsWorker.class, RecordSignOffWorker.class, SaveWorkPackScheduleWorker.class, GenerateWorkPackPrintWorker.class, ValidateWorkerAssignmentWorker.class, CreateHourJournalLinesWorker.class, CreateDigitalTimesheetsWorker.class, PublishWorkPackAssignedWorker.class, PrepareHoursSubmissionWorker.class, SubmitHoursWorker.class, RecordHoursDecisionWorker.class, ReplaceWorkerAssignmentWorker.class, FindRevisionRecipientsWorker.class, SendRevisionNoticeWorker.class, OpenProgressPeriodWorker.class, GenerateFmsHoursFileWorker.class, RecordFmsHandOffWorker.class}))
 @Deployment(resources = {"classpath*:bpmn/*.bpmn", "classpath*:dmn/*.dmn"})
 public class ProcessTestApplication {
 }
