@@ -24,7 +24,7 @@ class TaskConfig {
     }
 
     @Bean
-    TaskService taskService(CamundaTaskClient camunda, TaskAllowList allowList, HoursSegregationCheck segregation) {
-        return new TaskService(camunda, allowList, segregation);
+    TaskService taskService(CamundaTaskClient camunda, TaskAllowList allowList, HoursSegregationCheck segregation, FmsHandOffCheck fmsHandOff) {
+        return new TaskService(camunda, allowList, segregation, fmsHandOff);
     }
 }

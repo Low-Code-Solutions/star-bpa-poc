@@ -41,11 +41,13 @@ public class TaskService {
     private final CamundaTaskClient camunda;
     private final TaskAllowList allowList;
     private final HoursSegregationCheck segregation;
+    private final FmsHandOffCheck fmsHandOff;
 
-    public TaskService(CamundaTaskClient camunda, TaskAllowList allowList, HoursSegregationCheck segregation) {
+    public TaskService(CamundaTaskClient camunda, TaskAllowList allowList, HoursSegregationCheck segregation, FmsHandOffCheck fmsHandOff) {
         this.camunda = camunda;
         this.allowList = allowList;
         this.segregation = segregation;
+        this.fmsHandOff = fmsHandOff;
     }
 
     /** Open tasks whose candidate groups include one of the user's groups, oldest first. */
@@ -123,6 +125,12 @@ public class TaskService {
             if (segregation.appliesTo(task.elementId())) {
                 segregation.refusal(task.elementId(), camunda.variables(task), username).ifPresent(refusal -> {
                     throw problem(refusal.status(), refusal.message());
+                });
+            }
+            // BPA-58: the Send hours to FMS completion names every file of the task and no other (ASSUMPTION texts); the task stays open
+            if (fmsHandOff.appliesTo(task.elementId())) {
+                fmsHandOff.refusal(camunda.variables(task), submitted).ifPresent(message -> {
+                    throw problem(HttpStatus.BAD_REQUEST, message);
                 });
             }
             // D63 (BPA-6 plan, Ahsan 4 Nov): the save workers record who completed the task. Set here from the session, never
