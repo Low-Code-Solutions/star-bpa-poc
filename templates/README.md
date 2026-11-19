@@ -122,7 +122,7 @@ The layout of the weekly FMS completion report (BPA-59; E2-09; FLOW-CCR p3, FLOW
 
 - The report has no week column: it belongs to the week of the task it is uploaded into (the upload names the open task).
 - Each row gets one outcome: `Read`, or `Work Pack not found`, `Work Pack is not In Progress`, `Completion % must be a number`, `Completion % can have at most 2 decimal places`, `Duplicate row for <WP>`, `Source <x> is not the configured progress source` (the story's texts), and the ASSUMPTION texts for a missing required value, an Actual hours that is not a number of 0 or more, and a Completion % outside -999.99 to 999.99. A report with no `Read` row goes back to the upload task with "No usable rows in the completion report". Several uploads may be made into one task; the one named when the task is completed is the one that counts.
-- The tests build their own files (`CompletionReportBuilder`, test sources, which also writes the two fixtures under `backend/src/test/resources/fms/`); **tests never use the demo files.**
+- The tests build their own files (`CompletionReportBuilder`, test sources, in memory, as the Epic 1 uploads; it also writes the demo file of the bad rows); **tests never use the demo files.**
 
 ### demo/ (completion report)
 

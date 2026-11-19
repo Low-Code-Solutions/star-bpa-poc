@@ -9,7 +9,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.lcs.star.bpa.CamundaRest.Reply;
 import com.lcs.star.bpa.progress.CompletionProgressService;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.http.HttpResponse;
 import java.time.Instant;
@@ -30,7 +29,6 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -44,7 +42,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * Outlines are one test each). Background: today is 20 Nov 2026 (Asia/Riyadh); the weekly instance for the week ending 19 Nov 2026 waits at
  * UserTask_UploadCompletionReport (started there with startInstructions, with a progress_period row that carries its key); {@link BookHoursFixture}
  * with {@code completionBackground} (WP-000457 and WP-000461 In Progress, WP-000480 Released); logged in as ppc-team. The upload names the open task
- * ({@code taskKey}, plan Q8). Files come from {@link CompletionReportBuilder} or, for the two named fixtures, src/test/resources/fms/; the demo files in
+ * ({@code taskKey}, plan Q8). Every file comes from {@link CompletionReportBuilder}, in memory (no .xlsx is committed under backend/, the BPA-43 guard); the demo files in
  * templates/demo are never used. The progress source is set through the environment ({@code bpa.progress.source}), which the app reads at each call.
  */
 @Tag("integration")
@@ -130,8 +128,8 @@ class CompletionReportApiTest {
     // --- the scenarios ----------------------------------------------------------------------------------------------------
 
     @Test
-    void BPA59_validReportIsRead() throws IOException {
-        HttpResponse<String> uploaded = upload("ppc-team", task, "fms-completion-wk47.xlsx", fixture("fms/fms-completion-wk47.xlsx"));
+    void BPA59_validReportIsRead() {
+        HttpResponse<String> uploaded = upload("ppc-team", task, "fms-completion-wk47.xlsx", CompletionReportBuilder.wk47());
 
         assertThat(uploaded.statusCode()).as(uploaded.body()).isEqualTo(201);
         assertThat(outcomes(uploaded)).containsExactly(READ, READ);
@@ -207,8 +205,8 @@ class CompletionReportApiTest {
     }
 
     @Test
-    void BPA59_otherPersonasCannotUploadReport() throws IOException {
-        HttpResponse<String> refused = upload("supervisor", task, "fms-completion-wk47.xlsx", fixture("fms/fms-completion-wk47.xlsx"));
+    void BPA59_otherPersonasCannotUploadReport() {
+        HttpResponse<String> refused = upload("supervisor", task, "fms-completion-wk47.xlsx", CompletionReportBuilder.wk47());
 
         assertThat(refused.statusCode()).isEqualTo(403);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.completion_report", Integer.class)).isZero();
@@ -227,8 +225,8 @@ class CompletionReportApiTest {
 
     /** The Scenario Outline: "notes.txt" renamed to "r.xlsx" is a file-level outcome; a 6 MB file is refused with 413. */
     @Test
-    void BPA59_unreadableOrLargeFileIsRefused() throws IOException {
-        HttpResponse<String> unreadable = upload("ppc-team", task, "r.xlsx", fixture("fms/r.xlsx"));
+    void BPA59_unreadableOrLargeFileIsRefused() {
+        HttpResponse<String> unreadable = upload("ppc-team", task, "r.xlsx", CompletionReportBuilder.notASpreadsheet());
         HttpResponse<String> large = upload("ppc-team", task, "big.xlsx", new byte[6 * 1024 * 1024]);
 
         assertThat(unreadable.statusCode()).as(unreadable.body()).isEqualTo(201);
@@ -401,10 +399,6 @@ class CompletionReportApiTest {
     private static List<String> outcomes(HttpResponse<String> uploaded) {
         assertThat(uploaded.statusCode()).as(uploaded.body()).isEqualTo(201);
         return rows(uploaded).stream().map(r -> r.path("outcome").asText()).toList();
-    }
-
-    private static byte[] fixture(String path) throws IOException {
-        return new ClassPathResource(path).getContentAsByteArray();
     }
 
     private BigDecimal reported(String workpackNumber) {

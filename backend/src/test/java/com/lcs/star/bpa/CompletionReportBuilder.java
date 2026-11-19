@@ -17,9 +17,10 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 /**
  * Builds completion report files for the tests (BPA-59; ADR 0009 pattern, as {@link TimesheetFileBuilder}): the layout of the template, sheet
  * "Completion", a header row, then one row per Work Pack, as .xlsx or .csv. Tests never use the demo files in templates/demo: every file comes from here.
- * A Number becomes a numeric cell (so 40.125 is a number, not text); a String stays text. {@link #main} writes the two committed test fixtures under
- * src/test/resources/fms/ (comment 10490): {@code fms-completion-wk47.xlsx} (the rows of the story's first scenario) and {@code r.xlsx} (a text file
- * renamed, "notes.txt" renamed to "r.xlsx").
+ * A Number becomes a numeric cell (so 40.125 is a number, not text); a String stays text. The two files the story names (comment 10490 puts them under
+ * src/test/resources/fms/) are made here in memory instead: {@link #wk47()} ("fms-completion-wk47.xlsx", the rows of the first scenario) and
+ * {@link #notASpreadsheet()} ("notes.txt" renamed to "r.xlsx"), because ModelResourcesTest (BPA-43, ADR 0003) allows no .xlsx under backend/. {@link #main}
+ * writes the demo file of the bad rows into templates/demo.
  */
 public final class CompletionReportBuilder {
 
@@ -110,17 +111,20 @@ public final class CompletionReportBuilder {
                 .xlsx();
     }
 
-    /**
-     * Writes the committed fixtures: {@code java ... CompletionReportBuilder backend/src/test/resources/fms}; with a second argument, the demo file of the
-     * bad rows into that folder (templates/demo).
-     */
+    /** The report of the story's first scenario ("fms-completion-wk47.xlsx"): WP-000457 at 40% with 150 hours, WP-000461 at 100% with 95, both from FMS. */
+    public static byte[] wk47() {
+        return report().row("WP-000457", 40, 150).row("WP-000461", 100, 95).xlsx();
+    }
+
+    /** "notes.txt" renamed to "r.xlsx": text that is not a workbook, so the file cannot be read. */
+    public static byte[] notASpreadsheet() {
+        return "These are notes, not a workbook.\n".getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** Writes the demo file of the bad rows into the folder given (templates/demo): {@code java ... CompletionReportBuilder templates/demo}. */
     public static void main(String[] args) throws IOException {
-        Path dir = Path.of(args.length > 0 ? args[0] : "src/test/resources/fms");
+        Path dir = Path.of(args.length > 0 ? args[0] : "templates/demo");
         Files.createDirectories(dir);
-        Files.write(dir.resolve("fms-completion-wk47.xlsx"), report().row("WP-000457", 40, 150).row("WP-000461", 100, 95).xlsx());
-        Files.write(dir.resolve("r.xlsx"), "These are notes, not a workbook.\n".getBytes(StandardCharsets.UTF_8));
-        if (args.length > 1) {
-            Files.write(Path.of(args[1]).resolve("completion-demo-bad-rows.xlsx"), demoBadRows());
-        }
+        Files.write(dir.resolve("completion-demo-bad-rows.xlsx"), demoBadRows());
     }
 }

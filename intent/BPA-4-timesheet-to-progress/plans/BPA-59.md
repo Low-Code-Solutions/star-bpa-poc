@@ -273,3 +273,7 @@ Approved with the recommended answers (Resolutions above).
 - supervisor `POST /api/v1/completion-reports` → 403.
 - Not run by hand: an `.xlsx` upload from the portal screen, the 6 MB file, the setting `progress.source` = PMS (covered by `BPA59_unreadableOrLargeFileIsRefused` and `BPA59_theConfiguredProgressSourceIsAccepted`).
 - Side effect on the local stack: two `completion_report` rows and two `workpack_progress` rows for the 19 Nov week.
+
+**Found by the full `./mvnw -B verify` (533 tests; 2 failures in existing tests, both fixed):**
+8. **No fixture files are committed under `backend/src/test/resources/fms/`.** The plan (and Jira comment 10490) put the two named test files there, but `ModelResourcesTest.BPA43_noModelOrTemplateIsCopiedIntoBackend` allows no `.xlsx` under `backend/` (ADR 0003). The repo's own practice for Epic 1 uploads is files built in memory, so `CompletionReportBuilder.wk47()` and `notASpreadsheet()` make them, the guard stays as it is, and the two files were removed again (`git rm`). **Comment 10490's "test fixtures stay under backend/src/test/resources/fms/" is therefore not followed; to say in the PR and in the Jira comment.**
+9. **`FlywayBaselineTest.BPA43_applicationStartsAndFlywayAppliesV1V2AndSeed` expects the migration list** (V1, V2, seed); V3 is the third migration, so its expected list gained "completion row source raw": **an edit to an existing test, to say in the PR.** The table count (50) is unchanged: V3 adds a column, not a table.
