@@ -48,7 +48,7 @@ public class CompletionReportService {
     public UUID upload(long processInstanceKey, String fileName, byte[] file, String username) {
         Period period = periods.ofInstance(processInstanceKey).orElseThrow(() -> new ErrorResponseException(HttpStatus.CONFLICT,
                 ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "The week of this task has no progress period"), null)); // ASSUMPTION text
-        TabularFileReader.Result read = TabularFileReader.read(fileName, file, REQUIRED, OPTIONAL);
+        TabularFileReader.Result read = TabularFileReader.read(fileName, file, REQUIRED, OPTIONAL, true); // the cell value, not its display (QA review)
         UUID id = reports.insertReport(period.id(), fileName, sha256(file), username, read.fileOutcome());
         String configured = settings.source();
         Set<String> seen = new HashSet<>();

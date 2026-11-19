@@ -40,6 +40,10 @@ public class CompletionProgressService {
         if ("Invalid".equals(outcome)) {
             return Decision.INVALID;
         }
+        if (outcome != null) {
+            // a file-level line ("File cannot be read", ...): the report has no row to read; the line stays as it is (QA review: GET result keeps its meaning)
+            return Decision.INVALID;
+        }
         List<ReadRow> read = reports.readRows(reportId);
         if (read.isEmpty()) {
             reports.setOutcome(reportId, "Invalid", username);

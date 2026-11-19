@@ -5,10 +5,18 @@ import static com.lcs.star.bpa.CamundaSteps.openTasks;
 import static com.lcs.star.bpa.CamundaSteps.poll;
 import static com.lcs.star.bpa.CamundaSteps.toJson;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.lcs.star.bpa.CamundaRest.Reply;
 import com.lcs.star.bpa.progress.CompletionProgressService;
+import com.lcs.star.bpa.worker.ReadCompletionReportWorker;
+import io.camunda.client.api.response.ActivatedJob;
+import io.camunda.client.api.worker.JobClient;
 import java.math.BigDecimal;
 import java.net.http.HttpResponse;
 import java.time.Instant;
@@ -87,6 +95,9 @@ class CompletionReportApiTest {
 
     @Autowired
     CompletionProgressService progress;
+
+    @Autowired
+    ReadCompletionReportWorker readWorker;
 
     private AssignmentFlow flow;
     private long instance;
@@ -352,6 +363,53 @@ class CompletionReportApiTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.workpack_progress", Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'workpack_progress' AND column_name = 'reported_pct'", Integer.class))
                 .as("audited once").isEqualTo(1);
+    }
+
+    /** QA review of BPA-59: a number is judged on the cell's own value (plan section 3), not on what the cell's number format shows. */
+    @Test
+    void aFormattedCellIsJudgedOnItsValueNotOnItsDisplay() {
+        byte[] file = CompletionReportBuilder.report().numberFormat("0.00").row("WP-000457", 40.125, 150).xlsx(); // Excel shows 40.13
+
+        HttpResponse<String> uploaded = upload("ppc-team", task, "r.xlsx", file);
+
+        assertThat(outcomes(uploaded)).containsExactly("Completion % can have at most 2 decimal places");
+        assertThat(rows(uploaded).get(0).path("completionPct").asText()).isEqualTo("40.125");
+    }
+
+    /** QA review of BPA-59: the report's decision (Accepted, Invalid) is not the file-level line; GET result keeps the contract's meaning of `outcome`. */
+    @Test
+    void theResultKeepsTheFileLevelLineAfterTheDecision() {
+        UUID unreadable = reportId(upload("ppc-team", task, "r.xlsx", CompletionReportBuilder.notASpreadsheet()));
+        assertThat(completeWith(task, unreadable).statusCode()).isEqualTo(204);
+        String back = awaitTask(instance, UPLOAD, task);
+        UUID good = reportId(upload("ppc-team", back, "r.xlsx", CompletionReportBuilder.report().row("WP-000457", 40, 150).xlsx()));
+        assertThat(completeWith(back, good).statusCode()).isEqualTo(204);
+        awaitTask(instance, APPROVE, null);
+
+        JsonNode first = json(flow.loggedInAs("ppc-team").get("/api/v1/completion-reports/" + unreadable + "/result").body());
+        JsonNode second = json(flow.loggedInAs("ppc-team").get("/api/v1/completion-reports/" + good + "/result").body());
+
+        assertThat(first.path("outcome").asText()).as("an unreadable file keeps its file-level line").isEqualTo("File cannot be read");
+        assertThat(second.path("outcome").isMissingNode()).as("rows carry the outcomes: no file-level line").isTrue();
+        assertThat(second.path("rows")).hasSize(1);
+    }
+
+    /** QA review of BPA-59: the job fails with no retries for a report of another week (the task API refuses it first; this is the backstop). */
+    @Test
+    void theReadJobFailsForAReportOfAnotherWeek() {
+        long other = startAtUpload();
+        insertPeriod(LocalDate.of(2026, 11, 26), other);
+        UUID foreign = reportId(upload("ppc-team", awaitTask(other, UPLOAD, null), "r.xlsx", CompletionReportBuilder.report().row("WP-000457", 40, 150).xlsx()));
+        ActivatedJob job = mock(ActivatedJob.class);
+        when(job.getKey()).thenReturn(4_000_000_003L);
+        when(job.getProcessInstanceKey()).thenReturn(instance);
+        when(job.getVariablesAsMap()).thenReturn(Map.of("completionReportId", foreign.toString(), "completedBy", "ppc-team"));
+        JobClient client = mock(JobClient.class, RETURNS_DEEP_STUBS);
+
+        readWorker.handle(client, job);
+
+        verify(client.newFailCommand(anyLong()).retries(0)).errorMessage("Completion report " + foreign + " does not belong to the week of this instance");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.workpack_progress", Integer.class)).isZero();
     }
 
     // --- helpers ----------------------------------------------------------------------------------------------------------------

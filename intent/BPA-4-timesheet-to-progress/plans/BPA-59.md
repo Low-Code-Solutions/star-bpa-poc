@@ -1,7 +1,7 @@
 # Plan: BPA-59 PPC Team can upload the weekly FMS completion report and see each row's outcome
 Jira: BPA-59 (Story, epic BPA-4)
-Story last updated: 2026-11-19T18:06:46.209+0400
-Status: Approved (Ahsan, Build Lead, 19 Nov 2026)
+Story last updated: 2026-11-19T19:17:08.945+0400
+Status: Closed (19 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-59-completion-report-upload, from main f11edaa (plus the inputs commit 596bae1)
 
@@ -277,3 +277,10 @@ Approved with the recommended answers (Resolutions above).
 **Found by the full `./mvnw -B verify` (533 tests; 2 failures in existing tests, both fixed):**
 8. **No fixture files are committed under `backend/src/test/resources/fms/`.** The plan (and Jira comment 10490) put the two named test files there, but `ModelResourcesTest.BPA43_noModelOrTemplateIsCopiedIntoBackend` allows no `.xlsx` under `backend/` (ADR 0003). The repo's own practice for Epic 1 uploads is files built in memory, so `CompletionReportBuilder.wk47()` and `notASpreadsheet()` make them, the guard stays as it is, and the two files were removed again (`git rm`). **Comment 10490's "test fixtures stay under backend/src/test/resources/fms/" is therefore not followed; to say in the PR and in the Jira comment.**
 9. **`FlywayBaselineTest.BPA43_applicationStartsAndFlywayAppliesV1V2AndSeed` expects the migration list** (V1, V2, seed); V3 is the third migration, so its expected list gained "completion row source raw": **an edit to an existing test, to say in the PR.** The table count (50) is unchanged: V3 adds a column, not a table.
+
+**After the `qa-reviewer` pass (19 Nov 2026; REVIEW.md "BPA-59 at 8c4da85"); the plan header now carries Jira's `updated` (a move to In Progress; the description is unchanged):**
+10. **A numeric cell is read as its own value** (`TabularFileReader.read(..., rawNumbers)`, used by the completion report upload only): an .xlsx cell 40.125 formatted `0.00` showed "40.13" and read as Read. The time sheet upload keeps the displayed text (BPA-52 unchanged). New test `aFormattedCellIsJudgedOnItsValueNotOnItsDisplay`, red first.
+11. **`outcome` of the result is the file-level line only.** `completion_report.outcome` also holds the report's decision (Accepted, Invalid), so `GET .../result` hides those two values, and a report with a file-level line ("File cannot be read") is not overwritten by the decision. Test `theResultKeepsTheFileLevelLineAfterTheDecision`, red first. The field is `outcome` in the contract (the plan called it `fileOutcome`).
+12. **A row with a missing value counts for the duplicate rule** (the Work Pack is added to the seen set before the required Completion % and Source checks), as the plan text and the data-model note say; the Source in the message is trimmed. Tests `aRowWithAMissingValueStillCountsForTheDuplicateRule` and `theSourceInTheMessageIsTrimmed`, red first. `theReadJobFailsForAReportOfAnotherWeek` covers the worker's fail branch (it passed at once: the branch existed).
+13. **Known and accepted (POC):** the plan said the period "must be CutOff", but the upload does not check the period's status (the weekly instance's period is CutOff until its lock ends the instance); a .csv value with a NUL character (U+0000) is refused by PostgreSQL and the upload answers 500; `WorkpackProgressRepository.setReported` overwrites `reported_pct` on a row that already has `approved_pct` (unreachable until BPA-60: nothing approves a % before the report is read); a Read row whose Work Pack is deleted before the task is completed makes the job throw and retry (an incident); a missing `taskKey` gets the framework's 400; the three tests of the shared reader come from BPA-52's suites (no `TabularFileReaderTest` of its own).
+14. **Tests written after the code, with no red run, stated plainly:** `CompletionRowChecksTest` (the first 9) and `aRerunOfReadCompletionReportChangesNothing`; nothing tests the one-transaction claim with a rollback.

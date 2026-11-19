@@ -49,6 +49,7 @@ public final class CompletionRowChecks {
         if (row.workpackNumber() == null) {
             return WORKPACK_REQUIRED;
         }
+        boolean duplicate = !seen.add(row.workpackNumber()); // counted from its number, whatever else the row lacks (QA review)
         if (row.completion() == null) {
             return COMPLETION_REQUIRED;
         }
@@ -56,7 +57,6 @@ public final class CompletionRowChecks {
             return SOURCE_REQUIRED;
         }
         Optional<String> status = workPackStatus.apply(row.workpackNumber());
-        boolean duplicate = !seen.add(row.workpackNumber());
         if (status.isEmpty()) {
             return WORKPACK_NOT_FOUND;
         }
@@ -80,7 +80,7 @@ public final class CompletionRowChecks {
             return HOURS_INVALID;
         }
         if (!configuredSource.equalsIgnoreCase(row.source().trim())) {
-            return "Source " + row.source() + " is not the configured progress source";
+            return "Source " + row.source().trim() + " is not the configured progress source";
         }
         return READ;
     }

@@ -86,6 +86,24 @@ class CompletionRowChecksTest {
                 .isEqualTo("Duplicate row for WP-000457");
     }
 
+    /** QA review of BPA-59: "whatever that row's outcome" includes a row refused for a missing value; the Work Pack counts as seen from its number. */
+    @Test
+    void aRowWithAMissingValueStillCountsForTheDuplicateRule() {
+        Set<String> seen = new HashSet<>();
+        assertThat(CompletionRowChecks.check(new Raw("WP-000457", null, "1", "FMS"), seen, CompletionRowChecksTest::status, "FMS"))
+                .isEqualTo("Completion % is required");
+        assertThat(CompletionRowChecks.check(new Raw("WP-000457", "45", "1", null), seen, CompletionRowChecksTest::status, "FMS"))
+                .as("a missing source is a required value too, and the earlier row counted").isEqualTo("Source is required");
+        assertThat(CompletionRowChecks.check(new Raw("WP-000457", "45", "1", "FMS"), seen, CompletionRowChecksTest::status, "FMS"))
+                .isEqualTo("Duplicate row for WP-000457");
+    }
+
+    /** QA review of BPA-59: the message names the Source as written, without the spaces around it. */
+    @Test
+    void theSourceInTheMessageIsTrimmed() {
+        assertThat(check("WP-000457", "40", "1", " PMS ")).isEqualTo("Source PMS is not the configured progress source");
+    }
+
     @Test
     void theKnownSourcesAreFmsAndPms() {
         assertThat(CompletionRowChecks.knownSource(" pms ")).contains("PMS");

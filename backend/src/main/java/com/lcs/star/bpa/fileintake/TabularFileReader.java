@@ -69,9 +69,17 @@ public final class TabularFileReader {
     }
 
     public static Result read(String fileName, byte[] file, List<String> required, List<String> optional) {
+        return read(fileName, file, required, optional, false);
+    }
+
+    /**
+     * As above; with {@code rawNumbers} a numeric .xlsx cell is read as its own value (40.125 stays 40.125, 150 becomes "150") instead of as Excel displays it,
+     * so a number format such as 0.00 cannot round a value before it is checked (BPA-59 QA review). The time sheet upload keeps the displayed text (BPA-52).
+     */
+    public static Result read(String fileName, byte[] file, List<String> required, List<String> optional, boolean rawNumbers) {
         String name = fileName == null ? "" : fileName.toLowerCase(Locale.ROOT);
         if (name.endsWith(".xlsx")) {
-            return readXlsx(file, required, optional);
+            return readXlsx(file, required, optional, rawNumbers);
         }
         if (name.endsWith(".csv")) {
             return readCsv(file, required, optional);
@@ -81,12 +89,12 @@ public final class TabularFileReader {
 
     // --- .xlsx ------------------------------------------------------------------------------------------------------------
 
-    private static Result readXlsx(byte[] file, List<String> required, List<String> optional) {
+    private static Result readXlsx(byte[] file, List<String> required, List<String> optional, boolean rawNumbers) {
         try (Workbook workbook = new XSSFWorkbook(new ByteArrayInputStream(file))) {
             if (workbook.getNumberOfSheets() == 0) {
                 return new Result(CANNOT_BE_READ, List.of());
             }
-            return xlsxRows(workbook.getSheetAt(0), required, optional);
+            return xlsxRows(workbook.getSheetAt(0), required, optional, rawNumbers);
         } catch (Exception e) {
             // Not a workbook, an old .xls, empty or damaged: POI raises several kinds of exception; all are "cannot be read".
             LOG.debug("The file could not be read as .xlsx", e);
@@ -94,7 +102,7 @@ public final class TabularFileReader {
         }
     }
 
-    private static Result xlsxRows(Sheet sheet, List<String> required, List<String> optional) {
+    private static Result xlsxRows(Sheet sheet, List<String> required, List<String> optional, boolean rawNumbers) {
         DataFormatter formatter = new DataFormatter(Locale.ENGLISH);
         Row header = sheet.getRow(0);
         List<String> headerCells = new ArrayList<>();
@@ -116,7 +124,7 @@ public final class TabularFileReader {
             }
             List<String> cells = new ArrayList<>();
             for (int c = 0; c <= row.getLastCellNum(); c++) {
-                cells.add(cellText(formatter, row.getCell(c)));
+                cells.add(cellText(formatter, row.getCell(c), rawNumbers));
             }
             TabularRow parsed = rowOf(r + 1, cells, columns, required, optional);
             if (parsed == null) {
@@ -131,12 +139,15 @@ public final class TabularFileReader {
     }
 
     /** The cell as displayed, trimmed; a real Excel date becomes dd/mm/yyyy; empty is "". */
-    private static String cellText(DataFormatter formatter, Cell cell) {
+    private static String cellText(DataFormatter formatter, Cell cell, boolean rawNumbers) {
         if (cell == null) {
             return "";
         }
         if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
             return EXCEL_DATE.format(cell.getLocalDateTimeCellValue().toLocalDate());
+        }
+        if (rawNumbers && cell.getCellType() == CellType.NUMERIC) {
+            return java.math.BigDecimal.valueOf(cell.getNumericCellValue()).stripTrailingZeros().toPlainString();
         }
         return formatter.formatCellValue(cell).trim();
     }

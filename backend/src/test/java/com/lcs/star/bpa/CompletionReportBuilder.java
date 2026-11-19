@@ -28,6 +28,7 @@ public final class CompletionReportBuilder {
     public static final List<String> HEADERS = List.of("Workpack number", "Completion %", "Actual hours", "Source");
 
     private List<String> headers = HEADERS;
+    private String numberFormat;
     private final List<List<Object>> rows = new ArrayList<>();
 
     public static CompletionReportBuilder report() {
@@ -37,6 +38,12 @@ public final class CompletionReportBuilder {
     /** Other column headers: another case or order (the rows keep the template's order of cells), or columns missing. */
     public CompletionReportBuilder headers(String... headers) {
         this.headers = List.of(headers);
+        return this;
+    }
+
+    /** A number format (for example "0.00") for the numeric cells of the .xlsx: Excel then shows the value rounded, while the cell keeps its value. */
+    public CompletionReportBuilder numberFormat(String format) {
+        this.numberFormat = format;
         return this;
     }
 
@@ -60,6 +67,11 @@ public final class CompletionReportBuilder {
     public byte[] xlsx() {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Completion");
+            org.apache.poi.ss.usermodel.CellStyle style = null;
+            if (numberFormat != null) {
+                style = workbook.createCellStyle();
+                style.setDataFormat(workbook.createDataFormat().getFormat(numberFormat));
+            }
             Row header = sheet.createRow(0);
             for (int c = 0; c < headers.size(); c++) {
                 header.createCell(c).setCellValue(headers.get(c));
@@ -71,6 +83,9 @@ public final class CompletionReportBuilder {
                     Object value = cells.get(c);
                     if (value instanceof Number number) {
                         row.createCell(c).setCellValue(number.doubleValue());
+                        if (style != null) {
+                            row.getCell(c).setCellStyle(style);
+                        }
                     } else if (value != null) {
                         row.createCell(c).setCellValue(value.toString());
                     }

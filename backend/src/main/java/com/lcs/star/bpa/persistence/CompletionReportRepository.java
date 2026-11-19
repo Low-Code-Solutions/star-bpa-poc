@@ -109,7 +109,10 @@ public class CompletionReportRepository {
         Object[] h = header.get();
         CompletionReportResult result = new CompletionReportResult(reportId, (String) h[0], ((Instant) h[1]).atOffset(ZoneOffset.UTC),
                 (java.time.LocalDate) h[3], rows);
-        result.setOutcome((String) h[2]);
+        // The report's decision (Accepted, Invalid) shares the column with the file-level line but is not part of the contract's `outcome`, which is the
+        // file-level line only and absent when the rows carry the outcomes (QA review of BPA-59).
+        String stored = (String) h[2];
+        result.setOutcome("Accepted".equals(stored) || "Invalid".equals(stored) ? null : stored);
         return Optional.of(result);
     }
 
