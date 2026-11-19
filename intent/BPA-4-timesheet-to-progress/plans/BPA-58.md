@@ -274,3 +274,23 @@ Extra tests (not scenarios):
 ## Human-gap log
 - FMS layout template and demo staged from the Epic 2 draft pack by Ahsan via Claude before the plan (commit 0c204ce), a departure from ADR 0015.
 - Docker Desktop was not running during planning, so the count of stale weekly instances on the local stack is unknown.
+
+## Progress and departures (19 Nov 2026)
+Approved on 19 Nov 2026 with the recommended answers: Q1 one task for all the week's files, Q5 a per-file outcome (only a rejected file's lines are released), Q7 option A (the new `ServiceTask_RecordFmsHandOff`, a BPMN change), Q2 the documentation text fixed. The plan's other ASSUMPTIONs (Q8 to Q13) stand and go to Jira as one comment, to be shown first.
+
+**Red runs** (committed apart, 043c269 and eb07bd8):
+- `FmsHoursExportApiTest`: 18 of 18 failed. 17 timed out waiting for `UserTask_SendHoursToFms` (no worker opens the period); the unknown-file test got "No static resource" (no endpoint). Scenario 9 failed on its Given (the file) as expected.
+- `TaskValidityTest.sendHoursToFmsChecksOutcomeAndReason` failed: no rule for the element.
+- React `SendHoursToFms.test.tsx`: "Failed to resolve import ./SendHoursToFms".
+- The integration red run came after Docker Desktop was started by Ahsan (it was not running when the plan was written).
+
+**Departures from the plan:**
+1. **`bpa-service` needed authorising on the weekly process.** The first green run still timed out: `PersonaSync.SERVICE_PERMISSIONS` lists the processes `bpa-service` may work on, and `Process_PPC_WeeklyProgressPeriod` was not in it, so Camunda never handed it a job. Added (an ASSUMPTION, proven by the BPA58_ tests), and `PersonaSyncTest.expectedServicePermissions` gained the same entry: **an edit to an existing test, to say in the PR**. On a real stack this takes effect at the next start of `bpa-app` (the persona sync).
+2. **`application.yml` `bpa.tasks.process-ids`** gains `Process_PPC_WeeklyProgressPeriod`, so the task API serves its user tasks (not in the Files table).
+3. **`FmsHandOffCheck`** (task package) is a new class: the completion must name every file of the task and no other. Texts: "Outcome is required for each file" for a missing file, "File is not part of this task" for another (ASSUMPTION). The plan had described this as part of `TaskValidity`.
+4. **`FmsHoursExportService`** (package `fms`) owns the transactions of the generate and hand-off steps; the repositories take part in them.
+5. **Re-run tests** call the services directly in `FmsHoursExportApiTest` (`aRerunOfOpenProgressPeriod…`, `aRerunOfGenerate…`, `aRerunOfRecordHandOff…`) instead of the mocked JobClient the plan named: the workers are thin, and the services hold the re-run logic.
+6. **`FmsHoursTemplateTest`** is folded into `FmsHoursFileWriterTest` (`theCommittedTemplateHasTheWritersHeader`).
+7. The new `Reason can be at most 250 characters` check trims first, as the story's limit is on the reason text.
+
+**Human-gap log, added:** Docker Desktop was started by Ahsan for the integration red run. The stale weekly instances on the local stack (Q3) were not yet counted or cancelled at this point.
