@@ -106,6 +106,9 @@ bpa:
       "[UserTask_SendHoursToFms]": # ppc-team, BPA-58: fmsHandOffs, one entry per file ({fmsHoursExportId, outcome, reason}); read gives the week and the files to list
         write: [fmsHandOffs]
         read: [weekEnding, fmsHoursExports]
+      "[UserTask_UploadCompletionReport]": # ppc-team, BPA-59: the id of the upload that counts (Q-DM20); read gives the week; validationMessages has its own field
+        write: [completionReportId]
+        read: [weekEnding]
       "[UserTask_CreateWorkPack]": # time-method-analyst (G9), BPA-6
         write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
         read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]

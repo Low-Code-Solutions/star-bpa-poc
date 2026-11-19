@@ -97,6 +97,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/hours-submissions/**").hasAnyAuthority(TIMEKEEPER, PRODUCTION_SUPERVISOR, PPC_TEAM)
                         // BPA-58: only the PPC Team downloads the weekly FMS hours file (agreed 10 Nov 2026 (a))
                         .requestMatchers("/api/v1/fms-hours-exports/**").hasAuthority(PPC_TEAM)
+                        // BPA-59: only the PPC Team uploads the weekly completion report and reads its result
+                        .requestMatchers("/api/v1/completion-reports/**", "/api/v1/completion-reports").hasAuthority(PPC_TEAM)
                         .anyRequest().authenticated())
                 // S26: token in the XSRF-TOKEN cookie (readable by React), sent back as X-XSRF-TOKEN on every state-changing call,
                 // the login included. The plain handler lets React send the cookie value unchanged.
