@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.lcs.star.bpa.CamundaRest.Reply;
+import com.lcs.star.bpa.progress.CompletionProgressService;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.http.HttpResponse;
@@ -85,6 +86,9 @@ class CompletionReportApiTest {
 
     @Autowired
     ConfigurableEnvironment environment;
+
+    @Autowired
+    CompletionProgressService progress;
 
     private AssignmentFlow flow;
     private long instance;
@@ -332,6 +336,24 @@ class CompletionReportApiTest {
         assertThat(jdbc.queryForObject("""
                 SELECT reported_pct FROM bpa.workpack_progress p JOIN bpa.workpack w ON w.id = p.workpack_id WHERE w.workpack_number = 'WP-000461'""",
                 BigDecimal.class)).as("a Work Pack missing from the accepted report is cleared").isNull();
+    }
+
+    /** Re-run key (ADR 0007, D65): a retried read step finds the report decided and writes nothing more; a first decision is audited once per column. */
+    @Test
+    void aRerunOfReadCompletionReportChangesNothing() {
+        UUID period = jdbc.queryForObject("SELECT id FROM bpa.progress_period WHERE process_instance_key = ?", UUID.class, instance);
+        UUID report = reportId(upload("ppc-team", task, "r.xlsx", CompletionReportBuilder.report().row("WP-000457", 40, 150).xlsx()));
+
+        CompletionProgressService.Decision first = progress.decide(report, period, "ppc-team");
+        jdbc.update("UPDATE bpa.workpack_progress SET reported_pct = 99 WHERE reported_pct = 40"); // a change a second run must not undo
+        CompletionProgressService.Decision again = progress.decide(report, period, "ppc-team");
+
+        assertThat(first).isEqualTo(CompletionProgressService.Decision.ACCEPTED);
+        assertThat(again).isEqualTo(CompletionProgressService.Decision.ACCEPTED);
+        assertThat(reported("WP-000457")).as("the second run applied nothing").isEqualByComparingTo("99");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.workpack_progress", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'workpack_progress' AND column_name = 'reported_pct'", Integer.class))
+                .as("audited once").isEqualTo(1);
     }
 
     // --- helpers ----------------------------------------------------------------------------------------------------------------

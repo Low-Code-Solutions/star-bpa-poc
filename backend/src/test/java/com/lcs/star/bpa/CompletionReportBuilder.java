@@ -95,11 +95,32 @@ public final class CompletionReportBuilder {
         return value.contains(",") || value.contains("\"") || value.contains("\n") ? "\"" + value.replace("\"", "\"\"") + "\"" : value;
     }
 
-    /** Writes the committed fixtures: {@code java ... CompletionReportBuilder backend/src/test/resources/fms}. */
+    /**
+     * The demo file of the rows that are not Read (plan Q3): each rule shows once, so none hides another. WP-000001 to WP-000004 are the first Work Packs
+     * of a fresh database; before showing it, replace them with In Progress Work Packs.
+     */
+    public static byte[] demoBadRows() {
+        return report()
+                .row("WP-999999", 40, 10) // Work Pack not found
+                .row("WP-000001", 120, 150) // Read: over 100% is left for approval (BPA-61)
+                .row("WP-000001", 45, 150) // Duplicate row for WP-000001
+                .row("WP-000002", 40.125, 95) // Completion % can have at most 2 decimal places
+                .row("WP-000003", "forty", 95) // Completion % must be a number
+                .row("WP-000004", 30, 20, "PMS") // Source PMS is not the configured progress source (setting FMS)
+                .xlsx();
+    }
+
+    /**
+     * Writes the committed fixtures: {@code java ... CompletionReportBuilder backend/src/test/resources/fms}; with a second argument, the demo file of the
+     * bad rows into that folder (templates/demo).
+     */
     public static void main(String[] args) throws IOException {
         Path dir = Path.of(args.length > 0 ? args[0] : "src/test/resources/fms");
         Files.createDirectories(dir);
         Files.write(dir.resolve("fms-completion-wk47.xlsx"), report().row("WP-000457", 40, 150).row("WP-000461", 100, 95).xlsx());
         Files.write(dir.resolve("r.xlsx"), "These are notes, not a workbook.\n".getBytes(StandardCharsets.UTF_8));
+        if (args.length > 1) {
+            Files.write(Path.of(args[1]).resolve("completion-demo-bad-rows.xlsx"), demoBadRows());
+        }
     }
 }

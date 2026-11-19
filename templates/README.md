@@ -105,3 +105,30 @@ The layout of the weekly FMS hours file (BPA-58; E2-08; FRD-10-1 §10.1.3.3). **
 | File | What it shows |
 | --- | --- |
 | `demo/fms-hours-demo-week-2026-11-19.xlsx` | what the cut-off for the week ending 19 Nov 2026 writes for the BPA-58 Background: three rows (E1021, E1099 and E1150, whose Cost Centre and CBS are blank). **Tests never use it** |
+
+## completion-report-template.xlsx
+
+The layout of the weekly FMS completion report (BPA-59; E2-09; FLOW-CCR p3, FLOW-PMS p2; FRD-21 §21.9, FRD-22 §22.6.2 s10). PPC uploads it in the portal ("Upload FMS completion report", the task of the weekly process) as `.xlsx` (first sheet) or `.csv`, through `POST /api/v1/completion-reports`; the result of each row can be read again from `GET /api/v1/completion-reports/{id}/result`. It is a layout, not a served download: nobody fills in the committed file.
+
+- **ASSUMPTION.** No source gives the columns; the layout is a working assumption until STAR sends the real FMS report (the workbook's `README` sheet says so).
+- Sheet `Completion`, header in row 1, one row per Work Pack from row 2. Columns are found by their header, trimmed and case-insensitive, in any order (the rule of the time sheet upload), so "Workpack Number" and "Workpack number" are the same column.
+
+| Column | Required | Notes |
+| --- | --- | --- |
+| Workpack number | yes | an In Progress Work Pack, for example `WP-000457`; one row per Work Pack |
+| Completion % | yes | a number with at most 2 decimals; 120 and negative values are read here and blocked at approval (BPA-61) |
+| Actual hours | no | a number of 0 or more when given; shown beside the POC approved hours at approval (BPA-60), information only |
+| Source | yes | `FMS` or `PMS`; only the source set in `progress.source` (default `FMS`) is accepted |
+
+- The report has no week column: it belongs to the week of the task it is uploaded into (the upload names the open task).
+- Each row gets one outcome: `Read`, or `Work Pack not found`, `Work Pack is not In Progress`, `Completion % must be a number`, `Completion % can have at most 2 decimal places`, `Duplicate row for <WP>`, `Source <x> is not the configured progress source` (the story's texts), and the ASSUMPTION texts for a missing required value, an Actual hours that is not a number of 0 or more, and a Completion % outside -999.99 to 999.99. A report with no `Read` row goes back to the upload task with "No usable rows in the completion report". Several uploads may be made into one task; the one named when the task is completed is the one that counts.
+- The tests build their own files (`CompletionReportBuilder`, test sources, which also writes the two fixtures under `backend/src/test/resources/fms/`); **tests never use the demo files.**
+
+### demo/ (completion report)
+
+Both files name Work Packs of a fresh database (`WP-000001` and the next ones). Before showing them, replace the Work Pack numbers with In Progress Work Packs.
+
+| File | What it shows |
+| --- | --- |
+| `completion-demo-good.xlsx` | two rows (`WP-000001` 40%, `WP-000002` 100%) that both read "Read" |
+| `completion-demo-bad-rows.xlsx` | one row for each outcome, so none hides another: an unknown Work Pack, a 120% row that is still "Read" (left for approval), a second row for `WP-000001` ("Duplicate row for WP-000001"), `WP-000002` at 40.125 (two decimals), `WP-000003` at "forty" (not a number) and `WP-000004` with Source PMS (rejected while `progress.source` is FMS). It names `WP-000001` to `WP-000004` |

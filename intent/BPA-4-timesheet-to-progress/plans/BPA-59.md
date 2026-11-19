@@ -247,3 +247,21 @@ Extra tests (not scenarios):
 
 ## Resolutions (19 Nov 2026)
 Approved with the recommended answers: Q1 the V3 migration (`source_raw`, `source` NULL); Q2 two uploads in one task, completed with the second; Q3 the demo bad-rows file rewritten by the builder; Q4 BPA-52 header rule; Q5 no new column; Q7 option A (rows checked at upload); Q8 a `taskKey` part; Q9 to Q11 as written (ASSUMPTIONs to comment in Jira after a yes).
+
+## Progress and departures (19 Nov 2026)
+Approved with the recommended answers (Resolutions above).
+
+**Red runs** (committed apart, 7f11d9a and 4bf23f9):
+- `CompletionReportApiTest`: 20 of 20 failed. 404 "No static resource api/v1/completion-reports" on the upload, or on the Given of the scenarios that need an uploaded report (the report id could not be read); the supervisor's expected 403 got 404.
+- `TaskValidityTest.uploadCompletionReportNeedsAReport` failed (no rule for the element).
+- React `UploadCompletionReport.test.tsx`: "Failed to resolve import ./UploadCompletionReport".
+- Green after the implementation: `CompletionReportApiTest` 20/20 on the first run; BPA-52's `TimesheetFileReaderTest` (4) and `TimesheetFileApiTest` (21) passed against the extracted reader before any BPA-59 code was built on it (f447d05).
+
+**Departures from the plan:**
+1. **The progress source is read from the environment at each call, not from a settable bean.** `config/ProgressSettings` reads `bpa.progress.source` through `Environment` each time, so the Scenario Outline's three examples run in one test by adding a `MapPropertySource` (no test-only bean, and no production class needed for the red run to compile).
+2. **`UploadTaskResolver`** (task package) is a new class: the open upload task, its group and its instance, answered with the task API's texts. A task with no `progress_period` row answers 409 "The week of this task has no progress period" (ASSUMPTION text). A request with no `taskKey` gets the framework's 400.
+3. **`TabularFileReader` returns rows as a map** (`TabularRow(rowNumber, values)` keyed by lower-case column name), so both uploads share it; `TimesheetFileReader` maps them back to its typed `Row`.
+4. **Existing test support edited (to say in the PR):** `TestBrowser.postMultipart` added (text parts plus the file part); `BookHoursFixture` clears `completion_report_row`, `completion_report` and `workpack_progress` and gained `completionBackground`; `bpatest/ProcessTestApplication` excludes `ReadCompletionReportWorker`. No existing test was changed to make it pass.
+5. **Demo bad-rows (Q3)** names `WP-000001` to `WP-000004` (not only the first two), because showing each rule once needs more Work Packs than two. The README says to replace them.
+6. **`CompletionRowChecksTest` (9) and `aRerunOfReadCompletionReportChangesNothing`** were written with the implementation, with no red run (they need the new classes).
+7. **Row checks order (ASSUMPTION):** required values, Work Pack not found or not In Progress, duplicate, completion number, decimals, range, Actual hours, source. A row for an unknown Work Pack is therefore "Work Pack not found" before it can be a duplicate.
