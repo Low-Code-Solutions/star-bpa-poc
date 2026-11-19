@@ -76,3 +76,32 @@ that is Assigned (it has Digital Time sheets) and, if needed, the Badge Nos with
 | `timesheet-demo-bad-rows.xlsx` | one good row, then a Work Pack that does not exist, a Badge No that is not assigned, a phase that is not on the Work Pack, a date in the future and hours that are not a number: each rejected with its own outcome |
 | `timesheet-demo-daily-limit.xlsx` | 17 hours for one Worker on one date: "Worker E1021 would exceed 16 hours on 17 Nov 2026" |
 | `timesheet-demo-empty.xlsx` | the template with no rows: "File has no rows" |
+
+## fms-hours-export-template.xlsx
+
+The layout of the weekly FMS hours file (BPA-58; E2-08; FRD-10-1 §10.1.3.3). **It is not a download template:** nobody fills it in. The backend writes each weekly file at the cut-off (`FmsHoursFileWriter`), PPC downloads it from `GET /api/v1/fms-hours-exports/{id}/file` and uploads it to FMS by hand (FLOW-FMS-D365 p1, FLOW-CCR p3). This file is the committed picture of the layout, and `FmsHoursTemplateTest` checks its header row against the writer.
+
+- **ASSUMPTION.** The layout is a working assumption until STAR sends its FMS upload template (Faraz asked STAR, S1). The workbook says so in its `README` sheet; the generated files have only the `FMS Hours` sheet.
+- Sheet `FMS Hours`, header in row 1, one row per Approved line not yet exported, sorted by Date, Badge No., Project, Activity. A week with no such line gets a file with the header row only (Q-DM19). A week that spans a month-end gets one file per calendar month of the work dates (S5).
+
+| Column | Value | Source |
+| --- | --- | --- |
+| Type | `FMS` (ASSUMPTION; FRD-5-3 §5.3.8 "Timesheet Category") | POC database |
+| Date | the line's work date, text `dd/mm/yyyy` | `digital_timesheet_line.work_date` |
+| Badge No. | the Worker's badge | `worker.employee_ref` (myPeople) |
+| Employment Type | `Direct` or `Agency` (S2; values ASSUMPTION) | `worker.agency_flag` (myPeople) |
+| Project | the time sheet's project | `digital_timesheet.project_ref` (D365 F&O) |
+| Activity | the time sheet's activity | `digital_timesheet.activity_ref` (P6 via D365 PMS) |
+| Cost Centre | the Worker's personal cost centre; blank when none (D40) | `worker.cost_centre_ref` (myPeople, ASSUMPTION) |
+| CBS | the time sheet's CBS code; blank when none (D40) | `digital_timesheet.cbs_code_ref` (D365 F&O CCR) |
+| CBS Cost Centre | the Work Pack's department (S3; ASSUMPTION until STAR confirms) | `workpack.department_ref` (D365 F&O) |
+| Hrs | the line's hours, a number shown to 2 decimals | `digital_timesheet_line.hours` |
+
+- A line is exported once: it is stamped (`exported_at`, `fms_hours_export_id`) when the file is generated. A late approval goes in the next file. If PPC records "Rejected by FMS" with a reason, that file is kept and its lines are released into the next file (S4).
+- Dates and Hrs are the cell types above (Date is text, as in the demo file; Hrs is numeric with format `0.00`).
+
+### demo/ (FMS hours)
+
+| File | What it shows |
+| --- | --- |
+| `demo/fms-hours-demo-week-2026-11-19.xlsx` | what the cut-off for the week ending 19 Nov 2026 writes for the BPA-58 Background: three rows (E1021, E1099 and E1150, whose Cost Centre and CBS are blank). **Tests never use it** |
