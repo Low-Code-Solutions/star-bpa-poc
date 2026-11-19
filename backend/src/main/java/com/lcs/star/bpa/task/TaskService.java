@@ -42,12 +42,15 @@ public class TaskService {
     private final TaskAllowList allowList;
     private final HoursSegregationCheck segregation;
     private final FmsHandOffCheck fmsHandOff;
+    private final CompletionReportCheck completionReport;
 
-    public TaskService(CamundaTaskClient camunda, TaskAllowList allowList, HoursSegregationCheck segregation, FmsHandOffCheck fmsHandOff) {
+    public TaskService(CamundaTaskClient camunda, TaskAllowList allowList, HoursSegregationCheck segregation, FmsHandOffCheck fmsHandOff,
+            CompletionReportCheck completionReport) {
         this.camunda = camunda;
         this.allowList = allowList;
         this.segregation = segregation;
         this.fmsHandOff = fmsHandOff;
+        this.completionReport = completionReport;
     }
 
     /** Open tasks whose candidate groups include one of the user's groups, oldest first. */
@@ -130,6 +133,12 @@ public class TaskService {
             // BPA-58: the Send hours to FMS completion names every file of the task and no other (ASSUMPTION texts); the task stays open
             if (fmsHandOff.appliesTo(task.elementId())) {
                 fmsHandOff.refusal(camunda.variables(task), submitted).ifPresent(message -> {
+                    throw problem(HttpStatus.BAD_REQUEST, message);
+                });
+            }
+            // BPA-59: the report must be one of this task's own week (ASSUMPTION text); the task stays open
+            if (completionReport.appliesTo(task.elementId())) {
+                completionReport.refusal(Long.parseLong(task.processInstanceKey()), submitted).ifPresent(message -> {
                     throw problem(HttpStatus.BAD_REQUEST, message);
                 });
             }

@@ -96,6 +96,15 @@ class TaskValidityTest {
                 .isEqualTo(Optional.empty());
     }
 
+    /** BPA-59: completing the upload task needs the report that counts; "Completion report is required" is an ASSUMPTION text. */
+    @Test
+    void uploadCompletionReportNeedsAReport() {
+        String upload = "UserTask_UploadCompletionReport";
+        assertThat(TaskValidity.check(upload, Map.of())).contains("Completion report is required");
+        assertThat(TaskValidity.check(upload, Map.of("completionReportId", "  "))).contains("Completion report is required");
+        assertThat(TaskValidity.check(upload, Map.of("completionReportId", "11111111-1111-1111-1111-111111111111"))).isEqualTo(Optional.empty());
+    }
+
     @Test
     void validCompletionsAndOtherTasksPass() {
         assertThat(TaskValidity.check(SIGN_OFF, Map.of("signOffDecision", "Approved"))).isEqualTo(Optional.empty());

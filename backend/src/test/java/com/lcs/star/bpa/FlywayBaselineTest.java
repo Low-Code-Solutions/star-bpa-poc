@@ -28,7 +28,9 @@ class FlywayBaselineTest {
     void BPA43_applicationStartsAndFlywayAppliesV1V2AndSeed() {
         List<String> applied = jdbc.queryForList(
                 "SELECT description FROM bpa.flyway_schema_history WHERE success ORDER BY installed_rank", String.class);
-        assertThat(applied).containsExactly("<< Flyway Schema Creation >>", "baseline schema", "epic2 timesheet to progress", "seed reference data");
+        // BPA-59: V3 (completion row source raw) is the third migration, before the repeatable seed
+        assertThat(applied).containsExactly("<< Flyway Schema Creation >>", "baseline schema", "epic2 timesheet to progress", "completion row source raw",
+                "seed reference data");
 
         Integer tables = jdbc.queryForObject(
                 "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "

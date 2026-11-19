@@ -62,6 +62,38 @@ public final class TestBrowser {
         return send(request);
     }
 
+    /**
+     * BPA-59: a multipart/form-data POST with the text parts {@code fields} (for example the task key) and one file part named {@code file}; the CSRF
+     * token goes back as in {@link #post}. Added for the completion report upload, which names its task in a second part.
+     */
+    public HttpResponse<String> postMultipart(String path, java.util.Map<String, String> fields, String fileName, byte[] content) {
+        String boundary = "----bpa" + java.util.UUID.randomUUID();
+        java.io.ByteArrayOutputStream body = new java.io.ByteArrayOutputStream();
+        try {
+            for (java.util.Map.Entry<String, String> field : fields.entrySet()) {
+                body.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + field.getKey() + "\"\r\n\r\n" + field.getValue() + "\r\n")
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            if (content != null) {
+                body.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"" + fileName
+                        + "\"\r\nContent-Type: application/octet-stream\r\n\r\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                body.write(content);
+                body.write("\r\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            body.write(("--" + boundary + "--\r\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(base + path))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()));
+        String token = cookie("XSRF-TOKEN");
+        if (token != null) {
+            request.header("X-XSRF-TOKEN", token);
+        }
+        return send(request);
+    }
+
     /** The body as bytes, for a binary response such as the Workpack print PDF (BPA-10). */
     public HttpResponse<byte[]> getBytes(String path) {
         try {

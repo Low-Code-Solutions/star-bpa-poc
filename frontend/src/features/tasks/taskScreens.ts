@@ -7,6 +7,7 @@ import { ValidateHours } from '@/features/timesheets/components/ValidateHours';
 import { ApproveHoursProduction } from '@/features/timesheets/components/ApproveHoursProduction';
 import { ApproveHoursPpc } from '@/features/timesheets/components/ApproveHoursPpc';
 import { SendHoursToFms } from '@/features/timesheets/components/SendHoursToFms';
+import { UploadCompletionReport } from '@/features/progress/components/UploadCompletionReport';
 import { USER_TASKS } from '@/utils/constants';
 import type { TaskScreen } from './tasks.types';
 
@@ -24,6 +25,7 @@ const screens: Record<string, TaskScreen> = {
   [USER_TASKS.approveHoursProduction]: ApproveHoursProduction,
   [USER_TASKS.approveHoursPpc]: ApproveHoursPpc,
   [USER_TASKS.sendHoursToFms]: SendHoursToFms,
+  [USER_TASKS.uploadCompletionReport]: UploadCompletionReport,
 };
 
 /** The screen for this element ID, or undefined. Own keys only, so a name like "constructor" is never a screen. */

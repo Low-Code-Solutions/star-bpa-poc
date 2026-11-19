@@ -67,4 +67,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-56](BPA-4-timesheet-to-progress/plans/BPA-56.md) | Production Supervisor can approve, return or reject a Work Pack's validated hours | Closed (18 Nov 2026) |
 | [BPA-57](BPA-4-timesheet-to-progress/plans/BPA-57.md) | PPC Team can approve, return or reject production hours as the final step | Closed (18 Nov 2026) |
 | [BPA-58](BPA-4-timesheet-to-progress/plans/BPA-58.md) | PPC Team can download each week's approved hours as an FMS timesheet file | Closed (19 Nov 2026) |
+| [BPA-59](BPA-4-timesheet-to-progress/plans/BPA-59.md) | PPC Team can upload the weekly FMS completion report and see each row's outcome | Closed (19 Nov 2026) |
 

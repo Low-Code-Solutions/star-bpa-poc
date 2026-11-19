@@ -22,6 +22,7 @@ export type NewDigitalTimesheetLine = Schemas['NewDigitalTimesheetLine'];
 export type DigitalTimesheetLineChange = Schemas['DigitalTimesheetLineChange'];
 export type TimesheetFileResult = Schemas['TimesheetFileResult'];
 export type TimesheetFileRow = Schemas['TimesheetFileRow'];
+export type CompletionReportResult = Schemas['CompletionReportResult'];
 export type HoursSubmission = Schemas['HoursSubmission'];
 export type HoursSubmissionLine = Schemas['HoursSubmissionLine'];
 export type LineAmendment = Schemas['LineAmendment'];
