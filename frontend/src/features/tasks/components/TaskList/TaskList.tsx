@@ -77,7 +77,9 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
             done.elementId === USER_TASKS.approveHoursProduction ||
             done.elementId === USER_TASKS.approveHoursPpc
           ? 'Decision recorded' // BPA-53 (ASSUMPTION text)
-          : 'Task completed; the Work Pack is saved',
+          : done.elementId === USER_TASKS.sendHoursToFms
+            ? 'Hand-off recorded' // BPA-58 (ASSUMPTION text)
+            : 'Task completed; the Work Pack is saved',
     );
   }
 

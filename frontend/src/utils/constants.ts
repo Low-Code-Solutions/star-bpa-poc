@@ -18,4 +18,6 @@ export const USER_TASKS = {
   approveHoursProduction: 'UserTask_ApproveHoursProduction',
   // BPA-57
   approveHoursPpc: 'UserTask_ApproveHoursPpc',
+  // BPA-58
+  sendHoursToFms: 'UserTask_SendHoursToFms',
 } as const;

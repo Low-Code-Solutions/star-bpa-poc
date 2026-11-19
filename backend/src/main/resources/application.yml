@@ -85,7 +85,7 @@ bpa:
   # (ASSUMPTION, no source names the read list). workpackNumber, validationMessages and confirmMessage have their own fields.
   tasks:
     # BPA-50: the Epic 2 process joins, for UserTask_BookHours (its other user tasks have no allow-list entry yet, so they are not served)
-    process-ids: [Process_PPC_WorkPackAssignment, Process_PPC_TimesheetToProgress]
+    process-ids: [Process_PPC_WorkPackAssignment, Process_PPC_TimesheetToProgress, Process_PPC_WeeklyProgressPeriod]
     allow-lists:
       "[UserTask_BookHours]": # supervisor (and production-team, C-E2-5), BPA-50: hours are saved line by line through the lines API, not as
         # variables of the completion, so both lists are empty; completing the task is "Send to Timekeeper" (BPA-53)
@@ -103,6 +103,9 @@ bpa:
         # hoursDecision out so an earlier decision is never offered back
         write: [hoursDecision, hoursReason]
         read: [hoursSubmissionId]
+      "[UserTask_SendHoursToFms]": # ppc-team, BPA-58: fmsHandOffs, one entry per file ({fmsHoursExportId, outcome, reason}); read gives the week and the files to list
+        write: [fmsHandOffs]
+        read: [weekEnding, fmsHoursExports]
       "[UserTask_CreateWorkPack]": # time-method-analyst (G9), BPA-6
         write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
         read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]

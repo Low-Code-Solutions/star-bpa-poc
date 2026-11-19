@@ -27,6 +27,13 @@ public final class TaskValidity {
     static final String APPROVE_PPC = "UserTask_ApproveHoursPpc"; // BPA-57: the same decision and reason rules
     static final String PRODUCTION_DECISION_UNKNOWN = "Decision must be Approved, Returned or Rejected";
 
+    /** BPA-58: PPC's outcome for each FMS file. "Reason is required" and the limit of 250 are the story's; the other texts are ASSUMPTIONs. */
+    static final String SEND_HOURS_TO_FMS = "UserTask_SendHoursToFms";
+    static final String OUTCOME_REQUIRED = "Outcome is required for each file";
+    static final String OUTCOME_UNKNOWN = "Outcome must be Sent to FMS or Rejected by FMS";
+    static final String REASON_TOO_LONG = "Reason can be at most 250 characters";
+    static final int REASON_MAX = 250;
+
     private TaskValidity() {
     }
 
@@ -34,6 +41,9 @@ public final class TaskValidity {
     public static Optional<String> check(String elementId, Map<String, Object> submitted) {
         if (APPROVE_PRODUCTION.equals(elementId) || APPROVE_PPC.equals(elementId)) {
             return checkProductionDecision(submitted);
+        }
+        if (SEND_HOURS_TO_FMS.equals(elementId)) {
+            return checkFmsHandOffs(submitted);
         }
         if (VALIDATE_HOURS.equals(elementId)) {
             return checkHoursDecision(submitted);
@@ -50,6 +60,32 @@ public final class TaskValidity {
         }
         if ("Declined".equals(decision) && !(submitted.get("declineReason") instanceof String reason && !reason.isBlank())) {
             return Optional.of(REASON_REQUIRED);
+        }
+        return Optional.empty();
+    }
+
+    /** One entry per file: an outcome that is one of the two, and for a rejection a reason of 1 to 250 characters. Which files the task has is {@link FmsHandOffCheck}'s. */
+    private static Optional<String> checkFmsHandOffs(Map<String, Object> submitted) {
+        if (!(submitted.get("fmsHandOffs") instanceof java.util.List<?> entries) || entries.isEmpty()) {
+            return Optional.of(OUTCOME_REQUIRED);
+        }
+        for (Object entry : entries) {
+            Object outcome = entry instanceof Map<?, ?> map ? map.get("outcome") : null;
+            if (outcome == null || (outcome instanceof String text && text.isBlank())) {
+                return Optional.of(OUTCOME_REQUIRED);
+            }
+            if (!"Sent to FMS".equals(outcome) && !"Rejected by FMS".equals(outcome)) {
+                return Optional.of(OUTCOME_UNKNOWN);
+            }
+            if ("Rejected by FMS".equals(outcome)) {
+                Object reason = ((Map<?, ?>) entry).get("reason");
+                if (!(reason instanceof String text && !text.isBlank())) {
+                    return Optional.of(REASON_REQUIRED);
+                }
+                if (text.trim().length() > REASON_MAX) {
+                    return Optional.of(REASON_TOO_LONG);
+                }
+            }
         }
         return Optional.empty();
     }

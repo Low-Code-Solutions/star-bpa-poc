@@ -71,6 +71,31 @@ class TaskValidityTest {
         assertThat(TaskValidity.check(ppc, Map.of("hoursDecision", "Approved"))).isEqualTo(Optional.empty());
     }
 
+    /**
+     * BPA-58: PPC's outcome for each FMS file. "Reason is required" is the story's text and 250 its limit; "Outcome is required for each file", the unknown-outcome
+     * text and "Reason can be at most 250 characters" are ASSUMPTIONs.
+     */
+    @Test
+    void sendHoursToFmsChecksOutcomeAndReason() {
+        String send = "UserTask_SendHoursToFms";
+        String id = "11111111-1111-1111-1111-111111111111";
+        assertThat(TaskValidity.check(send, Map.of())).contains("Outcome is required for each file");
+        assertThat(TaskValidity.check(send, Map.of("fmsHandOffs", java.util.List.of()))).contains("Outcome is required for each file");
+        assertThat(TaskValidity.check(send, Map.of("fmsHandOffs", java.util.List.of(Map.of("fmsHoursExportId", id))))).contains("Outcome is required for each file");
+        assertThat(TaskValidity.check(send, Map.of("fmsHandOffs", java.util.List.of(Map.of("fmsHoursExportId", id, "outcome", "Maybe")))))
+                .contains("Outcome must be Sent to FMS or Rejected by FMS");
+        assertThat(TaskValidity.check(send, Map.of("fmsHandOffs", java.util.List.of(Map.of("fmsHoursExportId", id, "outcome", "Rejected by FMS")))))
+                .contains("Reason is required");
+        assertThat(TaskValidity.check(send, Map.of("fmsHandOffs", java.util.List.of(Map.of("fmsHoursExportId", id, "outcome", "Rejected by FMS", "reason", "  ")))))
+                .contains("Reason is required");
+        assertThat(TaskValidity.check(send, Map.of("fmsHandOffs", java.util.List.of(Map.of("fmsHoursExportId", id, "outcome", "Rejected by FMS", "reason", "x".repeat(251))))))
+                .contains("Reason can be at most 250 characters");
+        assertThat(TaskValidity.check(send, Map.of("fmsHandOffs", java.util.List.of(Map.of("fmsHoursExportId", id, "outcome", "Rejected by FMS", "reason", "x".repeat(250))))))
+                .isEqualTo(Optional.empty());
+        assertThat(TaskValidity.check(send, Map.of("fmsHandOffs", java.util.List.of(Map.of("fmsHoursExportId", id, "outcome", "Sent to FMS")))))
+                .isEqualTo(Optional.empty());
+    }
+
     @Test
     void validCompletionsAndOtherTasksPass() {
         assertThat(TaskValidity.check(SIGN_OFF, Map.of("signOffDecision", "Approved"))).isEqualTo(Optional.empty());

@@ -46,7 +46,8 @@ public class PersonaSync implements SmartInitializingSingleton {
     static {
         var permissions = new LinkedHashMap<String, Set<String>>();
         for (String process : List.of("Process_PPC_WorkPackAssignment", "Process_PPC_WorkerReassignment", "Process_PPC_DrawingRevisionNotice",
-                "Process_PPC_TimesheetToProgress" /* BPA-49 (ASSUMPTION): started by the WorkPackAssigned message; proven by BPA49_ tests */)) {
+                "Process_PPC_TimesheetToProgress" /* BPA-49 (ASSUMPTION): started by the WorkPackAssigned message; proven by BPA49_ tests */,
+                "Process_PPC_WeeklyProgressPeriod" /* BPA-58 (ASSUMPTION): its jobs (open-progress-period, generate-fms-hours-file, record-fms-hand-off) are activated by bpa-service; proven by the BPA58_ tests */)) {
             permissions.put("PROCESS_DEFINITION:" + process, PROCESS_PERMISSIONS);
         }
         // BPA-50 (ASSUMPTION, proven by the BPA50_ tests): evaluates Decision_HoursWithinBudget at every hour-line save

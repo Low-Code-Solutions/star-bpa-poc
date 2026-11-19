@@ -60,6 +60,8 @@ tags:
     description: POC trigger standing in for a D365 Document Control event (BPA-16; S20, S28; 07 §10)
   - name: notifications
     description: The logged-in user's drawing-revision notices (BPA-16; D44)
+  - name: fms-hours-exports
+    description: The weekly FMS hours files PPC downloads and uploads to FMS by hand (BPA-58; E2-08)
 paths:
   /api/v1/auth/login:
     post:
@@ -1170,6 +1172,48 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
               example: { status: 409, title: Conflict, detail: Line is not editable (status Draft) }
+  /api/v1/fms-hours-exports/{fmsHoursExportId}/file:
+    parameters:
+      - name: fmsHoursExportId
+        in: path
+        required: true
+        description: fms_hours_export.id
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [fms-hours-exports]
+      operationId: downloadFmsHoursExport
+      summary: Download a weekly FMS hours file
+      description: |
+        BPA-58 (E2-08). The .xlsx the weekly cut-off generated, in the FMS layout of templates/fms-hours-export-template.xlsx.
+        The stored bytes are returned every time; the file is never rebuilt. Group ppc-team only (agreed 10 Nov 2026 (a)).
+      x-assumption: true
+      x-assumption-note: the file name fms-hours-<weekEnding>-<yyyy-MM>.xlsx; the layout is the Epic 2 working assumption until STAR sends its FMS template
+      responses:
+        '200':
+          description: The file (.xlsx)
+          headers:
+            Content-Disposition:
+              description: attachment; filename="fms-hours-<weekEnding>-<yyyy-MM>.xlsx"
+              schema:
+                type: string
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No file with this id
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 404, title: Not Found, detail: File not found }
   /api/v1/hours-submissions/{submissionId}:
     parameters:
       - name: submissionId
@@ -1495,7 +1539,7 @@ components:
         elementId:
           type: string
           description: BPMN element ID of the user task
-          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction, UserTask_ApproveHoursPpc]
+          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction, UserTask_ApproveHoursPpc, UserTask_SendHoursToFms]
         processInstanceKey:
           $ref: '#/components/schemas/CamundaKey'
         workpackNumber:
@@ -1549,7 +1593,9 @@ components:
             example: UserTask_CreateWorkPack and UserTask_ConfirmWorkPack take activityRef, drawingRef, departmentRef,
             completionDate, phases [{phase, manhours}] and materials [{materialRef, phase}] (Confirm also each material
             line's id, data model §6.3); UserTask_SignOffRelease takes signOffDecision (Approved or Declined) and
-            declineReason; UserTask_ScheduleWorkPack takes plannedStartDate and plannedEndDate.
+            declineReason; UserTask_ScheduleWorkPack takes plannedStartDate and plannedEndDate; UserTask_SendHoursToFms
+            (BPA-58) takes fmsHandOffs [{fmsHoursExportId, outcome (Sent to FMS or Rejected by FMS), reason}], one entry for
+            each file of the task (the reason is required, at most 250 characters, for Rejected by FMS). The 400 texts "Outcome is required for each file", "Outcome must be Sent to FMS or Rejected by FMS", "Reason can be at most 250 characters" and "File is not part of this task" are ASSUMPTIONs ("Reason is required" is the story's).
             The backend adds `completedBy`, the session user's Camunda username, to every completion, so the save workers
             record who did the work (D63; BPA-6). It is on no allow-list: a request that sends it is refused with 400.
             Likewise it adds `completedTaskKey`, the key of the task being completed, the re-run key of a worker that records a
