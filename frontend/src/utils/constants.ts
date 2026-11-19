@@ -20,4 +20,6 @@ export const USER_TASKS = {
   approveHoursPpc: 'UserTask_ApproveHoursPpc',
   // BPA-58
   sendHoursToFms: 'UserTask_SendHoursToFms',
+  // BPA-59
+  uploadCompletionReport: 'UserTask_UploadCompletionReport',
 } as const;
