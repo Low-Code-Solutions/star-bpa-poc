@@ -60,6 +60,8 @@ tags:
     description: POC trigger standing in for a D365 Document Control event (BPA-16; S20, S28; 07 §10)
   - name: notifications
     description: The logged-in user's drawing-revision notices (BPA-16; D44)
+  - name: completion-reports
+    description: The weekly FMS completion report PPC uploads into the open task (BPA-59; E2-09)
   - name: fms-hours-exports
     description: The weekly FMS hours files PPC downloads and uploads to FMS by hand (BPA-58; E2-08)
 paths:
@@ -794,6 +796,104 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
               example: { status: 413, title: Content Too Large, detail: File is larger than 5 MB }
+  /api/v1/completion-reports:
+    post:
+      tags: [completion-reports]
+      operationId: uploadCompletionReport
+      summary: Upload the weekly FMS completion report into the open upload task
+      description: |
+        BPA-59 (E2-09). PPC uploads the FMS completion report (.xlsx or .csv; columns Workpack number, Completion %, Actual hours, Source)
+        for the week of the instance that waits at UserTask_UploadCompletionReport; the `taskKey` part names that task (ASSUMPTION: the
+        report has no week column, decision (d), so the open task says which week). Every row is checked on its own, in file order, and
+        logged as written with its outcome; the result comes back at once. A file that cannot be read, has no rows or has the wrong layout
+        is still a successful call, with one file-level line in `outcome`. Several uploads may be made into the same task; completing the
+        task with a `completionReportId` says which one counts (Q-DM20). Group ppc-team. 413 above 5 MB (as the time sheet upload).
+      x-assumption: true
+      x-assumption-note: the columns and the row rules are ASSUMPTIONs of the story (no source gives the layout); the taskKey part, the 400 and 404 texts are ASSUMPTIONs of the plan
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, taskKey]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The completion report (.xlsx first sheet, or .csv with a header row)
+                taskKey:
+                  $ref: '#/components/schemas/CamundaKey'
+      responses:
+        '201':
+          description: Upload recorded; the result per row or one file-level line
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletionReportResult'
+        '400':
+          description: The request has no file part or no task key
+          x-assumption: true
+          x-assumption-note: text not stated by any story
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 400, title: Bad Request, detail: File is required }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No open Upload completion report task with this key
+          x-assumption: true
+          x-assumption-note: text as the task API
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 404, title: Not Found, detail: Task not found }
+        '413':
+          description: The file is larger than 5 MB (as the time sheet upload)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 413, title: Content Too Large, detail: File is larger than 5 MB }
+  /api/v1/completion-reports/{completionReportId}/result:
+    parameters:
+      - name: completionReportId
+        in: path
+        required: true
+        description: completion_report.id
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [completion-reports]
+      operationId: getCompletionReportResult
+      summary: The result of an uploaded completion report
+      description: BPA-59. The same result the upload answered with. Group ppc-team.
+      responses:
+        '200':
+          description: The report and its rows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompletionReportResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No report with this id
+          x-assumption: true
+          x-assumption-note: text as the time sheet result
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 404, title: Not Found, detail: Report not found }
   /api/v1/timesheet-files/template:
     get:
       tags: [timesheet-files]
@@ -1539,7 +1639,7 @@ components:
         elementId:
           type: string
           description: BPMN element ID of the user task
-          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction, UserTask_ApproveHoursPpc, UserTask_SendHoursToFms]
+          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction, UserTask_ApproveHoursPpc, UserTask_SendHoursToFms, UserTask_UploadCompletionReport]
         processInstanceKey:
           $ref: '#/components/schemas/CamundaKey'
         workpackNumber:
@@ -1595,7 +1695,7 @@ components:
             line's id, data model §6.3); UserTask_SignOffRelease takes signOffDecision (Approved or Declined) and
             declineReason; UserTask_ScheduleWorkPack takes plannedStartDate and plannedEndDate; UserTask_SendHoursToFms
             (BPA-58) takes fmsHandOffs [{fmsHoursExportId, outcome (Sent to FMS or Rejected by FMS), reason}], one entry for
-            each file of the task (the reason is required, at most 250 characters, for Rejected by FMS). The 400 texts "Outcome is required for each file", "Outcome must be Sent to FMS or Rejected by FMS", "Reason can be at most 250 characters" and "File is not part of this task" are ASSUMPTIONs ("Reason is required" is the story's).
+            each file of the task (the reason is required, at most 250 characters, for Rejected by FMS). UserTask_UploadCompletionReport (BPA-59) takes completionReportId, the id of the upload that counts ("Completion report is required" and "Completion report is not for this week" are ASSUMPTIONs). The 400 texts "Outcome is required for each file", "Outcome must be Sent to FMS or Rejected by FMS", "Reason can be at most 250 characters" and "File is not part of this task" are ASSUMPTIONs ("Reason is required" is the story's).
             The backend adds `completedBy`, the session user's Camunda username, to every completion, so the save workers
             record who did the work (D63; BPA-6). It is on no allow-list: a request that sends it is refused with 400.
             Likewise it adds `completedTaskKey`, the key of the task being completed, the re-run key of a worker that records a
@@ -1990,6 +2090,58 @@ components:
         wpOutcome:
           type: string
           description: 'Only "Replacement not applied: file has rejected rows" (BPA-13, D71, B1)'
+    CompletionReportResult:
+      type: object
+      description: completion_report and its completion_report_row rows (data model §13.3.3)
+      required: [id, fileName, receivedAt, weekEnding, rows]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fileName:
+          type: string
+          example: fms-completion-wk47.xlsx
+        receivedAt:
+          type: string
+          format: date-time
+        weekEnding:
+          type: string
+          format: date
+          description: The week of the instance the report was uploaded into (decision (d))
+        outcome:
+          type: string
+          description: |
+            File-level line; absent when the rows carry the outcomes. "File has no rows", "File cannot be read", "File layout not
+            recognised" (as the time sheet upload), "File has too many rows" (more than 5000 rows; ASSUMPTION).
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompletionReportRow'
+    CompletionReportRow:
+      type: object
+      description: One completion_report_row, the values as uploaded (raw text) and the outcome
+      required: [rowNumber, outcome]
+      properties:
+        rowNumber:
+          type: integer
+          description: Spreadsheet row, 1-based (row 1 is the header)
+        workpackNumber:
+          type: string
+        completionPct:
+          type: string
+          description: As written in the file
+        actualHours:
+          type: string
+          description: As written in the file
+        source:
+          type: string
+          description: As written in the file (FMS or PMS)
+        outcome:
+          type: string
+          description: |
+            "Read", or why the row was not: "Work Pack not found", "Work Pack is not In Progress", "Completion % must be a number",
+            "Completion % can have at most 2 decimal places", "Duplicate row for <WP>", "Source <x> is not the configured progress source"
+            (Jira, BPA-59); the required-value, Actual hours and range texts are ASSUMPTIONs (plan Q9).
     TimesheetFileResult:
       type: object
       description: timesheet_file and its timesheet_file_row rows (data model §13.2.3)

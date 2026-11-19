@@ -33,8 +33,8 @@ final class BookHoursFixture {
     Ids reset() {
         // BPA-52: a logged row points at its line, a line at its upload file and at its submission, so: rows, decisions, lines, files, submissions (BPA-53: a decision points at its submission)
         // BPA-58: a line points at its FMS file (cleared right after the lines) and a file at its progress period
-        for (String table : new String[] {"timesheet_file_row", "hours_decision", "digital_timesheet_line", "fms_hours_export", "timesheet_file", "hours_submission",
-                "digital_timesheet", "hour_journal_line", "hour_journal_header", "worker_assignment", "assignment_file", "workpack_phase", "workpack",
+        for (String table : new String[] {"timesheet_file_row", "hours_decision", "digital_timesheet_line", "fms_hours_export", "completion_report_row", "completion_report", "workpack_progress",
+                "timesheet_file", "hours_submission", "digital_timesheet", "hour_journal_line", "hour_journal_header", "worker_assignment", "assignment_file", "workpack_phase", "workpack",
                 "progress_period", "audit_log"}) {
             jdbc.update("DELETE FROM bpa." + table);
         }
@@ -107,6 +107,19 @@ final class BookHoursFixture {
         return jdbc.queryForObject("""
                 INSERT INTO bpa.digital_timesheet (worker_id, workpack_id, journal_line_id, project_ref, wbs_ref, activity_ref, created_by, updated_by)
                 VALUES (?, ?, ?, 'PRJ-139', '11031', ?, 'test', 'test') RETURNING id""", UUID.class, worker, workpack, journalLine, activityRef);
+    }
+
+    /**
+     * The Background of BPA-59 (E2-09), made with SQL on top of {@link #reset()}: WP-000457 and WP-000461 are In Progress (the Work Packs the story's
+     * report names) and WP-000480 is Released with no hours. A report row is checked against the Work Pack's number and status only.
+     */
+    void completionBackground() {
+        workPack461();
+        jdbc.update("UPDATE bpa.workpack SET status = 'In Progress' WHERE workpack_number IN ('WP-000457', 'WP-000461')");
+        jdbc.update("""
+                INSERT INTO bpa.workpack (workpack_number, activity_ref, drawing_ref, department_ref, completion_date, status, assignment_state,
+                                          process_instance_key, created_by, updated_by)
+                VALUES ('WP-000480', 'A-2201', 'DWG-118', 'Fabrication', DATE '2026-11-30', 'Released', 'Assigned', 9000000006, 'test', 'test')""");
     }
 
     /** The five lines of BPA-58's Background, with the statuses it states. */
