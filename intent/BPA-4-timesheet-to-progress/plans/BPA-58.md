@@ -294,3 +294,15 @@ Approved on 19 Nov 2026 with the recommended answers: Q1 one task for all the we
 7. The new `Reason can be at most 250 characters` check trims first, as the story's limit is on the reason text.
 
 **Human-gap log, added:** Docker Desktop was started by Ahsan for the integration red run. The stale weekly instances on the local stack (Q3) were not yet counted or cancelled at this point.
+
+**More departures, found at the full verify and the local proof:**
+8. **`ProcessTestApplication` (existing test support) excludes the three new workers.** `./mvnw -B verify` (487 tests) had 2 context errors, `Epic2DecisionTablesProcessTest` and `SkeletonWorkerProcessTest`: the Camunda Process Test app has no database and must leave database workers out of its scan (backend/CLAUDE.md), as for every earlier worker. Both pass after the exclusion; **an edit to existing test support, to say in the PR.**
+9. **Images were built with `docker build`, not `docker compose --build`.** Compose's bake build stopped on "additional privileges requested: pass --allow=fs.read=backend\Dockerfile" (a Buildx gate on the repo's own Dockerfile). I did not grant the flag: I built `star-bpa-poc-bpa-app` and `star-bpa-poc-frontend` from the same Dockerfiles with plain `docker build` and recreated the containers with `docker compose up -d --no-build`.
+10. **Q3, local:** the local Camunda had no `Process_PPC_WeeklyProgressPeriod` instances (0 found) when the new `bpa-app` started, so there was nothing to cancel. The QA server is untouched and still needs the clean-up described in Q3 at deploy time.
+
+**Local-stack proof (19 Nov 2026, new images, process definition version 4):**
+- WP-000011 had 4 Approved lines (BPA-57 proof). Started `Process_PPC_WeeklyProgressPeriod` at `ServiceTask_OpenProgressPeriod` by hand: `progress_period` week ending 2026-11-19, CutOff, cut-off 2026-11-19 20:59 UTC; one `fms_hours_export` (month 2026-11-01, 4 rows); the 4 lines stamped.
+- As ppc-team: `Send hours to FMS` task served with `weekEnding` and `fmsHoursExports`; the download gave 200, the xlsx content type and `fms-hours-2026-11-19-2026-11.xlsx`; the file has the 10 header columns and 4 rows sorted by Date and Badge No. (e.g. `FMS | 16/11/2026 | E1021 | Direct | PRJ-139 | A-2201 | STRP01 | CBS-139-PIP-01 | Fabrication | 7.0`, Hrs numeric). supervisor got 403.
+- Completing with "Rejected by FMS" and no reason: 400 "Reason is required". "Sent to FMS": 204; `sent_by` ppc-team, `sent_at` set, no rejection; the instance waits at `UserTask_UploadCompletionReport`.
+- Not run by hand: the rejection path and the month-end split (covered by `BPA58_fmsRejectionReleasesLinesToNextFile` and `BPA58_weekAcrossMonthEndGivesTwoFiles`).
+- Side effect on the local stack: week ending 19 Nov is now cut off, so bookings dated on or before 19 Nov are closed there (BPA-50 rule). Tonight's cron fire (20:59 UTC) will start a second instance for the same week, which fails with the "already has a progress period" incident.
