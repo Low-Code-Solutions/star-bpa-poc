@@ -132,3 +132,13 @@ Both files name Work Packs of a fresh database (`WP-000001` and the next ones). 
 | --- | --- |
 | `completion-demo-good.xlsx` | two rows (`WP-000001` 40%, `WP-000002` 100%) that both read "Read" |
 | `completion-demo-bad-rows.xlsx` | one row for each outcome, so none hides another: an unknown Work Pack, a 120% row that is still "Read" (left for approval), a second row for `WP-000001` ("Duplicate row for WP-000001"), `WP-000002` at 40.125 (two decimals), `WP-000003` at "forty" (not a number) and `WP-000004` with Source PMS (rejected while `progress.source` is FMS). It names `WP-000001` to `WP-000004` |
+
+Five `.csv` files (the same layout, comma and UTF-8) are for the portal demo and manual testing on the local dev stack. They name `WP-000011`, `WP-000030`, `WP-000031` and `WP-000032`, which are In Progress there (`WP-999999` does not exist); on another database replace the numbers with In Progress Work Packs. The upload needs an open "Upload FMS completion report" task of the weekly process.
+
+| File | What it shows |
+| --- | --- |
+| `completion-demo-all-read.csv` | three rows, all "Read": the clean report to complete the task with (`WP-000011` 45%, `WP-000030` 100%, `WP-000031` 20%) |
+| `completion-demo-good-and-bad-rows.csv` | a mix: two rows read, a 40.125 ("at most 2 decimal places"), "forty" ("must be a number") and a second `WP-000011` ("Duplicate row for WP-000011") |
+| `completion-demo-no-usable-row.csv` | only an unknown Work Pack ("Work Pack not found"): completing the task with it sends it back with "No usable rows in the completion report" |
+| `completion-demo-wrong-layout.csv` | the wrong columns: "File layout not recognised" |
+| `completion-demo-pms-source.csv` | a row with Source PMS ("Source PMS is not the configured progress source" while `progress.source` is FMS) and a row that reads |
