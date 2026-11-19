@@ -11,7 +11,11 @@ const NOVEMBER = '11111111-1111-1111-1111-111111111111';
 const DECEMBER = '22222222-2222-2222-2222-222222222222';
 
 type Call = { method: string; path: string; body: unknown };
-type Options = { files?: Array<{ id: string; periodMonth: string; rowCount: number }>; completeStatus?: number; completeDetail?: string };
+type Options = {
+  files?: Array<{ id: string; periodMonth: string; rowCount: number }>;
+  completeStatus?: number;
+  completeDetail?: string;
+};
 
 function fakeBackend({
   files = [{ id: NOVEMBER, periodMonth: '2026-11-01', rowCount: 3 }],
