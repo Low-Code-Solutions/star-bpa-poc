@@ -32,9 +32,10 @@ final class BookHoursFixture {
     /** Removes what an earlier test of this class left, then builds the Background. */
     Ids reset() {
         // BPA-52: a logged row points at its line, a line at its upload file and at its submission, so: rows, decisions, lines, files, submissions (BPA-53: a decision points at its submission)
-        for (String table : new String[] {"timesheet_file_row", "hours_decision", "digital_timesheet_line", "timesheet_file", "hours_submission", "digital_timesheet",
-                "hour_journal_line", "hour_journal_header", "worker_assignment", "assignment_file", "workpack_phase", "workpack", "progress_period",
-                "audit_log"}) {
+        // BPA-58: a line points at its FMS file (cleared right after the lines) and a file at its progress period
+        for (String table : new String[] {"timesheet_file_row", "hours_decision", "digital_timesheet_line", "fms_hours_export", "timesheet_file", "hours_submission",
+                "digital_timesheet", "hour_journal_line", "hour_journal_header", "worker_assignment", "assignment_file", "workpack_phase", "workpack",
+                "progress_period", "audit_log"}) {
             jdbc.update("DELETE FROM bpa." + table);
         }
         UUID workpack = jdbc.queryForObject("""
@@ -70,6 +71,51 @@ final class BookHoursFixture {
                 INSERT INTO bpa.progress_period (week_ending, cut_off_at, status, process_instance_key, created_by, updated_by)
                 VALUES (DATE '2026-11-12', TIMESTAMPTZ '2026-11-12 20:59:00+00', 'CutOff', 9000000002, 'test', 'test')""");
         return new Ids(workpack, timesheets);
+    }
+
+    /** The time sheets BPA-58's Background names beyond {@link #reset()}'s: E1021, E1099 and E2001 on WP-000457, E1150 on WP-000470. */
+    record FmsIds(UUID e1021, UUID e1099, UUID e2001, UUID e1150OnWp470) {
+    }
+
+    /**
+     * The Background of BPA-58 (E2-08), made with SQL on top of {@link #reset()}: CBS-139-PIP-01 on the time sheets of E1021 and E1099 (WP-000457, activity A-2201);
+     * E2001, the agency Worker (seed), with a time sheet on WP-000457; WP-000470 (activity A-2299, department Fabrication, which has no CBS in the seed) with
+     * a time sheet for E1150, the Worker with no cost centre. Lines are inserted by SQL with the stated status, which checks no assignment.
+     */
+    FmsIds fmsBackground(Ids ids) {
+        jdbc.update("UPDATE bpa.digital_timesheet SET cbs_code_ref = 'CBS-139-PIP-01' WHERE id IN (?, ?)", ids.timesheet("E1021"), ids.timesheet("E1099"));
+        UUID header = jdbc.queryForObject("SELECT id FROM bpa.hour_journal_header WHERE workpack_id = ?", UUID.class, ids.workpackId());
+        UUID e2001 = timesheetOn(header, ids.workpackId(), "E2001", "A-2201");
+        UUID workpack470 = jdbc.queryForObject("""
+                INSERT INTO bpa.workpack (workpack_number, activity_ref, drawing_ref, department_ref, completion_date, status, assignment_state,
+                                          process_instance_key, created_by, updated_by)
+                VALUES ('WP-000470', 'A-2299', 'DWG-118', 'Fabrication', DATE '2026-11-30', 'In Progress', 'Assigned', 9000000005, 'test', 'test')
+                RETURNING id""", UUID.class);
+        jdbc.update("INSERT INTO bpa.workpack_phase (workpack_id, phase, manhours, created_by, updated_by) VALUES (?, 'Welding', 100, 'test', 'test')", workpack470);
+        UUID header470 = jdbc.queryForObject("""
+                INSERT INTO bpa.hour_journal_header (workpack_id, estimated_manhours, created_by, updated_by) VALUES (?, 100, 'test', 'test') RETURNING id""",
+                UUID.class, workpack470);
+        UUID e1150 = timesheetOn(header470, workpack470, "E1150", "A-2299");
+        return new FmsIds(ids.timesheet("E1021"), ids.timesheet("E1099"), e2001, e1150);
+    }
+
+    private UUID timesheetOn(UUID header, UUID workpack, String badge, String activityRef) {
+        UUID worker = jdbc.queryForObject("SELECT id FROM bpa.worker WHERE employee_ref = ?", UUID.class, badge);
+        UUID journalLine = jdbc.queryForObject("""
+                INSERT INTO bpa.hour_journal_line (header_id, worker_id, role, designation, estimated_hours, created_by, updated_by)
+                SELECT ?, w.id, w.role, w.designation, 100, 'test', 'test' FROM bpa.worker w WHERE w.id = ? RETURNING id""", UUID.class, header, worker);
+        return jdbc.queryForObject("""
+                INSERT INTO bpa.digital_timesheet (worker_id, workpack_id, journal_line_id, project_ref, wbs_ref, activity_ref, created_by, updated_by)
+                VALUES (?, ?, ?, 'PRJ-139', '11031', ?, 'test', 'test') RETURNING id""", UUID.class, worker, workpack, journalLine, activityRef);
+    }
+
+    /** The five lines of BPA-58's Background, with the statuses it states. */
+    void fmsLines(FmsIds f) {
+        line(f.e1021(), LocalDate.of(2026, 11, 16), "Cutting", new BigDecimal("8"), "Approved");
+        line(f.e1099(), LocalDate.of(2026, 11, 16), "Cutting", new BigDecimal("7.5"), "Approved");
+        line(f.e1021(), LocalDate.of(2026, 11, 17), "Cutting", new BigDecimal("8"), "Submitted");
+        line(f.e1099(), LocalDate.of(2026, 11, 17), "Welding", new BigDecimal("6"), "Rejected");
+        line(f.e1150OnWp470(), LocalDate.of(2026, 11, 17), "Welding", new BigDecimal("4"), "Approved");
     }
 
     /** A line already on the time sheet, as a Given states it. */
