@@ -265,3 +265,11 @@ Approved with the recommended answers (Resolutions above).
 5. **Demo bad-rows (Q3)** names `WP-000001` to `WP-000004` (not only the first two), because showing each rule once needs more Work Packs than two. The README says to replace them.
 6. **`CompletionRowChecksTest` (9) and `aRerunOfReadCompletionReportChangesNothing`** were written with the implementation, with no red run (they need the new classes).
 7. **Row checks order (ASSUMPTION):** required values, Work Pack not found or not In Progress, duplicate, completion number, decimals, range, Actual hours, source. A row for an unknown Work Pack is therefore "Work Pack not found" before it can be a duplicate.
+
+**Local-stack proof (19 Nov 2026, new images, V3 applied to the existing local database at start-up, no BPMN change):**
+- The weekly instance of the 19 Nov week waited at `UserTask_UploadCompletionReport`. As ppc-team the task was served with `weekEnding`.
+- **Unhappy path:** a `.csv` whose only row was `WP-999999` → 201, "Work Pack not found"; completing the task with it → 204, the report `Invalid`, a new upload task opened whose `validationMessages` was "No usable rows in the completion report".
+- **Mixed report** (headers "Workpack Number / Actual Hours", so the header rule was exercised): WP-000011 40 "Read"; WP-000030 120 "Read"; a second WP-000030 "Duplicate row for WP-000030"; WP-000031 at 40.125 "Completion % can have at most 2 decimal places"; WP-000032 at "forty" "Completion % must be a number"; a second WP-000011 with Source PMS "Duplicate row for WP-000011" (the duplicate rule comes before the source check, departure 7). Completing with it → 204; the report `Accepted`; `workpack_progress` for week ending 2026-11-19: WP-000011 reported 40.00, WP-000030 reported 120.00, approved empty; the instance waits at `UserTask_ApproveCompletion`.
+- supervisor `POST /api/v1/completion-reports` → 403.
+- Not run by hand: an `.xlsx` upload from the portal screen, the 6 MB file, the setting `progress.source` = PMS (covered by `BPA59_unreadableOrLargeFileIsRefused` and `BPA59_theConfiguredProgressSourceIsAccepted`).
+- Side effect on the local stack: two `completion_report` rows and two `workpack_progress` rows for the 19 Nov week.
