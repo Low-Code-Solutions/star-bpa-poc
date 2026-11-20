@@ -192,3 +192,12 @@ Extra tests (not scenarios):
 
 ## Resolutions (20 Nov 2026)
 Approved with the recommended answers: Q1 the Blocked scenarios start at BusinessRuleTask_CheckProgressRule with a progressChecks variable; Q2 BPA-63 creates the retraction request; Q3 (a) the rule-task wiring change only if the red run proves the problem, (b) the new ServiceTask_RecordProgressResult (BPMN changes); Q4 an old Approved retraction is kept; Q7 and Q8 as written (ASSUMPTIONs to comment in Jira after a yes).
+
+## Progress and departures
+- **Red run (f9bf94b):** 10 of 10 failed. A throwaway probe (deleted) showed every `progressCheckResults` entry Accepted with no Work Pack, and the instance reached `ServiceTask_CalculateEarnedManhours`: the rule task's wiring did not feed the decision. This proved Q3 (a), so the BPMN change (a) and (b) was made (8582920).
+- **Departure (ASSUMPTION):** the workers find the week's period by the instance key, else by the `progressPeriodId` variable, because an instance started at the rule task (the Blocked tests) does not own the `progress_period` row. In production the instance key is always found.
+- **Departure, tests after code:** `ProgressMessagesTest` was written with the implementation, with no red run.
+- **Edit to a test after the red run:** `ProgressRuleApiTest.ruleResult` returns null while the row does not exist (WP-000470 gets its row from BPA-60's record step); it threw before. No scenario or assertion changed.
+- **Test support:** `ProcessTestApplication` excludes the two new workers (no database there). `BookHoursFixture` resets `progress_retraction` (f9bf94b).
+- **Result:** `ProgressRuleApiTest` 10/10, `ProgressMessagesTest` 5/5; `CompletionApprovalApiTest` 22/22, `Epic2DecisionTablesProcessTest` 16/16, `ModelDeployTest` and `ModelResourcesTest` pass. (One `Epic2DecisionTablesProcessTest` run failed on a Camunda container start and passed on rerun.)
+- **Known:** BPA-62 and BPA-63 have no worker or screen yet, so a week stops at `ServiceTask_CalculateEarnedManhours` or `UserTask_ApproveRetraction`; the BPMN change redeploys the weekly process (old instances keep the old wiring).
