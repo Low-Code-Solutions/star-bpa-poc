@@ -211,3 +211,12 @@ Approved with the recommended answers:
 - **Workers fail, no BPMN error:** `calculate-earned-manhours` fails with no retries for a week with no period or a Locked week (as the BPA-61 workers), not with a BPMN error and `validationMessages`.
 - **Data model:** §13.3.6 and the delta §3.6 formula now say Earned comes from the unrounded %; §13.3.6 has the "As built by BPA-62" note.
 - **Result:** `EarnedManhoursApiTest` 14/14, `EarnedManhoursServiceTest` 5/5, `ProgressRuleApiTest` 13/13, `CompletionApprovalApiTest` 22/22, `ModelDeployTest` 2/2, `ModelResourcesTest` 2/2.
+
+**Local-stack proof (20 Nov 2026, new `bpa-app` image, process definition version 8; the BPMN and DMN are unchanged by this story, so the deployed models still equal `models/`):**
+- Reset the week by SQL, seeded a Locked 12 Nov week (approved 30 / 60 / 10), started the weekly process at `ServiceTask_OpenProgressPeriod`, then as ppc-team through the portal API: "Send hours to FMS", upload `templates/demo/completion-demo-all-read.csv`, approve all at the pre-filled % (WP-000011 45, WP-000030 100, WP-000031 20, WP-000032 0).
+- `activity_progress` for the week ending 19 Nov: A-2201 11.07% / 1200.00 / **132.89**; A-2202 20.00% / 800.00 / 160.00; A-2203 0.00% / 950.50 / 0.00; A-2299 0.00% and no Earned (no budgeted units); **no row for A-2301** (no Work Pack). Audit rows written (`actual_pct`, `budgeted_units`, `earned_manhours`, `bpa-service`).
+- Worked out by hand from the local Work Packs: A-2201 Σ(% × hours) = 45 × 400 + 100 × 150 = 33000 over Σ hours 2980 = 11.0738% → 11.07; × 1200 ÷ 100 = 132.886 → 132.89. A-2202 20% × 800 = 160.
+- `GET /api/v1/progress-periods/2026-11-19/earned-manhours`: 200 as ppc-team and cost-controller (week increase equals Earned: no Locked earned rows); 403 as project-manager; cost-controller still 403 on `/workpacks`; an unknown week is 404 "Week not found".
+- **Operate:** the instance waits at `ServiceTask_PrepareVarianceCheck` (BPA-64, no worker yet).
+- Full `./mvnw -B verify`: 601 tests, 0 failures. No frontend change, so no frontend lint, test or build.
+- Side effect on the local stack: the week ending 19 Nov holds these rows and the instance at `ServiceTask_PrepareVarianceCheck`; a Locked 12 Nov seed period (`process_instance_key` 1).
