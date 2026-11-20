@@ -43,6 +43,17 @@ public class ProgressPeriodRepository {
                 (rs, n) -> new Period(rs.getObject("id", UUID.class), rs.getDate("week_ending").toLocalDate()), processInstanceKey).stream().findFirst();
     }
 
+    /** BPA-60: the period of a week ending (its Thursday), or empty when the week has none. */
+    public Optional<Period> ofWeek(LocalDate weekEnding) {
+        return jdbc.query("SELECT id, week_ending FROM bpa.progress_period WHERE week_ending = ?",
+                (rs, n) -> new Period(rs.getObject("id", UUID.class), rs.getDate("week_ending").toLocalDate()), Date.valueOf(weekEnding)).stream().findFirst();
+    }
+
+    /** BPA-60: the status of the period of a week ending (CutOff or Locked), or empty when the week has no period. */
+    public Optional<String> statusOfWeek(LocalDate weekEnding) {
+        return jdbc.queryForList("SELECT status FROM bpa.progress_period WHERE week_ending = ?", String.class, Date.valueOf(weekEnding)).stream().findFirst();
+    }
+
     public Optional<Period> find(UUID id) {
         return jdbc.query("SELECT id, week_ending FROM bpa.progress_period WHERE id = ?",
                 (rs, n) -> new Period(rs.getObject("id", UUID.class), rs.getDate("week_ending").toLocalDate()), id).stream().findFirst();

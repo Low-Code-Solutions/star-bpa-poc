@@ -10,6 +10,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.lcs.star.bpa.BookHoursFixture.FmsIds;
 import com.lcs.star.bpa.CamundaRest.Reply;
+import com.lcs.star.bpa.persistence.ProgressPeriodRepository;
+import com.lcs.star.bpa.progress.CompletionApprovalService;
 import java.math.BigDecimal;
 import java.net.http.HttpResponse;
 import java.time.Instant;
@@ -87,6 +89,9 @@ class CompletionApprovalApiTest {
     @Autowired
     ConfigurableEnvironment environment;
 
+    @Autowired
+    CompletionApprovalService approvalService;
+
     private BookHoursFixture fixture;
     private BookHoursFixture.Ids ids;
     private FmsIds fms;
@@ -152,6 +157,7 @@ class CompletionApprovalApiTest {
         HttpResponse<String> done = complete("ppc-team", preFilled());
 
         assertThat(done.statusCode()).as(done.body()).isEqualTo(204);
+        awaitRecorded();
         assertThat(approvedPct("WP-000457", W19)).isEqualByComparingTo("40");
         assertThat(approvedPct("WP-000461", W19)).isEqualByComparingTo("100");
         Map<String, Object> row = jdbc.queryForMap("""
@@ -159,7 +165,6 @@ class CompletionApprovalApiTest {
                 WHERE w.workpack_number = 'WP-000457' AND p.progress_period_id = ?""", period);
         assertThat(row.get("approved_by")).isEqualTo("ppc-team");
         assertThat(row.get("approved_at")).isNotNull();
-        poll(() -> activeElements(instance).stream().map(e -> e.path("elementId").asText()).toList(), ids -> ids.contains(NEXT), NEXT + " of " + instance);
     }
 
     @Test
@@ -170,6 +175,7 @@ class CompletionApprovalApiTest {
         HttpResponse<String> done = complete("ppc-team", approvals);
 
         assertThat(done.statusCode()).as(done.body()).isEqualTo(204);
+        awaitRecorded();
         Map<String, Object> row = jdbc.queryForMap("""
                 SELECT p.reported_pct, p.approved_pct, p.override_remark FROM bpa.workpack_progress p JOIN bpa.workpack w ON w.id = p.workpack_id
                 WHERE w.workpack_number = 'WP-000457' AND p.progress_period_id = ?""", period);
@@ -364,7 +370,33 @@ class CompletionApprovalApiTest {
         assertThat(row.path("remark").asText()).isEqualTo("FMS double-counted cutting");
     }
 
+    /** Re-run key (ADR 0007, D65): a retried record step finds the same values and writes nothing: approved_at is kept and nothing is audited twice. */
+    @Test
+    void aRerunOfRecordCompletionApprovalChangesNothing() {
+        List<CompletionApprovalService.Approval> approvals = CompletionApprovalService.parse(preFilled());
+        ProgressPeriodRepository.Period week = new ProgressPeriodRepository.Period(period, W19);
+
+        approvalService.record(week, approvals, "ppc-team");
+        java.sql.Timestamp first = approvedAt("WP-000457");
+        approvalService.record(week, approvals, "ppc-team");
+
+        assertThat(approvedAt("WP-000457")).as("approved_at is kept").isEqualTo(first);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'workpack_progress' AND column_name = 'approved_pct'", Integer.class))
+                .as("one audit row per Work Pack, written once").isEqualTo(3);
+    }
+
     // --- helpers ----------------------------------------------------------------------------------------------------------------
+
+    private java.sql.Timestamp approvedAt(String workpack) {
+        return jdbc.queryForObject("""
+                SELECT p.approved_at FROM bpa.workpack_progress p JOIN bpa.workpack w ON w.id = p.workpack_id WHERE w.workpack_number = ? AND p.progress_period_id = ?""",
+                java.sql.Timestamp.class, workpack, period);
+    }
+
+    /** The record step runs after the task completes: wait until the instance has moved on to BPA-61's step, then the rows are written. */
+    private void awaitRecorded() {
+        poll(() -> activeElements(instance).stream().map(e -> e.path("elementId").asText()).toList(), active -> active.contains(NEXT), NEXT + " of " + instance);
+    }
 
     private long startAtApprove() {
         Reply started = IntegrationApp.admin.post("/v2/process-instances", Map.of(

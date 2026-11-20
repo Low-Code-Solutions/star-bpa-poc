@@ -34,6 +34,10 @@ public final class TaskValidity {
     static final String REASON_TOO_LONG = "Reason can be at most 250 characters";
     static final int REASON_MAX = 250;
 
+    /** BPA-60: completing the approval needs the approvals of the week; "Approvals are required" is an ASSUMPTION text. */
+    static final String APPROVE_COMPLETION = "UserTask_ApproveCompletion";
+    static final String APPROVALS_REQUIRED = "Approvals are required";
+
     /** BPA-59: the Upload completion report completion needs the report that counts; "Completion report is required" is an ASSUMPTION text. */
     static final String UPLOAD_COMPLETION_REPORT = "UserTask_UploadCompletionReport";
     static final String REPORT_REQUIRED = "Completion report is required";
@@ -45,6 +49,9 @@ public final class TaskValidity {
     public static Optional<String> check(String elementId, Map<String, Object> submitted) {
         if (APPROVE_PRODUCTION.equals(elementId) || APPROVE_PPC.equals(elementId)) {
             return checkProductionDecision(submitted);
+        }
+        if (APPROVE_COMPLETION.equals(elementId)) {
+            return submitted.get("completionApprovals") instanceof java.util.List<?> list && !list.isEmpty() ? Optional.empty() : Optional.of(APPROVALS_REQUIRED);
         }
         if (UPLOAD_COMPLETION_REPORT.equals(elementId)) {
             return submitted.get("completionReportId") instanceof String id && !id.isBlank() ? Optional.empty() : Optional.of(REPORT_REQUIRED);
