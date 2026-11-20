@@ -199,3 +199,15 @@ Approved with the recommended answers:
 - Q8: the scenario tests start at `ServiceTask_CalculateEarnedManhours`.
 - Q10: texts as written.
 - ASSUMPTIONs to comment in Jira after a yes.
+
+## Progress and departures
+- **Red run (9fd70da):** 13 of 14 failed for the expected reasons (11 tests timed out at `ServiceTask_CalculateEarnedManhours` because there is no worker; the two endpoint tests got the 501 stub). Green after the implementation (81f73e4): `EarnedManhoursApiTest` 14/14.
+- **Departure, a stub:** adding the path to `api/openapi.yaml` makes the generated interface method abstract, so the commit with the contract and the red tests also holds a `ProgressPeriodController` method that answers 501, so the tests compile. The implementation replaced it.
+- **Weak test, said plainly:** `aLockedWeekIsRefused` passed in the red run (no worker writes anything, so "no row" held). It still proves no row is written for a Locked week once the worker exists.
+- **First red attempt invalid:** the setup inserted the 12 Nov period, which `BookHoursFixture.reset()` already creates; the 14 tests all failed with a duplicate key. Fixed in the test (it locks the fixture's period, as BPA-61 does) and re-run; the red result above is the second run.
+- **Tests after code, no red run:** `EarnedManhoursServiceTest` (pure roll-up and rounding, 5 tests).
+- **Test support:** `ProcessTestApplication` excludes `CalculateEarnedManhoursWorker`; `BookHoursFixture` clears `activity_progress` before `progress_period`.
+- **Edits to existing tests (the instance now moves on to `ServiceTask_PrepareVarianceCheck`; no stored-value assertion changed):** `ProgressRuleApiTest.BPA61_allAcceptedGoesToEarnedManhours` accepts `EARNED` or `ServiceTask_PrepareVarianceCheck`; `CompletionApprovalApiTest.AFTER_RECORD` and both classes' `cancelWaiting` lists gain the new step. To be said in the PR.
+- **Workers fail, no BPMN error:** `calculate-earned-manhours` fails with no retries for a week with no period or a Locked week (as the BPA-61 workers), not with a BPMN error and `validationMessages`.
+- **Data model:** §13.3.6 and the delta §3.6 formula now say Earned comes from the unrounded %; §13.3.6 has the "As built by BPA-62" note.
+- **Result:** `EarnedManhoursApiTest` 14/14, `EarnedManhoursServiceTest` 5/5, `ProgressRuleApiTest` 13/13, `CompletionApprovalApiTest` 22/22, `ModelDeployTest` 2/2, `ModelResourcesTest` 2/2.
