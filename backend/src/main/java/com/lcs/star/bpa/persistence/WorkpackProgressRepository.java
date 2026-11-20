@@ -124,6 +124,28 @@ public class WorkpackProgressRepository {
         }
     }
 
+    /**
+     * BPA-61: the progress rule's result for the Work Pack and week (Accepted, Blocked, NeedsRetraction). A row that already holds this result is left as it
+     * is (re-run key: the values); one audit row per change (D64). A Work Pack with no progress row for the week is an {@link IllegalArgumentException}.
+     */
+    public void setRuleResult(UUID periodId, String workpackNumber, String result, String username) {
+        Timestamp at = now();
+        List<Object[]> existing = jdbc.query("""
+                SELECT p.id, p.rule_result FROM bpa.workpack_progress p JOIN bpa.workpack w ON w.id = p.workpack_id
+                WHERE w.workpack_number = ? AND p.progress_period_id = ? FOR UPDATE OF p""", (rs, n) -> new Object[] {rs.getObject("id", UUID.class), rs.getString("rule_result")},
+                workpackNumber, periodId);
+        if (existing.isEmpty()) {
+            throw new IllegalArgumentException("Work Pack " + workpackNumber + " has no progress row for the week");
+        }
+        UUID id = (UUID) existing.get(0)[0];
+        String old = (String) existing.get(0)[1];
+        if (result.equals(old)) {
+            return;
+        }
+        jdbc.update("UPDATE bpa.workpack_progress SET rule_result = ?, updated_at = ?, updated_by = ? WHERE id = ?", result, at, username, id);
+        auditColumn(id, "rule_result", old, result, username, at);
+    }
+
     private void auditColumn(UUID recordId, String column, String oldValue, String newValue, String username, Timestamp at) {
         if (oldValue == null && newValue == null) {
             return;

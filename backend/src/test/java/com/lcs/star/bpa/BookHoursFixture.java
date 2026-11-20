@@ -33,7 +33,7 @@ final class BookHoursFixture {
     Ids reset() {
         // BPA-52: a logged row points at its line, a line at its upload file and at its submission, so: rows, decisions, lines, files, submissions (BPA-53: a decision points at its submission)
         // BPA-58: a line points at its FMS file (cleared right after the lines) and a file at its progress period
-        for (String table : new String[] {"timesheet_file_row", "hours_decision", "digital_timesheet_line", "fms_hours_export", "completion_report_row", "completion_report", "workpack_progress",
+        for (String table : new String[] {"timesheet_file_row", "hours_decision", "digital_timesheet_line", "fms_hours_export", "completion_report_row", "completion_report", "progress_retraction", "workpack_progress",
                 "timesheet_file", "hours_submission", "digital_timesheet", "hour_journal_line", "hour_journal_header", "worker_assignment", "assignment_file", "workpack_phase", "workpack",
                 "progress_period", "audit_log"}) {
             jdbc.update("DELETE FROM bpa." + table);

@@ -60,6 +60,8 @@ class CompletionApprovalApiTest {
     static final String PROCESS = "Process_PPC_WeeklyProgressPeriod";
     static final String APPROVE = "UserTask_ApproveCompletion";
     static final String NEXT = "ServiceTask_PrepareProgressCheck";
+    /** Where the instance can rest once the approval is recorded: BPA-61 added workers after this step (BPA-61 edit of this test), so it no longer rests at NEXT. */
+    static final java.util.Set<String> AFTER_RECORD = java.util.Set.of(NEXT, "ServiceTask_CalculateEarnedManhours", "UserTask_ApproveRetraction");
     static final LocalDate W12 = LocalDate.of(2026, 11, 12);
     static final LocalDate W19 = LocalDate.of(2026, 11, 19);
     static final String REMARK_REQUIRED = "A remark is required when the approved % differs from the reported %";
@@ -433,7 +435,7 @@ class CompletionApprovalApiTest {
 
     /** The record step runs after the task completes: wait until the instance has moved on to BPA-61's step, then the rows are written. */
     private void awaitRecorded() {
-        poll(() -> activeElements(instance).stream().map(e -> e.path("elementId").asText()).toList(), active -> active.contains(NEXT), NEXT + " of " + instance);
+        poll(() -> activeElements(instance).stream().map(e -> e.path("elementId").asText()).toList(), active -> active.stream().anyMatch(AFTER_RECORD::contains), "a step after the record step of " + instance);
     }
 
     private long startAtApprove() {

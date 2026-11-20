@@ -31,6 +31,7 @@
         <bpmn:flowNodeRef>ServiceTask_RecordCompletionApproval</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>ServiceTask_PrepareProgressCheck</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>BusinessRuleTask_CheckProgressRule</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_RecordProgressResult</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Gateway_ProgressOutcome</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>ServiceTask_RecordRetractionDecision</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Gateway_IsRetractionApproved</bpmn:flowNodeRef>
@@ -149,18 +150,31 @@
       <bpmn:outgoing>Flow_ToCheckProgressRule</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:businessRuleTask id="BusinessRuleTask_CheckProgressRule" name="Check progress rule">
-      <bpmn:documentation>E2-11. Decision_ProgressRule per Work Pack (FIRST). FRD-21 §21.9.1.</bpmn:documentation>
+      <bpmn:documentation>E2-11. Decision_ProgressRule per Work Pack (FIRST). FRD-21 §21.9.1. BPA-61: the decision reads newPct, previousPct and retractionApproved, so each pass maps them from its progressCheck (without the mapping every Work Pack came out Accepted), and each result keeps its Work Pack for ServiceTask_RecordProgressResult.</bpmn:documentation>
       <bpmn:extensionElements>
-        <zeebe:calledDecision decisionId="Decision_ProgressRule" resultVariable="progressCheck" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=progressCheck.newPct" target="newPct" />
+          <zeebe:input source="=progressCheck.previousPct" target="previousPct" />
+          <zeebe:input source="=progressCheck.retractionApproved" target="retractionApproved" />
+        </zeebe:ioMapping>
+        <zeebe:calledDecision decisionId="Decision_ProgressRule" resultVariable="progressRuleResult" />
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_ToCheckProgressRule</bpmn:incoming>
-      <bpmn:outgoing>Flow_ToProgressOutcome</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ToRecordProgressResult</bpmn:outgoing>
       <bpmn:multiInstanceLoopCharacteristics>
         <bpmn:extensionElements>
-          <zeebe:loopCharacteristics inputCollection="=progressChecks" inputElement="progressCheck" outputCollection="progressCheckResults" outputElement="=progressCheck" />
+          <zeebe:loopCharacteristics inputCollection="=progressChecks" inputElement="progressCheck" outputCollection="progressCheckResults" outputElement="={workpackNumber: progressCheck.workpackNumber, newPct: progressCheck.newPct, previousPct: progressCheck.previousPct, progressResult: progressRuleResult.progressResult, progressReason: progressRuleResult.progressReason}" />
         </bpmn:extensionElements>
       </bpmn:multiInstanceLoopCharacteristics>
     </bpmn:businessRuleTask>
+    <bpmn:serviceTask id="ServiceTask_RecordProgressResult" name="Record progress result">
+      <bpmn:documentation>E2-11 (BPA-61, plan Q3 b). Reads progressCheckResults (workpackNumber, newPct, previousPct, progressResult, progressReason) and writes workpack_progress.rule_result for the week (Accepted, Blocked, NeedsRetraction) in one transaction; sets validationMessages, one per Work Pack that is not Accepted: ABOVE_100 "&lt;WP&gt; completion cannot exceed 100% (approved &lt;n&gt;%)", BELOW_0 "&lt;WP&gt; completion cannot be below 0%", DECREASE "&lt;WP&gt; completion fell from &lt;prev&gt;% to &lt;new&gt;%; a retraction is needed" (empty when all are Accepted, so an old message never shows). Re-run key: the values (the same rule_result written again changes nothing).</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="record-progress-result" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToRecordProgressResult</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToProgressOutcome</bpmn:outgoing>
+    </bpmn:serviceTask>
     <bpmn:exclusiveGateway id="Gateway_ProgressOutcome" name="Progress outcome?" default="Flow_ProgressAccepted">
       <bpmn:documentation>E2-11. Blocked wins over NeedsRetraction; both win over Accepted.</bpmn:documentation>
       <bpmn:incoming>Flow_ToProgressOutcome</bpmn:incoming>
@@ -315,7 +329,8 @@
     <bpmn:sequenceFlow id="Flow_ToMergeProgressCheck" sourceRef="ServiceTask_RecordCompletionApproval" targetRef="Gateway_MergeProgressCheck" />
     <bpmn:sequenceFlow id="Flow_ToPrepareProgressCheck" sourceRef="Gateway_MergeProgressCheck" targetRef="ServiceTask_PrepareProgressCheck" />
     <bpmn:sequenceFlow id="Flow_ToCheckProgressRule" sourceRef="ServiceTask_PrepareProgressCheck" targetRef="BusinessRuleTask_CheckProgressRule" />
-    <bpmn:sequenceFlow id="Flow_ToProgressOutcome" sourceRef="BusinessRuleTask_CheckProgressRule" targetRef="Gateway_ProgressOutcome" />
+    <bpmn:sequenceFlow id="Flow_ToRecordProgressResult" sourceRef="BusinessRuleTask_CheckProgressRule" targetRef="ServiceTask_RecordProgressResult" />
+    <bpmn:sequenceFlow id="Flow_ToProgressOutcome" sourceRef="ServiceTask_RecordProgressResult" targetRef="Gateway_ProgressOutcome" />
     <bpmn:sequenceFlow id="Flow_ProgressBlocked" name="Blocked" sourceRef="Gateway_ProgressOutcome" targetRef="Gateway_MergeApproval">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=some r in progressCheckResults satisfies r.progressResult = "Blocked"</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
@@ -352,19 +367,19 @@
   <bpmndi:BPMNDiagram id="BPMNDiagram_Process_PPC_WeeklyProgressPeriod">
     <bpmndi:BPMNPlane id="BPMNPlane_Process_PPC_WeeklyProgressPeriod" bpmnElement="Collaboration_WeeklyProgressPeriod">
       <bpmndi:BPMNShape id="Participant_PPC_WeeklyProgressPeriod_di" bpmnElement="Participant_PPC_WeeklyProgressPeriod" isHorizontal="true">
-        <dc:Bounds x="160" y="60" width="4870" height="800" />
+        <dc:Bounds x="160" y="60" width="5020" height="800" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_PpcTeam_di" bpmnElement="Lane_PpcTeam" isHorizontal="true">
-        <dc:Bounds x="190" y="60" width="4840" height="200" />
+        <dc:Bounds x="190" y="60" width="4990" height="200" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_ProjectManager_di" bpmnElement="Lane_ProjectManager" isHorizontal="true">
-        <dc:Bounds x="190" y="260" width="4840" height="200" />
+        <dc:Bounds x="190" y="260" width="4990" height="200" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_CostController_di" bpmnElement="Lane_CostController" isHorizontal="true">
-        <dc:Bounds x="190" y="460" width="4840" height="200" />
+        <dc:Bounds x="190" y="460" width="4990" height="200" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_System_di" bpmnElement="Lane_System" isHorizontal="true">
-        <dc:Bounds x="190" y="660" width="4840" height="200" />
+        <dc:Bounds x="190" y="660" width="4990" height="200" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="StartEvent_WeeklyCutOff_di" bpmnElement="StartEvent_WeeklyCutOff">
         <dc:Bounds x="292" y="742" width="36" height="36" />
@@ -420,67 +435,70 @@
       <bpmndi:BPMNShape id="BusinessRuleTask_CheckProgressRule_di" bpmnElement="BusinessRuleTask_CheckProgressRule">
         <dc:Bounds x="2210" y="720" width="100" height="80" />
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_RecordProgressResult_di" bpmnElement="ServiceTask_RecordProgressResult">
+        <dc:Bounds x="2360" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_ProgressOutcome_di" bpmnElement="Gateway_ProgressOutcome" isMarkerVisible="true">
-        <dc:Bounds x="2385" y="735" width="50" height="50" />
+        <dc:Bounds x="2535" y="735" width="50" height="50" />
         <bpmndi:BPMNLabel>
           <dc:Bounds x="2360" y="790" width="100" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_ApproveRetraction_di" bpmnElement="UserTask_ApproveRetraction">
-        <dc:Bounds x="2510" y="320" width="100" height="80" />
+        <dc:Bounds x="2660" y="320" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ServiceTask_RecordRetractionDecision_di" bpmnElement="ServiceTask_RecordRetractionDecision">
-        <dc:Bounds x="2660" y="720" width="100" height="80" />
+        <dc:Bounds x="2810" y="720" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_IsRetractionApproved_di" bpmnElement="Gateway_IsRetractionApproved" isMarkerVisible="true">
-        <dc:Bounds x="2835" y="735" width="50" height="50" />
+        <dc:Bounds x="2985" y="735" width="50" height="50" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="2810" y="790" width="100" height="27" />
+          <dc:Bounds x="2960" y="790" width="100" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ServiceTask_CalculateEarnedManhours_di" bpmnElement="ServiceTask_CalculateEarnedManhours">
-        <dc:Bounds x="2960" y="720" width="100" height="80" />
+        <dc:Bounds x="3110" y="720" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ServiceTask_CompleteWorkPacks_di" bpmnElement="ServiceTask_CompleteWorkPacks">
-        <dc:Bounds x="4460" y="720" width="100" height="80" />
+        <dc:Bounds x="4610" y="720" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ServiceTask_PrepareVarianceCheck_di" bpmnElement="ServiceTask_PrepareVarianceCheck">
-        <dc:Bounds x="3260" y="720" width="100" height="80" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="BusinessRuleTask_CheckManhourVariance_di" bpmnElement="BusinessRuleTask_CheckManhourVariance">
         <dc:Bounds x="3410" y="720" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="BusinessRuleTask_CheckCostVariance_di" bpmnElement="BusinessRuleTask_CheckCostVariance">
+      <bpmndi:BPMNShape id="BusinessRuleTask_CheckManhourVariance_di" bpmnElement="BusinessRuleTask_CheckManhourVariance">
         <dc:Bounds x="3560" y="720" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ServiceTask_SendVarianceAlerts_di" bpmnElement="ServiceTask_SendVarianceAlerts">
+      <bpmndi:BPMNShape id="BusinessRuleTask_CheckCostVariance_di" bpmnElement="BusinessRuleTask_CheckCostVariance">
         <dc:Bounds x="3710" y="720" width="100" height="80" />
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_SendVarianceAlerts_di" bpmnElement="ServiceTask_SendVarianceAlerts">
+        <dc:Bounds x="3860" y="720" width="100" height="80" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_MergeReview_di" bpmnElement="Gateway_MergeReview" isMarkerVisible="true">
-        <dc:Bounds x="3885" y="535" width="50" height="50" />
+        <dc:Bounds x="4035" y="535" width="50" height="50" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="3860" y="590" width="100" height="27" />
+          <dc:Bounds x="4010" y="590" width="100" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_ReviewActualManhours_di" bpmnElement="UserTask_ReviewActualManhours">
-        <dc:Bounds x="4010" y="520" width="100" height="80" />
+        <dc:Bounds x="4160" y="520" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_ApproveWeeklyProgress_di" bpmnElement="UserTask_ApproveWeeklyProgress">
-        <dc:Bounds x="4160" y="320" width="100" height="80" />
+        <dc:Bounds x="4310" y="320" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_IsWeekApproved_di" bpmnElement="Gateway_IsWeekApproved" isMarkerVisible="true">
-        <dc:Bounds x="4335" y="735" width="50" height="50" />
+        <dc:Bounds x="4485" y="735" width="50" height="50" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="4310" y="790" width="100" height="27" />
+          <dc:Bounds x="4460" y="790" width="100" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ServiceTask_LockProgressPeriod_di" bpmnElement="ServiceTask_LockProgressPeriod">
-        <dc:Bounds x="4610" y="720" width="100" height="80" />
+        <dc:Bounds x="4760" y="720" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="EndEvent_PeriodLocked_di" bpmnElement="EndEvent_PeriodLocked">
-        <dc:Bounds x="4792" y="742" width="36" height="36" />
+        <dc:Bounds x="4942" y="742" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="4760" y="783" width="100" height="27" />
+          <dc:Bounds x="4910" y="783" width="100" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BoundaryEvent_ReportInvalid_di" bpmnElement="BoundaryEvent_ReportInvalid">
@@ -551,109 +569,113 @@
         <di:waypoint x="2160" y="760" />
         <di:waypoint x="2210" y="760" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_ToProgressOutcome_di" bpmnElement="Flow_ToProgressOutcome">
+      <bpmndi:BPMNEdge id="Flow_ToRecordProgressResult_di" bpmnElement="Flow_ToRecordProgressResult">
         <di:waypoint x="2310" y="760" />
-        <di:waypoint x="2385" y="760" />
+        <di:waypoint x="2360" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToProgressOutcome_di" bpmnElement="Flow_ToProgressOutcome">
+        <di:waypoint x="2460" y="760" />
+        <di:waypoint x="2535" y="760" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ProgressBlocked_di" bpmnElement="Flow_ProgressBlocked">
-        <di:waypoint x="2410" y="735" />
-        <di:waypoint x="2410" y="110" />
+        <di:waypoint x="2560" y="735" />
+        <di:waypoint x="2560" y="110" />
         <di:waypoint x="1510" y="110" />
         <di:waypoint x="1510" y="135" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_NeedsRetraction_di" bpmnElement="Flow_NeedsRetraction">
-        <di:waypoint x="2435" y="760" />
-        <di:waypoint x="2472" y="760" />
-        <di:waypoint x="2472" y="360" />
-        <di:waypoint x="2510" y="360" />
+        <di:waypoint x="2585" y="760" />
+        <di:waypoint x="2622" y="760" />
+        <di:waypoint x="2622" y="360" />
+        <di:waypoint x="2660" y="360" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ProgressAccepted_di" bpmnElement="Flow_ProgressAccepted">
-        <di:waypoint x="2435" y="760" />
-        <di:waypoint x="2960" y="760" />
+        <di:waypoint x="2585" y="760" />
+        <di:waypoint x="3110" y="760" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ToRecordRetraction_di" bpmnElement="Flow_ToRecordRetraction">
-        <di:waypoint x="2610" y="360" />
-        <di:waypoint x="2635" y="360" />
-        <di:waypoint x="2635" y="760" />
-        <di:waypoint x="2660" y="760" />
+        <di:waypoint x="2760" y="360" />
+        <di:waypoint x="2785" y="360" />
+        <di:waypoint x="2785" y="760" />
+        <di:waypoint x="2810" y="760" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ToIsRetractionApproved_di" bpmnElement="Flow_ToIsRetractionApproved">
-        <di:waypoint x="2760" y="760" />
-        <di:waypoint x="2835" y="760" />
+        <di:waypoint x="2910" y="760" />
+        <di:waypoint x="2985" y="760" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_RetractionApproved_di" bpmnElement="Flow_RetractionApproved">
-        <di:waypoint x="2860" y="735" />
-        <di:waypoint x="2860" y="710" />
+        <di:waypoint x="3010" y="735" />
+        <di:waypoint x="3010" y="710" />
         <di:waypoint x="1960" y="710" />
         <di:waypoint x="1960" y="735" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_RetractionDeclined_di" bpmnElement="Flow_RetractionDeclined">
-        <di:waypoint x="2860" y="735" />
-        <di:waypoint x="2860" y="110" />
+        <di:waypoint x="3010" y="735" />
+        <di:waypoint x="3010" y="110" />
         <di:waypoint x="1510" y="110" />
         <di:waypoint x="1510" y="135" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ToPrepareVariance_di" bpmnElement="Flow_ToPrepareVariance">
-        <di:waypoint x="3060" y="760" />
-        <di:waypoint x="3260" y="760" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_ToManhourVariance_di" bpmnElement="Flow_ToManhourVariance">
-        <di:waypoint x="3360" y="760" />
+        <di:waypoint x="3210" y="760" />
         <di:waypoint x="3410" y="760" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_ToCostVariance_di" bpmnElement="Flow_ToCostVariance">
+      <bpmndi:BPMNEdge id="Flow_ToManhourVariance_di" bpmnElement="Flow_ToManhourVariance">
         <di:waypoint x="3510" y="760" />
         <di:waypoint x="3560" y="760" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_ToSendAlerts_di" bpmnElement="Flow_ToSendAlerts">
+      <bpmndi:BPMNEdge id="Flow_ToCostVariance_di" bpmnElement="Flow_ToCostVariance">
         <di:waypoint x="3660" y="760" />
         <di:waypoint x="3710" y="760" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_ToMergeReview_di" bpmnElement="Flow_ToMergeReview">
+      <bpmndi:BPMNEdge id="Flow_ToSendAlerts_di" bpmnElement="Flow_ToSendAlerts">
         <di:waypoint x="3810" y="760" />
-        <di:waypoint x="3847" y="760" />
-        <di:waypoint x="3847" y="560" />
-        <di:waypoint x="3885" y="560" />
+        <di:waypoint x="3860" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToMergeReview_di" bpmnElement="Flow_ToMergeReview">
+        <di:waypoint x="3960" y="760" />
+        <di:waypoint x="3997" y="760" />
+        <di:waypoint x="3997" y="560" />
+        <di:waypoint x="4035" y="560" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ToReviewManhours_di" bpmnElement="Flow_ToReviewManhours">
-        <di:waypoint x="3935" y="560" />
-        <di:waypoint x="4010" y="560" />
+        <di:waypoint x="4085" y="560" />
+        <di:waypoint x="4160" y="560" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ToApproveWeek_di" bpmnElement="Flow_ToApproveWeek">
-        <di:waypoint x="4110" y="560" />
-        <di:waypoint x="4135" y="560" />
-        <di:waypoint x="4135" y="360" />
-        <di:waypoint x="4160" y="360" />
+        <di:waypoint x="4260" y="560" />
+        <di:waypoint x="4285" y="560" />
+        <di:waypoint x="4285" y="360" />
+        <di:waypoint x="4310" y="360" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ToIsWeekApproved_di" bpmnElement="Flow_ToIsWeekApproved">
-        <di:waypoint x="4260" y="360" />
-        <di:waypoint x="4297" y="360" />
-        <di:waypoint x="4297" y="760" />
-        <di:waypoint x="4335" y="760" />
+        <di:waypoint x="4410" y="360" />
+        <di:waypoint x="4447" y="360" />
+        <di:waypoint x="4447" y="760" />
+        <di:waypoint x="4485" y="760" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_WeekApproved_di" bpmnElement="Flow_WeekApproved">
-        <di:waypoint x="4385" y="760" />
-        <di:waypoint x="4460" y="760" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_ToLockPeriod_di" bpmnElement="Flow_ToLockPeriod">
-        <di:waypoint x="4560" y="760" />
+        <di:waypoint x="4535" y="760" />
         <di:waypoint x="4610" y="760" />
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToLockPeriod_di" bpmnElement="Flow_ToLockPeriod">
+        <di:waypoint x="4710" y="760" />
+        <di:waypoint x="4760" y="760" />
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_WeekChangesRequested_di" bpmnElement="Flow_WeekChangesRequested">
-        <di:waypoint x="4360" y="735" />
-        <di:waypoint x="4360" y="110" />
+        <di:waypoint x="4510" y="735" />
+        <di:waypoint x="4510" y="110" />
         <di:waypoint x="1510" y="110" />
         <di:waypoint x="1510" y="135" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_WeekCostReviewRequested_di" bpmnElement="Flow_WeekCostReviewRequested">
-        <di:waypoint x="4360" y="735" />
-        <di:waypoint x="4360" y="510" />
-        <di:waypoint x="3910" y="510" />
-        <di:waypoint x="3910" y="535" />
+        <di:waypoint x="4510" y="735" />
+        <di:waypoint x="4510" y="510" />
+        <di:waypoint x="4060" y="510" />
+        <di:waypoint x="4060" y="535" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ToPeriodLocked_di" bpmnElement="Flow_ToPeriodLocked">
-        <di:waypoint x="4710" y="760" />
-        <di:waypoint x="4792" y="760" />
+        <di:waypoint x="4860" y="760" />
+        <di:waypoint x="4942" y="760" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ReportInvalid_di" bpmnElement="Flow_ReportInvalid">
         <di:waypoint x="1400" y="818" />
