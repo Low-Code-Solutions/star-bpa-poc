@@ -1,7 +1,7 @@
 # Plan: BPA-62 System can calculate each activity's Earned man-hours for the week
 Jira: BPA-62 (Story, epic BPA-4)
 Story last updated: 2026-11-20T18:44:28.634+0400
-Status: Approved (Ahsan, 20 Nov 2026)
+Status: Closed (20 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-62-earned-manhours, from main edfe7b5
 
@@ -98,7 +98,7 @@ Re-run key: (activity_ref, progress_period_id) and the values (ADR 0007). Busine
 | Test support | `bpatest/ProcessTestApplication` excludes the new worker; `BookHoursFixture` resets `activity_progress` |
 | Existing tests (instance no longer rests at `ServiceTask_CalculateEarnedManhours`) | `ProgressRuleApiTest.BPA61_allAcceptedGoesToEarnedManhours` waits for `EARNED` or `ServiceTask_PrepareVarianceCheck`; `CompletionApprovalApiTest.AFTER_RECORD` gains `ServiceTask_PrepareVarianceCheck`; both classes' `cancelWaiting` lists gain it. To be said in the PR |
 | Tests | new `EarnedManhoursApiTest` (8 `BPA62_` + extras) |
-| Docs | data model §13.3.6 "As built by BPA-62" + the Earned formula text (Q1); plan; REVIEW.md; `intent/README.md` |
+| Docs | data model §13.3.6 "As built by BPA-62" + the Earned formula text (Q1), also in `intent/BPA-4-timesheet-to-progress/data-model-v0.7-delta.md` §3.6; plan; REVIEW.md; `intent/README.md` |
 
 Not changed: BPMN (Q5), DMN, database schema, frontend.
 
@@ -220,3 +220,12 @@ Approved with the recommended answers:
 - **Operate:** the instance waits at `ServiceTask_PrepareVarianceCheck` (BPA-64, no worker yet).
 - Full `./mvnw -B verify`: 601 tests, 0 failures. No frontend change, so no frontend lint, test or build.
 - Side effect on the local stack: the week ending 19 Nov holds these rows and the instance at `ServiceTask_PrepareVarianceCheck`; a Locked 12 Nov seed period (`process_instance_key` 1).
+
+## After the `qa-reviewer` pass (20 Nov 2026; REVIEW.md "BPA-62 at d10a8ac")
+- **No Important findings.** Nits:
+  - The Locked check in `calculate` is not atomic with the writes (no lock on the `progress_period` row), so a concurrent lock could interleave. Left (POC): BPA-66 and BPA-67 should take `SELECT ... FOR UPDATE` on the period when they land.
+  - **Q7 text made exact (ASSUMPTION):** `lastLockedEarnedManhours` is the activity's row in the latest Locked week that has a row for it, not strictly the latest Locked week's: an activity with no row in the most recent Locked week takes an older Locked week as the base.
+  - `BPA62_lockedWeekIsNotRecalculated` cannot fail on its 12 Nov assertion alone; the guard is `aLockedWeekIsRefused` (said above).
+  - The delta file is now in "Files that change".
+- **To say in the PR:** the edited existing tests, the 501 stub, `EarnedManhoursServiceTest` written after the code.
+- **Not done:** the plan's ASSUMPTION comments are not posted in Jira yet (shown to Ahsan first, posted on his yes).
