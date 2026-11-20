@@ -245,3 +245,29 @@ Extra tests (not scenarios):
 
 ## Resolutions (20 Nov 2026)
 Approved with the recommended answers: Q1 Approved lines up to the week ending over the sum of workpack_phase.manhours; Q2 the lock rule is skipped with no earlier period; Q3 no retraction field; Q4 In Progress Work Packs plus those with a row for the week, no project scope; Q7 option A (ServiceTask_RecordCompletionApproval, a BPMN change); Q8 refuse outside 0 to 100 at completion; Q9 to Q12 as written (ASSUMPTIONs to comment in Jira after a yes).
+
+## Progress and departures (20 Nov 2026)
+Approved with the recommended answers (Resolutions above).
+
+**Red runs** (committed apart, 366d19d and 2bcfb6b):
+- `CompletionApprovalApiTest`: 19 of 19 failed with 404 "No static resource api/v1/progress-periods/…". **The completion scenarios failed one step earlier than the plan expected** (at the GET that builds their payload, not at "Task not found"), because the test reads the pre-filled values first.
+- `TaskValidityTest.approveCompletionNeedsTheApprovals` failed (no rule); React `ApproveCompletion.test.tsx` failed on the missing import.
+- The integration red run came after Docker Desktop was started again (it was not running when the red run was first tried).
+- Green after the implementation: 17 of 19 on the first run; the 2 failures were the test's own timing (below); then 19 of 19, and 20 with the re-run test.
+
+**Departures from the plan:**
+1. **Two tests wait for the record step.** `BPA60_ppcApprovesReportedPercent` and `BPA60_ppcChangesAPercentBeforeApproving` read the database straight after the 204, but the worker writes after the task completes; they now call `awaitRecorded()` (the instance has reached `ServiceTask_PrepareProgressCheck`) first. No assertion changed.
+2. **`aRerunOfRecordCompletionApprovalChangesNothing`** was written with the implementation, with no red run (it needs the new service); it calls `CompletionApprovalService.record` twice.
+3. **New classes not in the Files table:** `persistence/ProgressWeekRepository` (the derived figures in one query), `progress/CompletionApprovalService` (parse and record), `progress/ProgressReadService` is the read model as planned; `features/progress/approvalMessages.ts` (the screen's checks).
+4. **`ProgressPeriodRepository`** gained `ofWeek` and `statusOfWeek`; `WorkpackProgressRepository` gained `approve` (the upsert with the re-run rule).
+5. **A Hours basis with a Work Pack budget of 0** pre-fills the reported % (ASSUMPTION; the hours-based % is absent).
+6. **A payload entry without a number** answers 400 "Completion % must be a number" (ASSUMPTION, the BPA-59 text).
+7. **Existing test support edited (to say in the PR):** `bpatest/ProcessTestApplication` excludes `RecordCompletionApprovalWorker`. No existing test was changed.
+
+**Local-stack proof (20 Nov 2026, new images, process definition version 6):**
+- Reset the week; cut-off by hand; as ppc-team "Send hours to FMS" (Sent), upload `templates/demo/completion-demo-all-read.csv` (3 rows, all "Read"), complete: the instance reached `UserTask_ApproveCompletion`.
+- `GET /api/v1/progress-periods/2026-11-19/workpacks`: four rows (WP-000011 45, WP-000030 100, WP-000031 20, and WP-000032 marked `noReportRow` with approved 0), with last locked %, hours-based %, FMS actual, approved hours and difference, and "reported by production" on WP-000031.
+- Refusals on the open task: a payload that missed WP-000032 → 400 "Approvals must cover every Work Pack of the week"; 38.125 → 400 "Completion % can have at most 2 decimal places"; 38 without a remark → 400 "A remark is required…"; a changed no-report-row Work Pack without a remark → the same 400; 120 → 400 "Completion % must be between 0 and 100"; a seeded 12 Nov CutOff period → 409 "Week ending 12 Nov 2026 must be locked first" (the seeded row was removed again); cost-controller → 403.
+- Approving (WP-000011 to 38 with the remark "FMS double-counted cutting"): 204; `workpack_progress` for 2026-11-19: reported 45 / approved 38 with the remark, 100 / 100, 20 / 20, and WP-000032 no report / approved 0, all `approved_by` ppc-team with `approved_at`, `previous_pct` 0. The instance waits at `ServiceTask_PrepareProgressCheck` (no worker until BPA-61).
+- Not run by hand: the Hours basis and the screen in a browser (covered by `BPA60_withBasisHoursTheApprovedIsPreFilledFromLoggedHours` and the React tests).
+- Side effect on the local stack: the week ending 19 Nov holds four approved rows.
