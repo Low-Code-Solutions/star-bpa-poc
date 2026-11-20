@@ -36,6 +36,12 @@ public class ProgressPeriodController implements ProgressPeriodsApi {
         return ResponseEntity.ok(new ProgressWeek(week.weekEnding(), ProgressWeek.BasisEnum.fromValue(week.basis()), rows));
     }
 
+    /** BPA-62 stub (contract first): answers 501 until the implementation commit, so the red tests compile and fail for the expected reason. */
+    @Override
+    public ResponseEntity<com.lcs.star.bpa.api.generated.model.EarnedManhoursWeek> getProgressWeekEarnedManhours(LocalDate weekEnding) {
+        throw new ErrorResponseException(HttpStatus.NOT_IMPLEMENTED);
+    }
+
     private static WorkpackProgressRow map(Row row) {
         WorkpackProgressRow out = new WorkpackProgressRow(row.workpackNumber(), row.noReportRow(), row.lastLockedPct(), row.approvedHours(), row.approvedPct());
         out.setReportedPct(row.reportedPct());
