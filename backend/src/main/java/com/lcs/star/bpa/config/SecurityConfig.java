@@ -40,6 +40,7 @@ public class SecurityConfig {
 
     /** Reads the Project Hour Journal Header (BPA-7). */
     static final String PPC_TEAM = "ppc-team";
+    static final String PROJECT_MANAGER = "project-manager";
 
     /** Read the Workpack print (BPA-10; with the Analyst; groups ASSUMPTION in the story). */
     static final String PRODUCTION_PLANNER = "production-planner";
@@ -99,6 +100,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/fms-hours-exports/**").hasAuthority(PPC_TEAM)
                         // BPA-59: only the PPC Team uploads the weekly completion report and reads its result
                         .requestMatchers("/api/v1/completion-reports/**", "/api/v1/completion-reports").hasAuthority(PPC_TEAM)
+                        // BPA-60: the PPC Team and the Project Manager read the week's Work Packs for the completion % approval (delta section 7)
+                        .requestMatchers("/api/v1/progress-periods/**").hasAnyAuthority(PPC_TEAM, PROJECT_MANAGER)
                         .anyRequest().authenticated())
                 // S26: token in the XSRF-TOKEN cookie (readable by React), sent back as X-XSRF-TOKEN on every state-changing call,
                 // the login included. The plain handler lets React send the cookie value unchanged.

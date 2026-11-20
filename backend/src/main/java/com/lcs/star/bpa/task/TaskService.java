@@ -43,14 +43,16 @@ public class TaskService {
     private final HoursSegregationCheck segregation;
     private final FmsHandOffCheck fmsHandOff;
     private final CompletionReportCheck completionReport;
+    private final CompletionApprovalCheck completionApproval;
 
     public TaskService(CamundaTaskClient camunda, TaskAllowList allowList, HoursSegregationCheck segregation, FmsHandOffCheck fmsHandOff,
-            CompletionReportCheck completionReport) {
+            CompletionReportCheck completionReport, CompletionApprovalCheck completionApproval) {
         this.camunda = camunda;
         this.allowList = allowList;
         this.segregation = segregation;
         this.fmsHandOff = fmsHandOff;
         this.completionReport = completionReport;
+        this.completionApproval = completionApproval;
     }
 
     /** Open tasks whose candidate groups include one of the user's groups, oldest first. */
@@ -140,6 +142,12 @@ public class TaskService {
             if (completionReport.appliesTo(task.elementId())) {
                 completionReport.refusal(Long.parseLong(task.processInstanceKey()), submitted).ifPresent(message -> {
                     throw problem(HttpStatus.BAD_REQUEST, message);
+                });
+            }
+            // BPA-60: the week before must be locked (409) and the approvals must be complete and valid (400); the task stays open
+            if (completionApproval.appliesTo(task.elementId())) {
+                completionApproval.refusal(Long.parseLong(task.processInstanceKey()), submitted).ifPresent(refusal -> {
+                    throw problem(refusal.status(), refusal.message());
                 });
             }
             // D63 (BPA-6 plan, Ahsan 4 Nov): the save workers record who completed the task. Set here from the session, never

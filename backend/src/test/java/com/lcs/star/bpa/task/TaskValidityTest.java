@@ -105,6 +105,16 @@ class TaskValidityTest {
         assertThat(TaskValidity.check(upload, Map.of("completionReportId", "11111111-1111-1111-1111-111111111111"))).isEqualTo(Optional.empty());
     }
 
+    /** BPA-60: completing the approval needs the approvals of the week; "Approvals are required" is an ASSUMPTION text. */
+    @Test
+    void approveCompletionNeedsTheApprovals() {
+        String approve = "UserTask_ApproveCompletion";
+        assertThat(TaskValidity.check(approve, Map.of())).contains("Approvals are required");
+        assertThat(TaskValidity.check(approve, Map.of("completionApprovals", java.util.List.of()))).contains("Approvals are required");
+        assertThat(TaskValidity.check(approve, Map.of("completionApprovals", java.util.List.of(Map.of("workpackNumber", "WP-000457", "approvedPct", 40)))))
+                .isEqualTo(Optional.empty());
+    }
+
     @Test
     void validCompletionsAndOtherTasksPass() {
         assertThat(TaskValidity.check(SIGN_OFF, Map.of("signOffDecision", "Approved"))).isEqualTo(Optional.empty());

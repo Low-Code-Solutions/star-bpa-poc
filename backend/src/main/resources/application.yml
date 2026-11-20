@@ -109,6 +109,9 @@ bpa:
       "[UserTask_UploadCompletionReport]": # ppc-team, BPA-59: the id of the upload that counts (Q-DM20); read gives the week; validationMessages has its own field
         write: [completionReportId]
         read: [weekEnding]
+      "[UserTask_ApproveCompletion]": # ppc-team, BPA-60: one approval per Work Pack of the week (completionApprovals); read gives the week; the rows come from GET /api/v1/progress-periods/{weekEnding}/workpacks
+        write: [completionApprovals]
+        read: [weekEnding]
       "[UserTask_CreateWorkPack]": # time-method-analyst (G9), BPA-6
         write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
         read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]

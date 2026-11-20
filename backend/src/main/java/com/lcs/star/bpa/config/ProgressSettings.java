@@ -13,11 +13,17 @@ import org.springframework.stereotype.Component;
 public class ProgressSettings {
 
     static final String SOURCE = "bpa.progress.source";
+    static final String BASIS = "bpa.progress.basis";
 
     private final Environment environment;
 
     public ProgressSettings(Environment environment) {
         this.environment = environment;
+    }
+
+    /** The configured progress basis (BPA-60; C-E2-2): "Physical" (default, FRD-21 §21.6: PPC approves the reported physical %) or "Hours" (FRD-7 §7.7.1: pre-filled from logged hours). */
+    public String basis() {
+        return "HOURS".equalsIgnoreCase(environment.getProperty(BASIS, "Physical").trim()) ? "Hours" : "Physical";
     }
 
     /** The configured progress source, "FMS" or "PMS". */
