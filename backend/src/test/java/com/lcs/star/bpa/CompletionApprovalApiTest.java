@@ -265,10 +265,16 @@ class CompletionApprovalApiTest {
                 UPDATE bpa.workpack_phase SET manhours = CASE phase WHEN 'Cutting' THEN 100 ELSE 50 END
                 WHERE workpack_id = ?""", ids.workpackId()); // a budget of 150
         fixture.fill(fms.e1021(), "Cutting", new BigDecimal("60"), "Approved");
+        // QA review: Jira's own numbers make the reported % (40) equal the hours-based % (60 of 150), so the test could not tell the bases apart; the reported
+        // % is 35 here, and 40.00 can then only come from the hours
+        jdbc.update("""
+                UPDATE bpa.workpack_progress SET reported_pct = 35 WHERE progress_period_id = ?
+                AND workpack_id = (SELECT id FROM bpa.workpack WHERE workpack_number = 'WP-000457')""", period);
 
         JsonNode row = rowOf("WP-000457", read("ppc-team"));
 
         assertThat(row.path("approvedPct").decimalValue()).isEqualByComparingTo("40.00");
+        assertThat(row.path("reportedPct").decimalValue()).isEqualByComparingTo("35.00");
     }
 
     @Test
@@ -368,6 +374,38 @@ class CompletionApprovalApiTest {
 
         assertThat(row.path("approvedPct").decimalValue()).isEqualByComparingTo("38");
         assertThat(row.path("remark").asText()).isEqualTo("FMS double-counted cutting");
+    }
+
+    /**
+     * QA review, plan question for Jira: under the Hours basis the pre-fill (the hours-based %) differs from the reported %, and Jira's rule (a) asks for a
+     * remark whenever the approved % differs from the reported %. The code follows (a) literally, so an untouched pre-fill that differs from the reported % needs
+     * a remark. This pins that reading (an ASSUMPTION) so a change to it is deliberate.
+     */
+    @Test
+    void underTheHoursBasisAnUntouchedPreFillThatDiffersFromTheReportedPercentNeedsARemark() {
+        progressSetting("basis", "Hours");
+        jdbc.update("UPDATE bpa.workpack_phase SET manhours = CASE phase WHEN 'Cutting' THEN 100 ELSE 50 END WHERE workpack_id = ?", ids.workpackId());
+        fixture.fill(fms.e1021(), "Cutting", new BigDecimal("60"), "Approved");
+        jdbc.update("""
+                UPDATE bpa.workpack_progress SET reported_pct = 35 WHERE progress_period_id = ?
+                AND workpack_id = (SELECT id FROM bpa.workpack WHERE workpack_number = 'WP-000457')""", period);
+
+        HttpResponse<String> refused = complete("ppc-team", preFilled());
+
+        assertThat(refused.statusCode()).isEqualTo(400);
+        assertThat(json(refused.body()).path("detail").asText()).isEqualTo(REMARK_REQUIRED);
+    }
+
+    /** QA review: rows of a Locked week never change (data model 13.3.4, worker-checked); a stale instance cannot overwrite them. */
+    @Test
+    void aLockedWeekIsNeverChanged() {
+        jdbc.update("UPDATE bpa.progress_period SET status = 'Locked', locked_at = now() WHERE id = ?", period);
+        List<CompletionApprovalService.Approval> approvals = CompletionApprovalService.parse(preFilled());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> approvalService.record(new ProgressPeriodRepository.Period(period, W19), approvals, "ppc-team"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("Week ending 19 Nov 2026 is locked");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.workpack_progress WHERE approved_pct IS NOT NULL AND progress_period_id = ?", Integer.class, period))
+                .isZero();
     }
 
     /** Re-run key (ADR 0007, D65): a retried record step finds the same values and writes nothing: approved_at is kept and nothing is audited twice. */

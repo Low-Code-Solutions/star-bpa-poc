@@ -1,5 +1,6 @@
 package com.lcs.star.bpa.progress;
 
+import com.lcs.star.bpa.persistence.ProgressPeriodRepository;
 import com.lcs.star.bpa.persistence.ProgressPeriodRepository.Period;
 import com.lcs.star.bpa.persistence.WorkpackProgressRepository;
 import com.lcs.star.bpa.progress.ProgressReadService.Row;
@@ -30,10 +31,12 @@ public class CompletionApprovalService {
 
     private final ProgressReadService read;
     private final WorkpackProgressRepository progress;
+    private final ProgressPeriodRepository periods;
 
-    public CompletionApprovalService(ProgressReadService read, WorkpackProgressRepository progress) {
+    public CompletionApprovalService(ProgressReadService read, WorkpackProgressRepository progress, ProgressPeriodRepository periods) {
         this.read = read;
         this.progress = progress;
+        this.periods = periods;
     }
 
     /** The payload as entries; an entry that is not understood is an {@link IllegalArgumentException} with the text to answer with. */
@@ -45,12 +48,8 @@ public class CompletionApprovalService {
                     throw new IllegalArgumentException(NOT_COVERED);
                 }
                 Object pct = map.get("approvedPct");
-                BigDecimal approved;
-                try {
-                    approved = pct instanceof Number || pct instanceof String s && !s.isBlank() ? new BigDecimal(String.valueOf(pct).trim()) : null;
-                } catch (NumberFormatException e) {
-                    approved = null;
-                }
+                // a plain decimal only: BigDecimal would read "1e1" as 10 (QA review)
+                BigDecimal approved = pct instanceof Number ? new BigDecimal(String.valueOf(pct)) : pct instanceof String s ? CompletionRowChecks.number(s).orElse(null) : null;
                 if (approved == null) {
                     throw new IllegalArgumentException(NOT_A_NUMBER);
                 }
@@ -63,6 +62,10 @@ public class CompletionApprovalService {
     /** Writes the approvals of the week; the Work Packs and what they are compared with come from the week's read model. */
     @Transactional
     public void record(Period period, List<Approval> approvals, String username) {
+        // rows of a Locked week never change (data model 13.3.4, worker-checked; QA review): a stale instance cannot overwrite them
+        if (periods.statusOfWeek(period.weekEnding()).filter("Locked"::equals).isPresent()) {
+            throw new IllegalArgumentException("Week ending " + period.weekEnding().format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH)) + " is locked");
+        }
         Map<String, Row> rows = new HashMap<>();
         read.week(period).rows().forEach(row -> rows.put(row.workpackNumber(), row));
         for (Approval approval : approvals) {

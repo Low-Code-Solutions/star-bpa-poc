@@ -33,9 +33,9 @@ const ROWS = [
 ];
 
 type Call = { method: string; path: string; body: unknown };
-type Options = { completeStatus?: number; completeDetail?: string };
+type Options = { completeStatus?: number; completeDetail?: string; weekStatus?: number };
 
-function fakeBackend({ completeStatus = 204, completeDetail = '' }: Options = {}) {
+function fakeBackend({ completeStatus = 204, completeDetail = '', weekStatus = 200 }: Options = {}) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -61,7 +61,9 @@ function fakeBackend({ completeStatus = 204, completeDetail = '' }: Options = {}
       });
     }
     if (path === '/api/v1/progress-periods/2026-11-19/workpacks') {
-      return json(200, { weekEnding: '2026-11-19', basis: 'Physical', workpacks: ROWS });
+      return weekStatus === 200
+        ? json(200, { weekEnding: '2026-11-19', basis: 'Physical', workpacks: ROWS })
+        : json(weekStatus, { detail: 'Week not found' });
     }
     if (path === `/api/v1/tasks/${TASK}/complete`) {
       return completeStatus === 204 ? new Response(null, { status: 204 }) : json(completeStatus, { detail: completeDetail });
@@ -78,7 +80,9 @@ async function renderScreen(options: Options = {}) {
   const onDone = vi.fn();
   render(<ApproveCompletion api={apiClient()} taskKey={TASK} onDone={onDone} />);
   await screen.findByText('Week ending 19 Nov 2026');
-  await screen.findByText('WP-000457');
+  if (options.weekStatus === undefined || options.weekStatus === 200) {
+    await screen.findByText('WP-000457');
+  }
   return { ...backend, user, onDone };
 }
 
@@ -165,6 +169,24 @@ describe('ApproveCompletion', () => {
     await user.click(screen.getByRole('button', { name: 'Complete task' }));
 
     expect(await screen.findByText(detail)).toBeInTheDocument();
+    expect(onDone).not.toHaveBeenCalled();
+  });
+});
+
+// QA review of BPA-60: a week that cannot be loaded must not look like "no approvals".
+describe('ApproveCompletion, a week that cannot be loaded', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('BPA60_aWeekThatCannotBeLoadedBlocksCompletion', async () => {
+    const { user, calls, onDone } = await renderScreen({ weekStatus: 404 });
+
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+
+    expect(await screen.findByText('The week could not be loaded')).toBeInTheDocument();
+    expect(calls.some((c) => c.path.endsWith('/complete'))).toBe(false);
     expect(onDone).not.toHaveBeenCalled();
   });
 });

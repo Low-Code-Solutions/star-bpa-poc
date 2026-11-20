@@ -40,7 +40,9 @@ export function ApproveCompletion({ api, taskKey, onDone }: TaskScreenProps) {
       title="Approve completion %"
       onDone={onDone}
       onLoaded={loaded}
-      check={() => approvalMessages(rows, edits)}
+      check={() =>
+        week.isError || (week.isFetched && !week.data) ? ['The week could not be loaded'] : approvalMessages(rows, edits)
+      }
       variables={() => ({
         completionApprovals: rows.map((row) => {
           const entry = entryOf(row, edits[row.workpackNumber]);

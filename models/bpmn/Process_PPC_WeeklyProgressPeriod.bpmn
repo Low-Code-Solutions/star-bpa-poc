@@ -127,7 +127,7 @@
       <bpmn:outgoing>Flow_ToRecordApproval</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:serviceTask id="ServiceTask_RecordCompletionApproval" name="Record completion approval">
-      <bpmn:documentation>E2-10 (BPA-60, plan Q7). Reads completionApprovals (one entry per Work Pack: workpackNumber, approvedPct, remark) and writes workpack_progress for the week: approved_pct, override_remark (empty when the approved % equals the reported %), previous_pct (the last locked %), approved_by = completedBy, approved_at. All or nothing for the week. Re-run key: completedTaskKey; a re-run that finds the same values writes nothing.</bpmn:documentation>
+      <bpmn:documentation>E2-10 (BPA-60, plan Q7). Reads completionApprovals (one entry per Work Pack: workpackNumber, approvedPct, remark) and writes workpack_progress for the week: approved_pct, override_remark (empty when the approved % equals the reported %), previous_pct (the last locked %), approved_by = completedBy, approved_at. All or nothing for the week. Re-run key: the values themselves (a row that already holds them is left as it is and keeps approved_at); a Locked week is refused (job fails, no retries).</bpmn:documentation>
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="record-completion-approval" retries="3" />
       </bpmn:extensionElements>

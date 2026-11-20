@@ -1,5 +1,8 @@
 import type { WorkpackProgressRow } from '@/types/api';
 
+/** A % is a plain decimal (no exponent, hexadecimal, comma or text), as the backend reads it. */
+const PLAIN_DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
+
 export type Edit = { pct?: string; remark?: string };
 
 /** The % a changed approval is compared with: the reported %, or the last locked % for a Work Pack with no report row (D6; plan Q9). */
@@ -24,7 +27,7 @@ function decimals(text: string): number {
  */
 export function approvalMessages(rows: WorkpackProgressRow[], edits: Record<string, Edit>): string[] {
   const entries = rows.map((row) => ({ row, ...entryOf(row, edits[row.workpackNumber]) }));
-  if (entries.some((e) => e.pctText.trim() === '' || Number.isNaN(Number(e.pctText)))) {
+  if (entries.some((e) => !PLAIN_DECIMAL.test(e.pctText.trim()))) {
     return ['Completion % must be a number'];
   }
   if (entries.some((e) => decimals(e.pctText) > 2)) {

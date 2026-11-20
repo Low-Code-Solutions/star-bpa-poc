@@ -1,7 +1,7 @@
 # Plan: BPA-60 PPC Team can approve the completion % of each Work Pack for the week
 Jira: BPA-60 (Story, epic BPA-4)
-Story last updated: 2026-11-20T11:01:23.176+0400
-Status: Approved (Ahsan, Build Lead, 20 Nov 2026)
+Story last updated: 2026-11-20T11:03:43.172+0400
+Status: Closed (20 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-60-ppc-approve-completion, from main 4c9089a
 
@@ -88,7 +88,7 @@ Groups ppc-team and project-manager (delta §7). One row per Work Pack (Q4: In P
   - `previous_pct` = the last locked %;
   - `approved_by` = `completedBy`, `approved_at` = clock.
 - One transaction; audit rows per changed column (D64).
-- **Re-run key:** the task's key (`completedTaskKey`). A re-run that finds the same values writes nothing and keeps `approved_at` (ASSUMPTION; no new column).
+- **Re-run key:** the values themselves (the plan first said `completedTaskKey`): a row that already holds the same values is left as it is and keeps `approved_at` (ASSUMPTION; no new column).
 - **No output variable:** BPA-61's `prepare-progress-check` reads `approved_pct` and `previous_pct` from the table.
 - Alternative (B): the task API writes before completing. No BPMN change, but the write and the completion are not atomic (rejected in BPA-58 for the same reason).
 
@@ -271,3 +271,14 @@ Approved with the recommended answers (Resolutions above).
 - Approving (WP-000011 to 38 with the remark "FMS double-counted cutting"): 204; `workpack_progress` for 2026-11-19: reported 45 / approved 38 with the remark, 100 / 100, 20 / 20, and WP-000032 no report / approved 0, all `approved_by` ppc-team with `approved_at`, `previous_pct` 0. The instance waits at `ServiceTask_PrepareProgressCheck` (no worker until BPA-61).
 - Not run by hand: the Hours basis and the screen in a browser (covered by `BPA60_withBasisHoursTheApprovedIsPreFilledFromLoggedHours` and the React tests).
 - Side effect on the local stack: the week ending 19 Nov holds four approved rows.
+
+**After the `qa-reviewer` pass (20 Nov 2026; REVIEW.md "BPA-60 at e0e161e"); the plan header now carries Jira's `updated` (11:03:43; the description is unchanged, only the timestamp moved):**
+8. **The Hours test now discriminates.** Jira's numbers make the reported % (40) equal the hours-based % (60 of 150), so `BPA60_withBasisHoursTheApprovedIsPreFilledFromLoggedHours` passed whichever basis was used; it now sets the reported % to 35, so 40.00 can only come from the hours (it passed at once: the implementation does use the basis). The Physical test already discriminated.
+9. **Under the Hours basis an untouched pre-fill that differs from the reported % needs a remark.** Jira rule (a) asks for a remark whenever the approved % differs from the *reported* %, and the pre-fill under Hours is the hours-based %. The code follows (a) literally. `underTheHoursBasisAnUntouchedPreFill…NeedsARemark` pins this (an ASSUMPTION, written with no red run). **Open question for Jira:** under Hours, should the remark be compared with the pre-filled (hours-based) %? A hours-based % above 100 (approved hours over the budget) is also pre-filled and then refused at completion with "Completion % must be between 0 and 100".
+10. **Rows of a Locked week never change.** `CompletionApprovalService.record` refuses a Locked week ("Week ending <d MMM yyyy> is locked"; the job fails with no retries), as the data model says (13.3.4, worker-checked). `aLockedWeekIsNeverChanged`, red first.
+11. **The approved % is a plain decimal on both sides:** `parse` read "1e1" as 10 (`new BigDecimal`) and the screen read "0x10" or "1e1" through `Number()`; both now use the decimal rule of BPA-59 (`CompletionApprovalServiceTest` and `approvalMessages.test.ts`, red first).
+12. **A week that cannot be loaded is not "no approvals":** the screen shows "The week could not be loaded" and sends nothing (`BPA60_aWeekThatCannotBeLoadedBlocksCompletion`, red first).
+13. **`BookHoursFixture.progressBackground` was not needed** (the test sets the week up itself with the existing `completionBackground` and `fmsBackground`).
+14. **The BPMN documentation text** of `ServiceTask_RecordCompletionApproval` said "Re-run key: completedTaskKey"; the code keys on the values. The text is corrected (documentation only; the deployed definition takes it at the next start of `bpa-app`).
+15. **Jira's description lists "a retraction reason field for a % below last week"** on the screen; plan Q3 (approved by Ahsan) leaves it out because `progress_retraction` belongs to BPA-61 and BPA-63. Jira wins on precedence: **to say in the Jira comment** for the Product Owner.
+16. **Known and accepted (POC):** the screen caches the week's rows, so a Work Pack that becomes In Progress while the task is open makes completion fail with "Approvals must cover every Work Pack of the week" until the task is reopened; `approve` keeps `approved_at` and `approved_by` when the same values are approved again after a return; `ProgressSettings.basis()` falls back to Physical for any value other than "Hours"; the red run failed the negative scenarios at the GET that builds their payload, so none failed on its own rule (weak red evidence, as noted in the departures above); one failure of `ConfirmWorkPackApiTest.BPA23_correctMaterialsAndPhases` in the full run (559 tests), which passed when its class was re-run alone (9 of 9) and which nothing in this branch touches.
