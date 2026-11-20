@@ -1,0 +1,170 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor, within } from '@tests/test-utils';
+import userEvent from '@testing-library/user-event';
+import { apiClient } from '@/services/apiClient';
+import { ApproveCompletion } from './ApproveCompletion';
+
+// BPA-60: the Approve completion % screen (UserTask_ApproveCompletion). One row per Work Pack with the reported, last locked and hours-based %, the % reported
+// by production and the FMS actual hours beside the POC approved hours (information only); PPC changes an approved % (a remark is then required) and approves
+// the whole week. The rules are the backend's (CompletionApprovalApiTest); the texts not in Jira are ASSUMPTIONs (plan Q11).
+const TASK = '2251799813698000';
+const ROWS = [
+  {
+    workpackNumber: 'WP-000457',
+    noReportRow: false,
+    reportedPct: 40,
+    lastLockedPct: 30,
+    hoursBasedPct: 30,
+    reportedByProductionPct: 40,
+    fmsActualHours: 150,
+    approvedHours: 142.5,
+    hoursDifference: 7.5,
+    approvedPct: 40,
+  },
+  {
+    workpackNumber: 'WP-000461',
+    noReportRow: false,
+    reportedPct: 100,
+    lastLockedPct: 60,
+    approvedHours: 20,
+    approvedPct: 100,
+  },
+  { workpackNumber: 'WP-000470', noReportRow: true, lastLockedPct: 0, approvedHours: 0, approvedPct: 0 },
+];
+
+type Call = { method: string; path: string; body: unknown };
+type Options = { completeStatus?: number; completeDetail?: string };
+
+function fakeBackend({ completeStatus = 204, completeDetail = '' }: Options = {}) {
+  const calls: Call[] = [];
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const fetchMock = vi.fn(async (input: Request) => {
+    const path = new URL(input.url).pathname;
+    const body =
+      input.method === 'GET'
+        ? null
+        : await input
+            .clone()
+            .text()
+            .then((t) => (t ? JSON.parse(t) : null));
+    calls.push({ method: input.method, path, body });
+    if (path === `/api/v1/tasks/${TASK}`) {
+      return json(200, {
+        key: TASK,
+        name: 'Approve completion %',
+        elementId: 'UserTask_ApproveCompletion',
+        processInstanceKey: '2251799813692700',
+        creationDate: '2026-11-20T07:00:00Z',
+        variables: { weekEnding: '2026-11-19' },
+        validationMessages: [],
+      });
+    }
+    if (path === '/api/v1/progress-periods/2026-11-19/workpacks') {
+      return json(200, { weekEnding: '2026-11-19', basis: 'Physical', workpacks: ROWS });
+    }
+    if (path === `/api/v1/tasks/${TASK}/complete`) {
+      return completeStatus === 204 ? new Response(null, { status: 204 }) : json(completeStatus, { detail: completeDetail });
+    }
+    return json(404, {});
+  });
+  return { fetchMock, calls };
+}
+
+async function renderScreen(options: Options = {}) {
+  const backend = fakeBackend(options);
+  vi.stubGlobal('fetch', backend.fetchMock);
+  const user = userEvent.setup();
+  const onDone = vi.fn();
+  render(<ApproveCompletion api={apiClient()} taskKey={TASK} onDone={onDone} />);
+  await screen.findByText('Week ending 19 Nov 2026');
+  await screen.findByText('WP-000457');
+  return { ...backend, user, onDone };
+}
+
+const rowOf = (workpack: string) => screen.getByText(workpack).closest('tr') as HTMLElement;
+
+describe('ApproveCompletion', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('BPA60_theGridShowsEveryWorkPackWithItsInformationColumns', async () => {
+    await renderScreen();
+
+    const first = rowOf('WP-000457');
+    expect(within(first).getByText('Reported by production: 40.00%')).toBeInTheDocument();
+    expect(within(first).getByText('150.00')).toBeInTheDocument();
+    expect(within(first).getByText('142.50')).toBeInTheDocument();
+    expect(within(first).getByText('7.50')).toBeInTheDocument();
+    expect(within(first).getByLabelText('Approved % for WP-000457')).toHaveValue('40');
+    expect(within(rowOf('WP-000470')).getByText('No report row')).toBeInTheDocument();
+    expect(within(rowOf('WP-000470')).getByLabelText('Approved % for WP-000470')).toHaveValue('0');
+  });
+
+  it('BPA60_approvingWithoutChangesSendsEveryWorkPack', async () => {
+    const { user, calls, onDone } = await renderScreen();
+
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(calls.find((c) => c.path === `/api/v1/tasks/${TASK}/complete`)?.body).toEqual({
+      variables: {
+        completionApprovals: [
+          { workpackNumber: 'WP-000457', approvedPct: 40 },
+          { workpackNumber: 'WP-000461', approvedPct: 100 },
+          { workpackNumber: 'WP-000470', approvedPct: 0 },
+        ],
+      },
+    });
+  });
+
+  it('BPA60_aChangedPercentNeedsARemarkBeforeTheCallIsMade', async () => {
+    const { user, calls, onDone } = await renderScreen();
+    const input = screen.getByLabelText('Approved % for WP-000457');
+
+    await user.clear(input);
+    await user.type(input, '38');
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+
+    expect(await screen.findByText('A remark is required when the approved % differs from the reported %')).toBeInTheDocument();
+    expect(calls.some((c) => c.path.endsWith('/complete'))).toBe(false);
+    expect(onDone).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText('Remark for WP-000457'), 'FMS double-counted cutting');
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    const sent = calls.find((c) => c.path === `/api/v1/tasks/${TASK}/complete`)?.body as {
+      variables: { completionApprovals: Array<Record<string, unknown>> };
+    };
+    expect(sent.variables.completionApprovals[0]).toEqual({
+      workpackNumber: 'WP-000457',
+      approvedPct: 38,
+      remark: 'FMS double-counted cutting',
+    });
+  });
+
+  it('BPA60_aPercentWithThreeDecimalsIsRefusedOnTheScreen', async () => {
+    const { user, calls } = await renderScreen();
+    const input = screen.getByLabelText('Approved % for WP-000457');
+
+    await user.clear(input);
+    await user.type(input, '38.125');
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+
+    expect(await screen.findByText('Completion % can have at most 2 decimal places')).toBeInTheDocument();
+    expect(calls.some((c) => c.path.endsWith('/complete'))).toBe(false);
+  });
+
+  it('BPA60_theServersRefusalIsShown', async () => {
+    const detail = 'Week ending 12 Nov 2026 must be locked first';
+    const { user, onDone } = await renderScreen({ completeStatus: 409, completeDetail: detail });
+
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+
+    expect(await screen.findByText(detail)).toBeInTheDocument();
+    expect(onDone).not.toHaveBeenCalled();
+  });
+});
