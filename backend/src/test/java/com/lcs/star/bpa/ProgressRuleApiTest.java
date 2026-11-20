@@ -58,6 +58,7 @@ class ProgressRuleApiTest {
     static final String RULE = "BusinessRuleTask_CheckProgressRule";
     static final String RETRACTION = "UserTask_ApproveRetraction";
     static final String EARNED = "ServiceTask_CalculateEarnedManhours";
+    static final String VARIANCE = "ServiceTask_PrepareVarianceCheck";
     static final LocalDate W12 = LocalDate.of(2026, 11, 12);
     static final LocalDate W19 = LocalDate.of(2026, 11, 19);
 
@@ -104,7 +105,7 @@ class ProgressRuleApiTest {
     private static void cancelWaiting() {
         for (String element : new String[] {"ServiceTask_OpenProgressPeriod", "ServiceTask_GenerateFmsHoursFile", "UserTask_SendHoursToFms",
                 "ServiceTask_RecordFmsHandOff", "UserTask_UploadCompletionReport", "ServiceTask_ReadCompletionReport", APPROVE, "ServiceTask_RecordCompletionApproval",
-                "ServiceTask_PrepareProgressCheck", RULE, "ServiceTask_RecordProgressResult", RETRACTION, EARNED}) {
+                "ServiceTask_PrepareProgressCheck", RULE, "ServiceTask_RecordProgressResult", RETRACTION, EARNED, VARIANCE}) {
             CamundaSteps.cancelInstancesWaitingAt(element);
         }
     }
@@ -195,7 +196,7 @@ class ProgressRuleApiTest {
     void BPA61_allAcceptedGoesToEarnedManhours() {
         assertThat(approve(Map.of()).statusCode()).as("the report's 40% and 100%").isEqualTo(204);
 
-        poll(() -> activeElements(instance).stream().map(e -> e.path("elementId").asText()).toList(), active -> active.contains(EARNED), EARNED + " of " + instance);
+        poll(() -> activeElements(instance).stream().map(e -> e.path("elementId").asText()).toList(), active -> active.contains(EARNED) || active.contains(VARIANCE), EARNED + " or " + VARIANCE + " of " + instance); // BPA-62: the calculation worker now runs, so the instance moves on to BPA-64's step
     }
 
     @Test
