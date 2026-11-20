@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.lcs.star.bpa.CamundaRest.Reply;
+import com.lcs.star.bpa.progress.ProgressCheckService;
 import java.math.BigDecimal;
 import java.net.http.HttpResponse;
 import java.time.Instant;
@@ -78,6 +79,12 @@ class ProgressRuleApiTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    com.lcs.star.bpa.progress.ProgressCheckService checkService;
+
+    @Autowired
+    com.lcs.star.bpa.persistence.ProgressPeriodRepository periods;
 
     @Autowired
     AssignmentFileApiTest.TestClock clock;
@@ -199,6 +206,8 @@ class ProgressRuleApiTest {
         awaitRuleResult("WP-000457", "NeedsRetraction");
 
         awaitTask(instance, RETRACTION);
+        assertThat(openTasks(instance, RETRACTION)).as("one new retraction task, not one per old retraction").hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.progress_retraction WHERE decision = 'Approved' AND approved_pct = 25", Integer.class)).as("the old Approved retraction is kept").isEqualTo(1);
     }
 
     @Test
@@ -219,6 +228,37 @@ class ProgressRuleApiTest {
         assertThat(approve(Map.of("WP-000457", "25")).statusCode()).isEqualTo(204);
 
         awaitRuleResult("WP-000457", "Accepted");
+    }
+
+    @Test
+    void aRerunOfPrepareProgressCheckGivesTheSameChecks() {
+        jdbc.update("UPDATE bpa.workpack_progress SET approved_pct = reported_pct WHERE progress_period_id = ?", period);
+        var week = periods.find(period).orElseThrow();
+
+        assertThat(checkService.checks(week)).isNotEmpty().isEqualTo(checkService.checks(week));
+    }
+
+    @Test
+    void aRerunOfRecordProgressResultChangesNothing() {
+        var week = periods.find(period).orElseThrow();
+        var results = List.of(new ProgressCheckService.Result("WP-000457", new BigDecimal("25"), new BigDecimal("30"), "NeedsRetraction", "DECREASE"));
+
+        List<String> first = checkService.record(week, results, "bpa-service");
+        List<String> again = checkService.record(week, results, "bpa-service");
+
+        assertThat(again).isEqualTo(first).containsExactly("WP-000457 completion fell from 30% to 25%; a retraction is needed");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'workpack_progress' AND column_name = 'rule_result'", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void theMessagesAreResetOnTheNextPass() {
+        var week = periods.find(period).orElseThrow();
+        var blocked = List.of(new ProgressCheckService.Result("WP-000461", new BigDecimal("120"), new BigDecimal("60"), "Blocked", "ABOVE_100"));
+        var accepted = List.of(new ProgressCheckService.Result("WP-000461", new BigDecimal("100"), new BigDecimal("60"), "Accepted", null));
+
+        assertThat(checkService.record(week, blocked, "bpa-service")).hasSize(1);
+        assertThat(checkService.record(week, accepted, "bpa-service")).as("the worker sets validationMessages to this list, so the old message goes").isEmpty();
+        assertThat(ruleResult("WP-000461")).isEqualTo("Accepted");
     }
 
     // --- helpers ----------------------------------------------------------------------------------------------------------------

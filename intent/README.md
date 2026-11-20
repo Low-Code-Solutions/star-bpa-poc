@@ -69,5 +69,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-58](BPA-4-timesheet-to-progress/plans/BPA-58.md) | PPC Team can download each week's approved hours as an FMS timesheet file | Closed (19 Nov 2026) |
 | [BPA-59](BPA-4-timesheet-to-progress/plans/BPA-59.md) | PPC Team can upload the weekly FMS completion report and see each row's outcome | Closed (19 Nov 2026) |
 | [BPA-60](BPA-4-timesheet-to-progress/plans/BPA-60.md) | PPC Team can approve the completion % of each Work Pack for the week | Closed (20 Nov 2026) |
-| [BPA-61](BPA-4-timesheet-to-progress/plans/BPA-61.md) | System can block a Work Pack's progress above 100% or below last week without a retraction | Approved (Ahsan, Build Lead, 20 Nov 2026) |
+| [BPA-61](BPA-4-timesheet-to-progress/plans/BPA-61.md) | System can block a Work Pack's progress above 100% or below last week without a retraction | Closed (20 Nov 2026) |
 

@@ -1,7 +1,7 @@
 # Plan: BPA-61 System can block a Work Pack's progress above 100% or below last week without a retraction
 Jira: BPA-61 (Story, epic BPA-4)
 Story last updated: 2026-11-20T14:16:07.488+0400
-Status: Approved (Ahsan, Build Lead, 20 Nov 2026)
+Status: Closed (20 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-61-progress-rule-check, from main c2aad8b
 
@@ -104,8 +104,8 @@ The other scenarios go through the real path: complete `UserTask_ApproveCompleti
 | Area | Files |
 |---|---|
 | Model (Q3, if proved) | `models/bpmn/Process_PPC_WeeklyProgressPeriod.bpmn`: input mappings and output element on `BusinessRuleTask_CheckProgressRule`; new `ServiceTask_RecordProgressResult` (+ diagram room) |
-| Backend | `worker/PrepareProgressCheckWorker.java`, `worker/RecordProgressResultWorker.java`, `progress/ProgressCheckService.java` (builds the checks, writes the results, the messages), `persistence/WorkpackProgressRepository.java` (`setRuleResult`), a small query for approved retractions |
-| Test support | `bpatest/ProcessTestApplication` excludes the two new workers |
+| Backend | `worker/PrepareProgressCheckWorker.java`, `worker/RecordProgressResultWorker.java`, `progress/ProgressCheckService.java` (builds the checks, writes the results, the messages), `progress/ProgressMessages.java` (the texts), `persistence/WorkpackProgressRepository.java` (`setRuleResult`), `persistence/ProgressWeekRepository.java` (`approvedRows`, `retractionApprovedFor`) |
+| Test support | `bpatest/ProcessTestApplication` excludes the two new workers; `BookHoursFixture` resets `progress_retraction`; `CompletionApprovalApiTest` (BPA-60) waits for any step after the record step |
 | Tests | new `ProgressRuleApiTest` (9 BPA61_ + extras); `ProgressMessagesTest` (unit, the three texts and the number format) |
 | Docs | data model §13.3.4 "as built" note; plan; REVIEW.md; `intent/README.md` |
 
@@ -211,3 +211,10 @@ Approved with the recommended answers: Q1 the Blocked scenarios start at Busines
 - Not run by hand: Blocked (above 100 or below 0) cannot arise through the screen; covered by `BPA61_above100IsBlocked`, `BPA61_belowZeroBlockedBeforeRetraction`, `BPA61_blockedWinsOverRetraction`.
 - Side effect on the local stack: the week ending 19 Nov holds the decrease run (instance at `UserTask_ApproveRetraction`) and a Locked 12 Nov seed period (`process_instance_key` 1).
 - Frontend: no change in this story, so no frontend lint, test or build run.
+
+## After the `qa-reviewer` pass (20 Nov 2026; REVIEW.md "BPA-61 at fc714b7")
+- **Extra tests added** (they were in this plan but missing): `aRerunOfPrepareProgressCheckGivesTheSameChecks`, `aRerunOfRecordProgressResultChangesNothing` (one `rule_result` audit row after two passes), `theMessagesAreResetOnTheNextPass` (the all-Accepted pass gives an empty list, which the worker sets as `validationMessages`). They test code that already existed, so they passed at once (no red run).
+- **Scenario 8 tightened:** exactly one `UserTask_ApproveRetraction` task, and the old Approved retraction row is still there.
+- **Departure (recorded):** the two workers fail the job with no retries (`newFailCommand(...).retries(0)`) for a week with no period, nothing to check, or an unreadable result, and not with a BPMN error and `validationMessages`: these are not user input errors (the user's input was checked at `UserTask_ApproveCompletion`), so a failed job and an incident is the honest outcome. A database exception escapes the handler and the job retries (BPMN `retries` 3).
+- **Left (nits):** `periodOf` treats a malformed `progressPeriodId` as "no period"; `parse` takes any number text.
+- **Not done:** the plan's Q2/Q7/Q8 ASSUMPTION comments are not posted in Jira yet (they are shown to Ahsan first and posted on his yes).
