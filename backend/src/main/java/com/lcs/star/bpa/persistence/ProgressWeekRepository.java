@@ -59,6 +59,29 @@ public class ProgressWeekRepository {
                 end, end, end, periodId, periodId);
     }
 
+    /** One Work Pack of the week that PPC has approved a % for (BPA-61): the progress row, the Work Pack and the approved %. */
+    public record Approved(UUID progressId, UUID workpackId, String workpackNumber, BigDecimal approvedPct) {
+    }
+
+    /** The week's rows with an approved %, by Work Pack number (BPA-61: what the progress rule checks). */
+    public List<Approved> approvedRows(UUID periodId) {
+        return jdbc.query("""
+                SELECT p.id, w.id AS workpack_id, w.workpack_number, p.approved_pct FROM bpa.workpack_progress p JOIN bpa.workpack w ON w.id = p.workpack_id
+                WHERE p.progress_period_id = ? AND p.approved_pct IS NOT NULL ORDER BY w.workpack_number""",
+                (rs, n) -> new Approved(rs.getObject("id", UUID.class), rs.getObject("workpack_id", UUID.class), rs.getString("workpack_number"),
+                        rs.getBigDecimal("approved_pct")), periodId);
+    }
+
+    /**
+     * True when a retraction of this progress row has been Approved for exactly this % (decision (a): an approved retraction is valid only for the % it
+     * approved, so a changed % goes to the Project Manager again). An old Approved retraction is kept and simply no longer matches (plan Q4).
+     */
+    public boolean retractionApprovedFor(UUID progressId, BigDecimal pct) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM bpa.progress_retraction WHERE workpack_progress_id = ? AND decision = 'Approved' AND approved_pct = ?)""",
+                Boolean.class, progressId, pct));
+    }
+
     /** The approved % of the Work Pack in the latest Locked week before {@code weekEnding}; 0 when it was never locked (decision (c)). */
     public BigDecimal lastLockedPct(UUID workpackId, LocalDate weekEnding) {
         return jdbc.queryForObject("""

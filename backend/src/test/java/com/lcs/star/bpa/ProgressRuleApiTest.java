@@ -302,9 +302,11 @@ class ProgressRuleApiTest {
     }
 
     private String ruleResult(String workpack) {
-        return jdbc.queryForObject("""
+        // null while the row does not exist yet (WP-000470 gets its row from BPA-60's record step) or has no result
+        List<String> rows = jdbc.query("""
                 SELECT p.rule_result FROM bpa.workpack_progress p JOIN bpa.workpack w ON w.id = p.workpack_id WHERE w.workpack_number = ? AND p.progress_period_id = ?""",
-                String.class, workpack, period);
+                (rs, n) -> rs.getString("rule_result"), workpack, period);
+        return rows.isEmpty() ? null : rows.get(0);
     }
 
     private void awaitRuleResult(String workpack, String expected) {
