@@ -24,4 +24,6 @@ export const USER_TASKS = {
   uploadCompletionReport: 'UserTask_UploadCompletionReport',
   // BPA-60
   approveCompletion: 'UserTask_ApproveCompletion',
+  // BPA-63
+  approveRetraction: 'UserTask_ApproveRetraction',
 } as const;

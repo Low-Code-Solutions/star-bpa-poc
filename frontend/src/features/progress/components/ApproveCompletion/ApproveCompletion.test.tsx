@@ -209,7 +209,9 @@ describe('ApproveCompletion, retractions', () => {
     await user.type(screen.getByLabelText('Remark for WP-000457'), 'FMS double-counted cutting');
     await user.click(screen.getByRole('button', { name: 'Complete task' }));
 
-    expect(await screen.findByText('A retraction reason is required when completion falls below last week (30%)')).toBeInTheDocument();
+    expect(
+      await screen.findByText('A retraction reason is required when completion falls below last week (30%)'),
+    ).toBeInTheDocument();
     expect(calls.some((c) => c.path.endsWith('/complete'))).toBe(false);
     expect(onDone).not.toHaveBeenCalled();
 

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { TaskScreenShell } from '@/features/tasks/components/TaskScreenShell';
 import type { Task, TaskScreenProps } from '@/features/tasks/tasks.types';
 import { showDate } from '@/utils/dates';
-import { approvalMessages, entryOf, referencePct, type Edit } from '../../approvalMessages';
+import { approvalMessages, entryOf, needsReason, referencePct, type Edit } from '../../approvalMessages';
 import { getProgressWeek } from '../../services/progressService';
 
 const two = (value?: number) => (value === undefined ? '' : value.toFixed(2));
@@ -14,7 +14,8 @@ const two = (value?: number) => (value === undefined ? '' : value.toFixed(2));
  * with the difference (information only, BPA-59 (a)), then the approved % (pre-filled by the backend by progress.basis) and a remark, required when the approved
  * % differs from the reported % (or from the last locked % when there is "No report row", D6). Complete task approves the whole week (decision (d)): the variable
  * is completionApprovals, one entry for every row (bpa.tasks write allow-list). The checks use the backend's texts, which it checks again; a 409 "Week ending
- * <date> must be locked first" is shown as it is. There is no retraction field here (plan Q3: BPA-61 and BPA-63).
+ * <date> must be locked first" is shown as it is. BPA-63: where an approved % is below the last locked %, a retraction reason is asked for (the backend then makes the request
+ * for the Project Manager), and the Project Manager decline is shown on the row ("Retraction declined: <reason>", plan Q5).
  */
 export function ApproveCompletion({ api, taskKey, onDone }: TaskScreenProps) {
   const [weekEnding, setWeekEnding] = useState('');
@@ -47,9 +48,13 @@ export function ApproveCompletion({ api, taskKey, onDone }: TaskScreenProps) {
         completionApprovals: rows.map((row) => {
           const entry = entryOf(row, edits[row.workpackNumber]);
           const remark = entry.remark.trim();
-          return remark === ''
-            ? { workpackNumber: row.workpackNumber, approvedPct: Number(entry.pctText) }
-            : { workpackNumber: row.workpackNumber, approvedPct: Number(entry.pctText), remark };
+          const reason = needsReason(row, entry.pctText) ? entry.reason.trim() : '';
+          return {
+            workpackNumber: row.workpackNumber,
+            approvedPct: Number(entry.pctText),
+            ...(remark === '' ? {} : { remark }),
+            ...(reason === '' ? {} : { retractionReason: reason }),
+          };
         }),
       })}
     >
@@ -68,6 +73,7 @@ export function ApproveCompletion({ api, taskKey, onDone }: TaskScreenProps) {
             <th scope="col">Difference</th>
             <th scope="col">Approved %</th>
             <th scope="col">Remark</th>
+            <th scope="col">Retraction</th>
           </tr>
         </thead>
         <tbody>
@@ -104,6 +110,20 @@ export function ApproveCompletion({ api, taskKey, onDone }: TaskScreenProps) {
                     placeholder={entry.pctText.trim() !== '' && Number(entry.pctText) !== referencePct(row) ? 'Required' : ''}
                     onChange={(e) => change(row.workpackNumber, { remark: e.target.value })}
                   />
+                </td>
+                <td>
+                  {needsReason(row, entry.pctText) && (
+                    <input
+                      type="text"
+                      aria-label={`Retraction reason for ${row.workpackNumber}`}
+                      value={entry.reason}
+                      placeholder="Required"
+                      onChange={(e) => change(row.workpackNumber, { reason: e.target.value })}
+                    />
+                  )}
+                  {row.retractionDeclinedReason !== undefined && (
+                    <span>{`Retraction declined: ${row.retractionDeclinedReason}`}</span>
+                  )}
                 </td>
               </tr>
             );
