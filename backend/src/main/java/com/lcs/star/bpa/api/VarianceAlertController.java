@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * {@code GET /api/v1/me/variance-alerts} (BPA-64; E2-14): the session user's in-system variance alerts, newest first. The user is the session's, never a parameter, so
- * nobody reads another user's alerts. SecurityConfig lets cost-controller and project-manager through (delta §7), 403 for the rest. The text is rebuilt from the
+ * nobody reads another user's alerts. Any logged-in persona may ask and gets only its own alerts (BPA-65), so a persona with none gets an empty list. The text is rebuilt from the
  * stored figures with {@link VarianceMessages}, so it is the text that was sent.
  */
 @RestController
@@ -34,10 +34,11 @@ public class VarianceAlertController implements VarianceAlertsApi {
     }
 
     private static VarianceAlert map(Mine alert) {
-        String message = VarianceMessages.manhour(alert.cbsCodeRef(), alert.variancePct(), alert.actualValue(), alert.baselineValue(), alert.weekEnding());
-        // BPA-65 red stub: the alert date is taken from sentAt until V6 stores alert_date; weekEnding stays what it was
-        VarianceAlert out = new VarianceAlert(java.time.LocalDate.ofInstant(alert.sentAt(), java.time.ZoneId.of("Asia/Riyadh")), alert.cbsCodeRef(),
-                VarianceAlert.AlertTypeEnum.fromValue(alert.alertType()), message, OffsetDateTime.ofInstant(alert.sentAt(), ZoneOffset.UTC));
+        String message = VarianceAlertRepository.COST.equals(alert.alertType())
+                ? VarianceMessages.cost(alert.cbsCodeRef(), alert.variancePct(), alert.actualValue(), alert.baselineValue(), alert.alertDate())
+                : VarianceMessages.manhour(alert.cbsCodeRef(), alert.variancePct(), alert.actualValue(), alert.baselineValue(), alert.weekEnding());
+        VarianceAlert out = new VarianceAlert(alert.alertDate(), alert.cbsCodeRef(), VarianceAlert.AlertTypeEnum.fromValue(alert.alertType()), message,
+                OffsetDateTime.ofInstant(alert.sentAt(), ZoneOffset.UTC));
         out.setWeekEnding(alert.weekEnding());
         return out;
     }

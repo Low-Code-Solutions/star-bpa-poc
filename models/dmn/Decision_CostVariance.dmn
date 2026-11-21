@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_CostVariance" name="Cost variance" namespace="http://lowcodesol.com/star-bpa-poc" exporter="LCS generator (Claude)" exporterVersion="0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.1">
   <decision id="Decision_CostVariance" name="Cost variance">
-    <description>E2-15. Per CBS code per week. FRD-22 §22.10: 'Cost variance &gt; 10% against Revised Budget for any CBS' -&gt; PCON Manager + PM (POC: project-manager). Variance % = (actual cost - revised budget cost) / revised budget cost x 100. Over-run only and exactly 10% = no alert are ASSUMPTIONS. No revised budget (null or 0) gives no alert.</description>
+    <description>E2-15. Per CBS code, weekly with the progress period and daily during the month-end close (BPA-65). FRD-22 §22.10: 'Cost variance &gt; 10% against Revised Budget for any CBS' -&gt; PCON Manager + PM (POC: project-manager). Variance % = (actual cost - revised budget cost) / revised budget cost x 100. Exactly 10% = no alert is sourced by D3 (FRD-22 §22.10 &gt; 10%); over-run only (a cost under the budget gives no alert) is an ASSUMPTION. No revised budget (null or 0) gives no alert.</description>
     <decisionTable id="DecisionTable_CostVariance" hitPolicy="FIRST">
       <input id="Input_RevisedBudgetCost" label="Revised Operative Budget cost">
         <inputExpression id="InputExpression_RevisedBudgetCost" typeRef="number">

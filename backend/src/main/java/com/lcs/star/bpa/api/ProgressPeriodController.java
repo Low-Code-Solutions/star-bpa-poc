@@ -73,6 +73,11 @@ public class ProgressPeriodController implements ProgressPeriodsApi {
             out.setEtc(row.etc());
             out.setVariancePct(row.variancePct());
             out.setRemark(row.remark());
+            out.setActualCost(row.actualCost());
+            out.setRevisedBudgetCost(row.revisedBudgetCost());
+            out.setCostVariancePct(row.costVariancePct());
+            out.setCostResult(CbsActualRow.CostResultEnum.fromValue(row.costResult()));
+            out.setCostAlert(row.costAlert());
             return out;
         }).toList();
         return ResponseEntity.ok(new CbsActualsWeek(week.weekEnding(), rows, week.noCbsManhours()));

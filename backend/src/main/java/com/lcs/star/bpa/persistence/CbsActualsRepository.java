@@ -57,6 +57,11 @@ public class CbsActualsRepository {
         return found;
     }
 
+    /** Every CBS with an actual cost row up to the week ending's month (BPA-65, plan Q5, an ASSUMPTION): such a CBS is checked even with no hours and no forecast. */
+    public java.util.Set<String> costCbs(LocalDate weekEnding) {
+        return new java.util.TreeSet<>(jdbc.queryForList("SELECT DISTINCT cbs_code_ref FROM bpa.cbs_actual_cost WHERE period_month <= ?", String.class, Date.valueOf(weekEnding.withDayOfMonth(1))));
+    }
+
     /** The cumulative actual cost of the CBS: the sum of its months up to the week ending's month (data model "(A)"); null when it has none. */
     public BigDecimal actualCost(String cbs, LocalDate weekEnding) {
         List<BigDecimal> sums = jdbc.query("SELECT sum(actual_cost) AS cost FROM bpa.cbs_actual_cost WHERE cbs_code_ref = ? AND period_month <= ?",

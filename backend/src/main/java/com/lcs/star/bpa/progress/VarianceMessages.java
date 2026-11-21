@@ -29,4 +29,15 @@ public final class VarianceMessages {
     public static String date(LocalDate date) {
         return DATE.format(date);
     }
+
+    /** The cost alert text (BPA-65; D3), Jira's: "Cost on CBS is pct% over the Revised Budget (actual of budget SAR), date"; the date is the check date, not the week ending. */
+    public static String cost(String cbs, BigDecimal pct, BigDecimal actual, BigDecimal budget, LocalDate checkDate) {
+        return "Cost on " + cbs + " is " + VarianceMath.two(pct) + "% over the Revised Budget (" + VarianceMath.two(actual) + " of " + VarianceMath.two(budget) + " SAR), "
+                + DATE.format(checkDate);
+    }
+
+    /** ASSUMPTION (plan Q11): Jira gives only the message. */
+    public static String costSubject(String cbs, LocalDate checkDate) {
+        return "Cost alert: " + cbs + ", " + DATE.format(checkDate);
+    }
 }

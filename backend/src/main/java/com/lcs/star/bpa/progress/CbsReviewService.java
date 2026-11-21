@@ -64,9 +64,11 @@ public class CbsReviewService {
         return parsed;
     }
 
-    /** The CBS of the period that raised a Manhour alert and so need a remark, in CBS order. */
+    /** The CBS of the period that raised a Manhour or a Cost alert (BPA-65: the remark rule covers cost alerts too, agreed 10 Nov 2026) and so need a remark, in CBS order. */
     public Set<String> alerted(Period period) {
-        return new TreeSet<>(alerts.alertedCbs(period.id(), VarianceAlertRepository.MANHOUR));
+        Set<String> alerted = new TreeSet<>(alerts.alertedCbs(period.id(), VarianceAlertRepository.MANHOUR));
+        alerted.addAll(alerts.alertedCbs(period.id(), VarianceAlertRepository.COST));
+        return alerted;
     }
 
     @Transactional
