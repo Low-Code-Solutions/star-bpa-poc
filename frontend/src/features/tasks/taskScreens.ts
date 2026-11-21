@@ -9,6 +9,7 @@ import { ApproveHoursPpc } from '@/features/timesheets/components/ApproveHoursPp
 import { SendHoursToFms } from '@/features/timesheets/components/SendHoursToFms';
 import { UploadCompletionReport } from '@/features/progress/components/UploadCompletionReport';
 import { ApproveCompletion } from '@/features/progress/components/ApproveCompletion';
+import { ApproveRetraction } from '@/features/progress/components/ApproveRetraction';
 import { USER_TASKS } from '@/utils/constants';
 import type { TaskScreen } from './tasks.types';
 
@@ -28,6 +29,7 @@ const screens: Record<string, TaskScreen> = {
   [USER_TASKS.sendHoursToFms]: SendHoursToFms,
   [USER_TASKS.uploadCompletionReport]: UploadCompletionReport,
   [USER_TASKS.approveCompletion]: ApproveCompletion,
+  [USER_TASKS.approveRetraction]: ApproveRetraction,
 };
 
 /** The screen for this element ID, or undefined. Own keys only, so a name like "constructor" is never a screen. */

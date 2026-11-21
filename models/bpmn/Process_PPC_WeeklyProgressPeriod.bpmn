@@ -183,7 +183,7 @@
       <bpmn:outgoing>Flow_ProgressAccepted</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:userTask id="UserTask_ApproveRetraction" name="Approve progress retraction">
-      <bpmn:documentation>E2-12. FRD-21 §21.9.1 (decrease only with an approved retraction); §21.7 reverse a closed week: Project Manager, documented justification. retractionDecision Approved | Declined.</bpmn:documentation>
+      <bpmn:documentation>E2-12 (BPA-63). FRD-21 §21.9.1 (decrease only with an approved retraction); §21.7: Project Manager, documented justification. One task lists every Work Pack that waits for a retraction (last locked %, new %, PPC reason); the PM decides each one in retractionDecisions (workpackNumber, retractionDecision Approved or Declined, reason, required when Declined).</bpmn:documentation>
       <bpmn:extensionElements>
         <zeebe:userTask />
         <zeebe:assignmentDefinition candidateGroups="project-manager" />
@@ -192,7 +192,7 @@
       <bpmn:outgoing>Flow_ToRecordRetraction</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:serviceTask id="ServiceTask_RecordRetractionDecision" name="Record retraction decision">
-      <bpmn:documentation>E2-12. Writes progress_retraction.</bpmn:documentation>
+      <bpmn:documentation>E2-12 (BPA-63). Writes decision, decision_reason, decided_by/at and task_key on each open progress_retraction of the week (one transaction, audited). Sets retractionOutcome: Approved only when every Work Pack is Approved, else Declined (a declined week clears validationMessages). Re-run key: task_key.</bpmn:documentation>
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="record-retraction-decision" retries="3" />
       </bpmn:extensionElements>
@@ -341,7 +341,7 @@
     <bpmn:sequenceFlow id="Flow_ToRecordRetraction" sourceRef="UserTask_ApproveRetraction" targetRef="ServiceTask_RecordRetractionDecision" />
     <bpmn:sequenceFlow id="Flow_ToIsRetractionApproved" sourceRef="ServiceTask_RecordRetractionDecision" targetRef="Gateway_IsRetractionApproved" />
     <bpmn:sequenceFlow id="Flow_RetractionApproved" name="Approved" sourceRef="Gateway_IsRetractionApproved" targetRef="Gateway_MergeProgressCheck">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=retractionDecision = "Approved"</bpmn:conditionExpression>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=retractionOutcome = "Approved"</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="Flow_RetractionDeclined" name="Declined" sourceRef="Gateway_IsRetractionApproved" targetRef="Gateway_MergeApproval" />
     <bpmn:sequenceFlow id="Flow_ToPrepareVariance" sourceRef="ServiceTask_CalculateEarnedManhours" targetRef="ServiceTask_PrepareVarianceCheck" />

@@ -2,10 +2,13 @@ package com.lcs.star.bpa.task;
 
 import com.lcs.star.bpa.persistence.ProgressPeriodRepository;
 import com.lcs.star.bpa.persistence.ProgressPeriodRepository.Period;
+import com.lcs.star.bpa.persistence.ProgressRetractionRepository;
+import com.lcs.star.bpa.persistence.ProgressRetractionRepository.Request;
 import com.lcs.star.bpa.progress.CompletionApprovalService;
 import com.lcs.star.bpa.progress.CompletionApprovalService.Approval;
 import com.lcs.star.bpa.progress.ProgressReadService;
 import com.lcs.star.bpa.progress.ProgressReadService.Row;
+import com.lcs.star.bpa.progress.RetractionRules;
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
@@ -38,10 +41,12 @@ public class CompletionApprovalCheck {
 
     private final ProgressPeriodRepository periods;
     private final ProgressReadService read;
+    private final ProgressRetractionRepository retractions;
 
-    public CompletionApprovalCheck(ProgressPeriodRepository periods, ProgressReadService read) {
+    public CompletionApprovalCheck(ProgressPeriodRepository periods, ProgressReadService read, ProgressRetractionRepository retractions) {
         this.periods = periods;
         this.read = read;
+        this.retractions = retractions;
     }
 
     boolean appliesTo(String elementId) {
@@ -93,6 +98,21 @@ public class CompletionApprovalCheck {
         for (Approval a : approvals) {
             if (a.remark() != null && a.remark().trim().length() > 250) {
                 return bad(REMARK_TOO_LONG);
+            }
+        }
+        // BPA-63 (plan section 1): a retraction reason where a Work Pack falls below last week's locked % and no Approved retraction holds for this % (Jira text);
+        // a reason is at most 250 characters (ASSUMPTION text, plan Q7)
+        Map<String, List<Request>> requests = retractions.ofPeriod(period.id()).stream().collect(Collectors.groupingBy(Request::workpackNumber));
+        for (Approval a : approvals) {
+            Row row = byNumber.get(a.workpackNumber());
+            boolean blank = a.retractionReason() == null || a.retractionReason().isBlank();
+            if (RetractionRules.needsReason(a.approvedPct(), row.lastLockedPct(), requests.getOrDefault(a.workpackNumber(), List.of())) && blank) {
+                return bad(RetractionRules.reasonRequired(row.lastLockedPct()));
+            }
+        }
+        for (Approval a : approvals) {
+            if (a.retractionReason() != null && a.retractionReason().trim().length() > 250) {
+                return bad(RetractionRules.REASON_TOO_LONG);
             }
         }
         return Optional.empty();

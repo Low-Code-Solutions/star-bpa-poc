@@ -2,6 +2,8 @@ package com.lcs.star.bpa.progress;
 
 import com.lcs.star.bpa.persistence.ProgressPeriodRepository;
 import com.lcs.star.bpa.persistence.ProgressPeriodRepository.Period;
+import com.lcs.star.bpa.persistence.ProgressRetractionRepository;
+import com.lcs.star.bpa.persistence.ProgressRetractionRepository.Request;
 import com.lcs.star.bpa.persistence.WorkpackProgressRepository;
 import com.lcs.star.bpa.progress.ProgressReadService.Row;
 import java.math.BigDecimal;
@@ -26,17 +28,19 @@ public class CompletionApprovalService {
     public static final String NOT_COVERED = "Approvals must cover every Work Pack of the week";
 
     /** One entry of the payload: the Work Pack, the approved % as sent and the remark as sent (null when none). */
-    public record Approval(String workpackNumber, BigDecimal approvedPct, String remark) {
+    public record Approval(String workpackNumber, BigDecimal approvedPct, String remark, String retractionReason) {
     }
 
     private final ProgressReadService read;
     private final WorkpackProgressRepository progress;
     private final ProgressPeriodRepository periods;
+    private final ProgressRetractionRepository retractions;
 
-    public CompletionApprovalService(ProgressReadService read, WorkpackProgressRepository progress, ProgressPeriodRepository periods) {
+    public CompletionApprovalService(ProgressReadService read, WorkpackProgressRepository progress, ProgressPeriodRepository periods, ProgressRetractionRepository retractions) {
         this.read = read;
         this.progress = progress;
         this.periods = periods;
+        this.retractions = retractions;
     }
 
     /** The payload as entries; an entry that is not understood is an {@link IllegalArgumentException} with the text to answer with. */
@@ -53,10 +57,35 @@ public class CompletionApprovalService {
                 if (approved == null) {
                     throw new IllegalArgumentException(NOT_A_NUMBER);
                 }
-                approvals.add(new Approval(number.trim(), approved, map.get("remark") instanceof String remark ? remark : null));
+                approvals.add(new Approval(number.trim(), approved, map.get("remark") instanceof String remark ? remark : null, map.get("retractionReason") instanceof String reason ? reason : null));
             }
         }
         return approvals;
+    }
+
+    /**
+     * BPA-63 (plan Q3): the retraction request of the Work Pack, written in the same transaction as the approval. Needs a reason (below last week's locked %, no
+     * Approved retraction for this %): an open request is inserted, or updated to the new reason and %. Needs none: an open request goes (ASSUMPTION). Decided
+     * requests are never touched, so a re-approval at a different % is a new request and an Approved one is kept (BPA-61 Q4).
+     */
+    private void request(Period period, Row row, BigDecimal approved, String reasonText, String username) {
+        List<Request> mine = retractions.ofPeriod(period.id()).stream().filter(r -> r.workpackId().equals(row.workpackId())).toList();
+        Request open = mine.stream().filter(Request::open).findFirst().orElse(null);
+        if (!RetractionRules.needsReason(approved, row.lastLockedPct(), mine)) {
+            if (open != null) {
+                retractions.delete(open, username);
+            }
+            return;
+        }
+        String reason = reasonText == null ? "" : reasonText.trim();
+        if (reason.isEmpty()) {
+            throw new IllegalArgumentException(RetractionRules.reasonRequired(row.lastLockedPct()));
+        }
+        if (open != null) {
+            retractions.update(open, reason, approved, username);
+        } else {
+            retractions.insert(retractions.progressId(period.id(), row.workpackId()).orElseThrow(), username, reason, approved, username);
+        }
     }
 
     /** Writes the approvals of the week; the Work Packs and what they are compared with come from the week's read model. */
@@ -77,6 +106,7 @@ public class CompletionApprovalService {
             boolean changed = approved.compareTo(row.referencePct()) != 0;
             String remark = changed && approval.remark() != null && !approval.remark().isBlank() ? approval.remark().trim() : null;
             progress.approve(period.id(), row.workpackId(), approved, remark, row.lastLockedPct(), username);
+            request(period, row, approved, approval.retractionReason(), username);
         }
     }
 }

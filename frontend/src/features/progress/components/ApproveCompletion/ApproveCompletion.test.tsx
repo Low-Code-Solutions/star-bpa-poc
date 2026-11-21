@@ -33,9 +33,9 @@ const ROWS = [
 ];
 
 type Call = { method: string; path: string; body: unknown };
-type Options = { completeStatus?: number; completeDetail?: string; weekStatus?: number };
+type Options = { completeStatus?: number; completeDetail?: string; weekStatus?: number; rows?: unknown[] };
 
-function fakeBackend({ completeStatus = 204, completeDetail = '', weekStatus = 200 }: Options = {}) {
+function fakeBackend({ completeStatus = 204, completeDetail = '', weekStatus = 200, rows = ROWS }: Options = {}) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -62,7 +62,7 @@ function fakeBackend({ completeStatus = 204, completeDetail = '', weekStatus = 2
     }
     if (path === '/api/v1/progress-periods/2026-11-19/workpacks') {
       return weekStatus === 200
-        ? json(200, { weekEnding: '2026-11-19', basis: 'Physical', workpacks: ROWS })
+        ? json(200, { weekEnding: '2026-11-19', basis: 'Physical', workpacks: rows })
         : json(weekStatus, { detail: 'Week not found' });
     }
     if (path === `/api/v1/tasks/${TASK}/complete`) {
@@ -188,5 +188,85 @@ describe('ApproveCompletion, a week that cannot be loaded', () => {
     expect(await screen.findByText('The week could not be loaded')).toBeInTheDocument();
     expect(calls.some((c) => c.path.endsWith('/complete'))).toBe(false);
     expect(onDone).not.toHaveBeenCalled();
+  });
+});
+
+// BPA-63: a retraction reason where the approved % is below last week's locked %, and the Project Manager's decline shown back to PPC (plan Q5: a field on the
+// read model, retractionDeclinedReason). The texts are Jira's; the backend checks them again (RetractionApiTest).
+describe('ApproveCompletion, retractions', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('BPA63_decreaseWithoutReasonIsRefused', async () => {
+    const { user, calls, onDone } = await renderScreen();
+    const input = screen.getByLabelText('Approved % for WP-000457');
+    expect(screen.queryByLabelText('Retraction reason for WP-000457')).not.toBeInTheDocument();
+
+    await user.clear(input);
+    await user.type(input, '25');
+    await user.type(screen.getByLabelText('Remark for WP-000457'), 'FMS double-counted cutting');
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+
+    expect(
+      await screen.findByText('A retraction reason is required when completion falls below last week (30%)'),
+    ).toBeInTheDocument();
+    expect(calls.some((c) => c.path.endsWith('/complete'))).toBe(false);
+    expect(onDone).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText('Retraction reason for WP-000457'), 'FMS double-counted cutting');
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    const sent = calls.find((c) => c.path === `/api/v1/tasks/${TASK}/complete`)?.body as {
+      variables: { completionApprovals: Array<Record<string, unknown>> };
+    };
+    expect(sent.variables.completionApprovals[0]).toEqual({
+      workpackNumber: 'WP-000457',
+      approvedPct: 25,
+      remark: 'FMS double-counted cutting',
+      retractionReason: 'FMS double-counted cutting',
+    });
+    expect(sent.variables.completionApprovals[1]).toEqual({ workpackNumber: 'WP-000461', approvedPct: 100 });
+  });
+
+  it('BPA63_retractionDeclinedGoesBackToPpc', async () => {
+    const declined = {
+      ...ROWS[0],
+      approvedPct: 25,
+      remark: 'FMS double-counted cutting',
+      retractionDeclinedReason: 'Recheck with FMS first',
+    };
+    await renderScreen({ rows: [declined, ROWS[1], ROWS[2]] });
+
+    expect(within(rowOf('WP-000457')).getByText('Retraction declined: Recheck with FMS first')).toBeInTheDocument();
+    expect(within(rowOf('WP-000461')).queryByText(/Retraction declined/)).not.toBeInTheDocument();
+  });
+});
+
+// QA review of BPA-63: where an Approved retraction already holds for the stored %, no reason is asked for (the server decides the same). Written after the code.
+describe('ApproveCompletion, an approved retraction', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('BPA63_anApprovedRetractionNeedsNoNewReason', async () => {
+    const approved = { ...ROWS[0], approvedPct: 25, remark: 'FMS double-counted cutting', retractionApproved: true };
+    const { user, calls, onDone } = await renderScreen({ rows: [approved, ROWS[1], ROWS[2]] });
+
+    expect(screen.queryByLabelText('Retraction reason for WP-000457')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    const sent = calls.find((c) => c.path === `/api/v1/tasks/${TASK}/complete`)?.body as {
+      variables: { completionApprovals: Array<Record<string, unknown>> };
+    };
+    expect(sent.variables.completionApprovals[0]).toEqual({
+      workpackNumber: 'WP-000457',
+      approvedPct: 25,
+      remark: 'FMS double-counted cutting',
+    });
   });
 });

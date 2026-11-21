@@ -3,7 +3,7 @@ import type { WorkpackProgressRow } from '@/types/api';
 /** A % is a plain decimal (no exponent, hexadecimal, comma or text), as the backend reads it. */
 const PLAIN_DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
 
-export type Edit = { pct?: string; remark?: string };
+export type Edit = { pct?: string; remark?: string; reason?: string };
 
 /** The % a changed approval is compared with: the reported %, or the last locked % for a Work Pack with no report row (D6; plan Q9). */
 export function referencePct(row: WorkpackProgressRow): number {
@@ -11,8 +11,22 @@ export function referencePct(row: WorkpackProgressRow): number {
 }
 
 /** The approved % as typed (or the pre-filled one) and the remark as typed. */
-export function entryOf(row: WorkpackProgressRow, edit: Edit | undefined): { pctText: string; remark: string } {
-  return { pctText: edit?.pct ?? String(row.approvedPct), remark: edit?.remark ?? row.remark ?? '' };
+export function entryOf(row: WorkpackProgressRow, edit: Edit | undefined): { pctText: string; remark: string; reason: string } {
+  return {
+    pctText: edit?.pct ?? String(row.approvedPct),
+    remark: edit?.remark ?? row.remark ?? '',
+    reason: edit?.reason ?? row.retractionReason ?? '',
+  };
+}
+
+/**
+ * BPA-63: a retraction reason is needed where the approved % is below last week's locked % and no Approved retraction holds for this %. The backend decides
+ * (it knows every Approved retraction); the screen only knows the one for the stored %, so it asks for the reason in the same cases or more (a % changed to an
+ * earlier Approved % still gets the prompt; the reason is then ignored by the server).
+ */
+export function needsReason(row: WorkpackProgressRow, pctText: string): boolean {
+  const pct = Number(pctText);
+  return pct < row.lastLockedPct && !(row.retractionApproved === true && pct === row.approvedPct);
 }
 
 function decimals(text: string): number {
@@ -41,6 +55,13 @@ export function approvalMessages(rows: WorkpackProgressRow[], edits: Record<stri
   }
   if (entries.some((e) => e.remark.trim().length > 250)) {
     return ['Remark can be at most 250 characters'];
+  }
+  const lower = entries.find((e) => needsReason(e.row, e.pctText) && e.reason.trim() === '');
+  if (lower) {
+    return [`A retraction reason is required when completion falls below last week (${lower.row.lastLockedPct}%)`];
+  }
+  if (entries.some((e) => e.reason.trim().length > 250)) {
+    return ['Retraction reason can be at most 250 characters'];
   }
   return [];
 }
