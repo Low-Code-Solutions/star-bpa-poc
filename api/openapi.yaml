@@ -1726,7 +1726,7 @@ components:
         elementId:
           type: string
           description: BPMN element ID of the user task
-          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction, UserTask_ApproveHoursPpc, UserTask_SendHoursToFms, UserTask_UploadCompletionReport, UserTask_ApproveCompletion]
+          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction, UserTask_ApproveHoursPpc, UserTask_SendHoursToFms, UserTask_UploadCompletionReport, UserTask_ApproveCompletion, UserTask_ApproveRetraction]
         processInstanceKey:
           $ref: '#/components/schemas/CamundaKey'
         workpackNumber:
@@ -1782,7 +1782,7 @@ components:
             line's id, data model §6.3); UserTask_SignOffRelease takes signOffDecision (Approved or Declined) and
             declineReason; UserTask_ScheduleWorkPack takes plannedStartDate and plannedEndDate; UserTask_SendHoursToFms
             (BPA-58) takes fmsHandOffs [{fmsHoursExportId, outcome (Sent to FMS or Rejected by FMS), reason}], one entry for
-            each file of the task (the reason is required, at most 250 characters, for Rejected by FMS). UserTask_ApproveCompletion (BPA-60) takes completionApprovals [{workpackNumber, approvedPct, remark}], one entry for each Work Pack of the week (the whole week is approved at once; approvedPct has at most 2 decimals and lies between 0 and 100; the remark is required, at most 250 characters, when approvedPct differs from the reported %; a 409 "Week ending <date> must be locked first" when the week before is not Locked; "Approvals are required", "Approvals must cover every Work Pack of the week", "Completion % must be between 0 and 100" and "Remark can be at most 250 characters" are ASSUMPTIONs); UserTask_UploadCompletionReport (BPA-59) takes completionReportId, the id of the upload that counts ("Completion report is required" and "Completion report is not for this week" are ASSUMPTIONs). The 400 texts "Outcome is required for each file", "Outcome must be Sent to FMS or Rejected by FMS", "Reason can be at most 250 characters" and "File is not part of this task" are ASSUMPTIONs ("Reason is required" is the story's).
+            each file of the task (the reason is required, at most 250 characters, for Rejected by FMS). UserTask_ApproveCompletion (BPA-60) takes completionApprovals [{workpackNumber, approvedPct, remark}], one entry for each Work Pack of the week (the whole week is approved at once; approvedPct has at most 2 decimals and lies between 0 and 100; the remark is required, at most 250 characters, when approvedPct differs from the reported %; a 409 "Week ending <date> must be locked first" when the week before is not Locked; "Approvals are required", "Approvals must cover every Work Pack of the week", "Completion % must be between 0 and 100" and "Remark can be at most 250 characters" are ASSUMPTIONs); UserTask_ApproveCompletion also takes, per entry, retractionReason, required (at most 250 characters, ASSUMPTION text "Retraction reason can be at most 250 characters") when approvedPct is below the last locked % and no Approved retraction exists for that %, else 400 "A retraction reason is required when completion falls below last week (<prev>%)"; UserTask_ApproveRetraction (BPA-63, project-manager) takes retractionDecisions [{workpackNumber, retractionDecision (Approved or Declined), reason}], one entry for each Work Pack waiting for a retraction (Declined needs a reason of at most 250 characters, 400 "Reason is required"; 409 "You cannot approve a retraction you requested"; "Decisions must cover every Work Pack waiting for a retraction" and "Reason can be at most 250 characters" are ASSUMPTIONs); UserTask_UploadCompletionReport (BPA-59) takes completionReportId, the id of the upload that counts ("Completion report is required" and "Completion report is not for this week" are ASSUMPTIONs). The 400 texts "Outcome is required for each file", "Outcome must be Sent to FMS or Rejected by FMS", "Reason can be at most 250 characters" and "File is not part of this task" are ASSUMPTIONs ("Reason is required" is the story's).
             The backend adds `completedBy`, the session user's Camunda username, to every completion, so the save workers
             record who did the work (D63; BPA-6). It is on no allow-list: a request that sends it is refused with 400.
             Likewise it adds `completedTaskKey`, the key of the task being completed, the re-run key of a worker that records a
@@ -2268,6 +2268,15 @@ components:
         remark:
           type: string
           description: The stored remark of an earlier approval of this week, if any
+        retractionReason:
+          type: string
+          description: BPA-63. PPC's reason of the open (undecided) retraction request for this Work Pack, if any
+        retractionRequestedBy:
+          type: string
+          description: BPA-63. Who requested the open retraction (Camunda identity), if any
+        retractionDeclinedReason:
+          type: string
+          description: BPA-63. The Project Manager's reason when the latest request for the Work Pack's current approvedPct was declined ("Retraction declined, reason"); absent once PPC changes the %
     CompletionReportResult:
       type: object
       description: completion_report and its completion_report_row rows (data model §13.3.3)
