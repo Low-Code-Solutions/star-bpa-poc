@@ -244,3 +244,29 @@ describe('ApproveCompletion, retractions', () => {
     expect(within(rowOf('WP-000461')).queryByText(/Retraction declined/)).not.toBeInTheDocument();
   });
 });
+
+// QA review of BPA-63: where an Approved retraction already holds for the stored %, no reason is asked for (the server decides the same). Written after the code.
+describe('ApproveCompletion, an approved retraction', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('BPA63_anApprovedRetractionNeedsNoNewReason', async () => {
+    const approved = { ...ROWS[0], approvedPct: 25, remark: 'FMS double-counted cutting', retractionApproved: true };
+    const { user, calls, onDone } = await renderScreen({ rows: [approved, ROWS[1], ROWS[2]] });
+
+    expect(screen.queryByLabelText('Retraction reason for WP-000457')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    const sent = calls.find((c) => c.path === `/api/v1/tasks/${TASK}/complete`)?.body as {
+      variables: { completionApprovals: Array<Record<string, unknown>> };
+    };
+    expect(sent.variables.completionApprovals[0]).toEqual({
+      workpackNumber: 'WP-000457',
+      approvedPct: 25,
+      remark: 'FMS double-counted cutting',
+    });
+  });
+});

@@ -1,7 +1,7 @@
 # Plan: BPA-63 Project Manager can approve or decline a Work Pack's progress retraction
 Jira: BPA-63 (Story, epic BPA-4)
 Story last updated: 2026-11-21T13:36:51.506+0400
-Status: Approved (Ahsan, 21 Nov 2026)
+Status: Closed (21 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-63-pm-approve-retraction, from main 9f8b739
 
@@ -264,3 +264,53 @@ This is the same condition that gives NeedsRetraction, so a request exists for e
 
 ## Resolutions (21 Nov 2026)
 Approved with the recommended answers: Q1 the V4 migration, UNIQUE (task_key, workpack_progress_id); Q2 retractionOutcome set by the worker (the Flow_RetractionApproved condition and two documentation texts change); Q3 the request is written in ServiceTask_RecordCompletionApproval, one undecided request per row, decided rows kept; Q4 scenario 8 seeds requested_by by SQL and the 409 applies to any decision by the requester; Q5 retractionDeclinedReason on the read model and validationMessages cleared on the decline path; Q7 the ASSUMPTION texts as written (to comment in Jira after a yes); Q8 no new hard rule after a decline; Q9 the existing /workpacks endpoint.
+
+## Progress and departures (21 Nov 2026)
+**Commits:** cba7de1 plan Approved; 300c7b1 contract, V4, gateway and red backend tests; 12f6dec red React tests; 81d0825 backend; 81db41e frontend; 5713987 `FlywayBaselineTest` lists V4.
+
+**Red runs shown before any production code:**
+- Backend `RetractionApiTest`, 13 of 13 red: the Project Manager's task answered 404 "Task not found" (not on the allow-list), no request row existed, a decrease with no reason still got 204.
+- React: `BPA63_decreaseWithoutReasonIsRefused` and `BPA63_retractionDeclinedGoesBackToPpc` red (no reason field, no decline line); `ApproveRetraction.test.tsx` failed only because its screen did not exist (unresolved import).
+
+**Departures from the plan:**
+1. **Read model gains `retractionApproved`** (boolean, derived), not in the plan. Without it the screen would ask for a reason where the server does not (an Approved retraction already holds for the stored %). The server stays the authority. Contract, `ProgressReadService.Row`, controller and `ApproveCompletion` changed.
+2. **New ASSUMPTION text "Decisions are required"** (`TaskValidity`, an empty or missing `retractionDecisions` list), mirroring "Approvals are required".
+3. **Edit to an existing test:** `ProgressRuleApiTest`'s `approve` helper now sends `retractionReason` for a changed %, because a decrease needs one (BPA61_decreaseNeedsRetraction and BPA61_retractionValidOnlyForApprovedPercent would otherwise get a 400). No assertion on stored values changed.
+4. **Edit to an existing test:** `FlywayBaselineTest` lists V4 ("progress retraction task key") in the applied migrations. Found by the full `verify`.
+5. **Edit to a test after its red run:** my `RetractionApiTest.approve` helper added the remark only when the % differed from the pre-fill, but BPA-60's remark rule compares with the reported % (or the last locked % with no report row). `anApprovedPercentNeedsNoNewReason` failed on that helper, not on the code; the helper now follows the rule. The red run had failed earlier in that test, so the helper was not exercised then.
+6. **Three service-level extras written after the code, no red run:** `aRerunRecordsNothingTwice`, `segregationAlsoFailsTheRecordStep`, `anOpenRequestFollowsTheReApprovalAndGoesWhenNotNeeded`. `anOpenRequestFollows…` calls `CompletionApprovalService.record` directly because through the task API an open request cannot survive to a re-approval (PPC cannot complete Approve completion while the Project Manager's task is open).
+7. **`RetractionApiTest` has 16 tests** (8 scenarios, 5 HTTP extras, 3 service-level extras); the plan listed 7 extras.
+8. **The PM screen filters on `retractionReason`** (an open request), as planned (Q9); the empty case shows "No retraction is waiting for a decision" (ASSUMPTION text).
+9. **`Flow_RetractionApproved` is `=retractionOutcome = "Approved"`** (Q2, as approved); the worker also clears `validationMessages` on a decline (Q5).
+10. **BPA-61 pre-fill:** after a decline the stored `approved_pct` pre-fills the grid (BPA-60 Q9), so PPC sees the rejected % until they change it.
+
+**Verification:** `RetractionApiTest` 16/16; neighbouring `ProgressRuleApiTest`, `CompletionApprovalApiTest`, `ModelDeployTest`, `ModelResourcesTest` green; full `./mvnw -B verify` 617 tests, 1 failure (`FlywayBaselineTest`, departure 4, fixed and rerun green). Frontend: `npm run lint`, `format:check`, `build` clean; `npm test` 125 of 126, the one failure `BPA6_dateToCompleteBoundary` (CreateWorkPack, unrelated) passes alone and failed once under parallel load.
+
+## Local-stack proof (21 Nov 2026)
+Images rebuilt from this branch (`docker build` of `bpa-app` and the portal; `docker compose up -d --no-build`). The weekly instance was started **at `UserTask_ApproveCompletion`** for the week ending 19 Nov 2026 (the period reset by SQL, the 12 Nov Locked week holding approved 30/60/10; so the hours upload and report steps were not run again). All calls through the portal's origin (http://localhost:3000, nginx proxy) as the personas.
+- **Approve path** (WP-000011 reported 45, last locked 30, to 25):
+  - ppc-team without a reason: 400 "A retraction reason is required when completion falls below last week (30%)".
+  - With the reason: 204; `progress_retraction` row requested_by ppc-team, reason "FMS double-counted cutting", approved_pct 25.00, decision NULL; `rule_result` NeedsRetraction.
+  - project-manager's rows show last locked 30, new 25 and the reason; ppc-team on the PM task: 403 "You are not allowed to work on this task".
+  - PM Declined with an empty reason: 400 "Reason is required". PM Approved: 204.
+  - Row: decision Approved, decided_by project-manager, decided_at and task_key set; audit rows for requested_by, reason, approved_pct, decision, decided_by; all four Work Packs Accepted; `activity_progress` rows for 19 Nov; the instance waits at `ServiceTask_PrepareVarianceCheck` (BPA-64).
+- **Decline path** (WP-000011 to 25 and WP-000030 from 60 to 55, both with reasons):
+  - PM deciding only one of them: 400 "Decisions must cover every Work Pack waiting for a retraction".
+  - PM: WP-000011 Approved, WP-000030 Declined "Keep 60% until QC": 204. The instance waits at `UserTask_ApproveCompletion`.
+  - PPC's read model: WP-000030 `retractionDeclinedReason` "Keep 60% until QC", WP-000011 `retractionApproved` true; the task's `validationMessages` is empty.
+  - PPC re-approves WP-000011 at 25 with no reason (204; still one retraction row, Approved) and WP-000030 at 60: all Accepted, Earned man-hours ran, the instance waits at `ServiceTask_PrepareVarianceCheck`. The declined row is kept.
+- **Not run by hand:** the 409 segregation (only ppc-team can request; covered by `BPA63_approverMustNotBeRequester` with `requested_by` seeded) and the browser screens (covered by the React tests; the screens were not opened in a browser).
+- **BPMN match:** the deployed `Process_PPC_WeeklyProgressPeriod` equals `models/bpmn/Process_PPC_WeeklyProgressPeriod.bpmn` (whitespace-normalised, same hash) and contains `retractionOutcome = "Approved"`.
+- **Side effect on the local stack:** the 19 Nov week now holds this decline-path run (instance at `ServiceTask_PrepareVarianceCheck`, WP-000030's Declined request kept).
+
+## After the `qa-reviewer` pass (21 Nov 2026; REVIEW.md "BPA-63 at 5713987")
+- **Added after the review:** `theReadModelShowsTheRequestAndItsOutcome` (backend, covers `retractionReason`, `retractionRequestedBy`, `retractionApproved`, `retractionDeclinedReason`) and `BPA63_anApprovedRetractionNeedsNoNewReason` (React); both written after the code, no red run. `RetractionApiTest` now has **17 tests**. `approvalMessages.ts` comment corrected: the screen asks for the reason "in the same cases or more" than the server.
+- **Files in the diff that the plan did not list:** `progress/RetractionRules.java` (new, pure), `persistence/ProgressRetractionRepository.java` (the retraction reads and writes live here, not in `ProgressWeekRepository`), `FlywayBaselineTest.java`, `task/TaskConfig.java` (wiring), `ProgressRuleApiTest.java` (helper). `ProgressWeekRepository.java` was **not** changed. The plan's extra test `segregationAlsoFailsTheJob` is `segregationAlsoFailsTheRecordStep`.
+- **Accepted for the POC (recorded, not built):**
+  - no partial unique index on open requests: two open requests for one Work Pack row are prevented by the process only (one Approve completion task at a time);
+  - an Approved decision ignores a `reason` that is sent with it (not stored; ASSUMPTION);
+  - `decided_at` and `task_key` (and `workpack_progress_id` on insert) are not audited;
+  - Complete on the Project Manager's screen before the week has loaded sends an empty list and gets the server's 400 "Decisions are required";
+  - `RetractionDecisionService.decide` checks the Locked week before the re-run key, so a retried job after the lock fails (no retries) instead of returning the stored outcome;
+  - `ofPeriod` is read once per Work Pack in `CompletionApprovalService.request` and once per week in `ProgressReadService` (small table).
+- **ASSUMPTIONs to comment in Jira (shown to Ahsan first; posted only on his yes):** the texts "Retraction reason can be at most 250 characters", "Reason can be at most 250 characters", "Decisions must cover every Work Pack waiting for a retraction", "Decisions are required", "No retraction is waiting for a decision" (screen), and "The week of this task has no progress period"; the rules: an open request is deleted when no retraction is needed any more, `validationMessages` is cleared on a decline, the 409 applies to a decline as well as an approval, and after a decline the stored % pre-fills the grid. Jira's SOR Notes say "Process variable retractionDecision (per Work Pack)": the build uses the list `retractionDecisions` and the worker variable `retractionOutcome`, and Jira's scenarios 1 and 2 ("with retractionDecision 'Approved'") are tested through that list.

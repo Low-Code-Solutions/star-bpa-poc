@@ -347,6 +347,28 @@ class RetractionApiTest {
         assertThat(retractionRows("WP-000457")).as("at last week's % no retraction is needed").isEmpty();
     }
 
+    /** The read model fields the screens use (QA review of BPA-63): the open request, then the Approved and Declined outcomes. Written after the code, no red run. */
+    @Test
+    void theReadModelShowsTheRequestAndItsOutcome() {
+        toTheRetractionTask(Map.of("WP-000457", "25", "WP-000461", "55"), Map.of("WP-000457", REASON, "WP-000461", "Recount"));
+        JsonNode open = rowOf("WP-000457");
+        assertThat(open.path("retractionReason").asText()).isEqualTo(REASON);
+        assertThat(open.path("retractionRequestedBy").asText()).isEqualTo("ppc-team");
+        assertThat(open.path("retractionApproved").asBoolean()).isFalse();
+        assertThat(open.has("retractionDeclinedReason")).isFalse();
+
+        assertThat(decide(RETRACTION_TASK(), "project-manager",
+                List.of(decision("WP-000457", "Approved", null), decision("WP-000461", "Declined", "Keep 60% until QC"))).statusCode()).isEqualTo(204);
+        awaitTask(instance, APPROVE);
+
+        JsonNode approved = rowOf("WP-000457");
+        assertThat(approved.path("retractionApproved").asBoolean()).as("an Approved retraction is for the stored %").isTrue();
+        assertThat(approved.has("retractionReason")).as("no open request any more").isFalse();
+        JsonNode declined = rowOf("WP-000461");
+        assertThat(declined.path("retractionApproved").asBoolean()).isFalse();
+        assertThat(declined.path("retractionDeclinedReason").asText()).isEqualTo("Keep 60% until QC");
+    }
+
     // --- helpers ----------------------------------------------------------------------------------------------------------------
 
     /** PPC approves the week (changes with their retraction reasons) and the instance waits at the retraction task. */
@@ -448,6 +470,15 @@ class RetractionApiTest {
                 FROM bpa.progress_retraction r JOIN bpa.workpack_progress p ON p.id = r.workpack_progress_id JOIN bpa.workpack w ON w.id = p.workpack_id
                 WHERE w.workpack_number = ? AND p.progress_period_id = ? ORDER BY r.created_at""", workpack, period);
     }
+    private JsonNode rowOf(String workpack) {
+        for (JsonNode row : json(flow.loggedInAs("ppc-team").get("/api/v1/progress-periods/2026-11-19/workpacks").body()).path("workpacks")) {
+            if (workpack.equals(row.path("workpackNumber").asText())) {
+                return row;
+            }
+        }
+        throw new AssertionError(workpack + " is not in the week's rows");
+    }
+
 
     /** What PPC sees for the Work Pack: the read model's retractionDeclinedReason (plan Q5), null when absent. */
     private String declinedReason(String workpack) {

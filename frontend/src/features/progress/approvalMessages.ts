@@ -21,7 +21,8 @@ export function entryOf(row: WorkpackProgressRow, edit: Edit | undefined): { pct
 
 /**
  * BPA-63: a retraction reason is needed where the approved % is below last week's locked % and no Approved retraction holds for this %. The backend decides
- * (it knows every Approved retraction); the screen only knows the one for the stored %, so it asks for the reason in the same cases or fewer.
+ * (it knows every Approved retraction); the screen only knows the one for the stored %, so it asks for the reason in the same cases or more (a % changed to an
+ * earlier Approved % still gets the prompt; the reason is then ignored by the server).
  */
 export function needsReason(row: WorkpackProgressRow, pctText: string): boolean {
   const pct = Number(pctText);
