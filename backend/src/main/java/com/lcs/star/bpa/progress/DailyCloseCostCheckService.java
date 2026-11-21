@@ -54,23 +54,36 @@ public class DailyCloseCostCheckService {
         return false;
     }
 
-    /** Runs the check for the date (the business date at 06:00 Asia/Riyadh); does nothing outside the close. */
+    /**
+     * Runs the check for the date (the business date at 06:00 Asia/Riyadh); does nothing outside the close. There are no Camunda retries here and the job runs once a day, so
+     * one CBS that cannot be checked (the decision cannot be evaluated) or alerted (for example its alert row cannot be written) must not cost the others their alert: the
+     * failure is logged, the next CBS goes on, and at the end the run fails once naming the CBS that failed (QA review of BPA-65). Each CBS is alerted on its own for the same reason.
+     */
     public void runFor(LocalDate today) {
         if (!inCloseWindow(today, settings.monthLockDay())) {
             LOG.debug("{} is outside the close window: no daily cost check", today);
             return;
         }
-        List<CostOver> overs = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
+        int over = 0;
         for (Check check : checks.checks(today)) {
-            Map<String, Object> variables = new HashMap<>();
-            variables.put("revisedBudgetCost", check.revisedBudgetCost());
-            variables.put("actualCost", check.actualCost());
-            JsonNode output = decisions.evaluate(DECISION, variables);
-            if (CostVarianceMath.OVER_10_PCT.equals(output.path("costResult").asText())) {
-                overs.add(new CostOver(check.cbsCodeRef(), check.actualCost(), check.revisedBudgetCost()));
+            try {
+                Map<String, Object> variables = new HashMap<>();
+                variables.put("revisedBudgetCost", check.revisedBudgetCost());
+                variables.put("actualCost", check.actualCost());
+                JsonNode output = decisions.evaluate(DECISION, variables);
+                if (CostVarianceMath.OVER_10_PCT.equals(output.path("costResult").asText())) {
+                    over++;
+                    alerts.sendCostAlerts(null, today, List.of(new CostOver(check.cbsCodeRef(), check.actualCost(), check.revisedBudgetCost())), SERVICE_USER);
+                }
+            } catch (RuntimeException e) {
+                LOG.error("Daily close cost check {}: {} failed: {}", today, check.cbsCodeRef(), e.getMessage(), e);
+                failed.add(check.cbsCodeRef());
             }
         }
-        LOG.info("Daily close cost check {}: {} CBS over the Revised Budget", today, overs.size());
-        alerts.sendCostAlerts(null, today, overs, SERVICE_USER);
+        LOG.info("Daily close cost check {}: {} CBS over the Revised Budget, {} failed", today, over, failed.size());
+        if (!failed.isEmpty()) {
+            throw new IllegalStateException("The daily close cost check for " + today + " failed for " + String.join(", ", failed) + " (the other CBS were checked)");
+        }
     }
 }

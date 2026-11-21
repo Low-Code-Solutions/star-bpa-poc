@@ -1,7 +1,7 @@
 # Plan: BPA-65 Project Manager can be alerted when a CBS's cost exceeds its revised budget by more than 10%
 Jira: BPA-65 (Story, epic BPA-4)
-Story last updated: 2026-11-21T23:54:21.501+0400
-Status: Approved (Ahsan, Build Lead, 22 Nov 2026)
+Story last updated: 2026-11-22T00:36:24.016+0400
+Status: Closed (22 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-65-cost-variance-alerts, from main c4901b2
 
@@ -21,7 +21,7 @@ BPA-65 builds four things:
 ## Readiness check (Definition of Ready, docs/02, against Jira 21 Nov 23:54)
 | Check | State |
 |---|---|
-| Jira status | **In Progress** since 21 Nov 23:54 (the only change since 17 Nov). No other transition without asking (Q9) |
+| Jira status | **In Review** since 22 Nov 00:36 (Ahsan; the only change since the plan was written, re-read after the review). No other transition without asking (Q9) |
 | Template, persona, outcome | Met (Project Manager) |
 | Gherkin incl. unhappy paths | Met: 12 scenarios (2 Outlines); unhappy paths are NO_BUDGET, the supervisor, the missing remark and outside the close |
 | BPMN element IDs exist | **Partly.** `BusinessRuleTask_CheckCostVariance` and `ServiceTask_SendVarianceAlerts` exist and are wired (BPA-64 Q8). The proposed `Process_PPC_DailyCloseCostCheck` / `StartEvent_DailyCloseCheck` does not exist (the DoR box is unticked) (Q1) |
@@ -270,3 +270,15 @@ Images rebuilt from this branch (`docker build` of `bpa-app` and the portal, `do
 - **Models:** the deployed `Process_PPC_WeeklyProgressPeriod` and `Decision_CostVariance` equal the repo files (same whitespace-normalised hash).
 - **Not run by hand:** the daily close job (the clock is the real clock; proved by `DailyCloseCostCheckTest`, plan Q12 (b)), a retry of the send step (covered by `BPA65_costAlertSentOncePerPeriod`) and the browser screens (covered by the React tests; not opened in a browser).
 - **Side effects on the local stack:** the 19 Nov week's Cost and Manhour alert rows, its `cbs_review` row and the instance waiting at `UserTask_ApproveWeeklyProgress` remain.
+
+## After the `qa-reviewer` pass (22 Nov 2026; REVIEW.md "BPA-65 at d414d61")
+- **Fixed after the review:** one CBS that fails (the decision cannot be evaluated, or its alert row cannot be written, for example a `numeric(7,2)` overflow) no longer stops the daily close check for the others. `DailyCloseCostCheckService.runFor` checks and alerts each CBS on its own (`sendCostAlerts` is called per CBS), logs the failure, goes on, and fails once at the end naming the CBS that failed, so `DailyCloseCostCheckJob` logs it as an error. `DailyCloseCostCheckServiceTest` (2 tests, mocks) red first (2 of 2 at 9447205), then green; `DailyCloseCostCheckTest` 5/5, `CostVarianceApiTest` 10/10, `DailyCloseWindowTest` 3/3 and `VarianceAlertServiceTest` 4/4 green after it.
+- **Jira re-read (22 Nov 2026):** the only change since the "Story last updated" time recorded when the plan was written is the status In Progress → In Review by Ahsan on 22 Nov 00:36; the description and acceptance criteria are unchanged since 12 Nov. The header time is now that of the re-read and the readiness row says In Review.
+- **Recorded after the review (plan vs diff):**
+  - Plan section 5 and the files table said `MyVarianceAlerts` "shows the week when present". The diff only changes the list key (`alertType`, `alertDate`, CBS, `sentAt`): the message already carries the date, so no new element was added.
+  - `ProcessTestApplication` is not changed: its component scan covers only the `worker` package, so the daily job and service are never loaded there.
+- **Risks added:** a Camunda retry of the weekly send step after a mail failure that crosses midnight Asia/Riyadh takes a new check date and sends a second cost alert for the same run (at-least-once, as BPA-16); a man-hour "nobody to alert" failure ends the weekly send job before the cost alert is tried (both need no reachable Cost Controller and no PCON address).
+- **Accepted for the POC (recorded, not built):** `VarianceAlertRepository.exists` ignores `recipientIsEmail` (pre-existing); `record()` names the Manhour index whatever its `type`; `BookHoursFixture.reset` deletes every `cbs_actual_cost` row and reinserts the seed row; `variance_pct numeric(7,2)` overflows for a tiny budget (the new isolation keeps that CBS from stopping the others).
+- **For Ahsan and Jira (shown first, posted only on a yes):**
+  - **BPMN Reference:** Jira still names the proposed `Process_PPC_DailyCloseCostCheck` / `StartEvent_DailyCloseCheck`; the build is the scheduled `DailyCloseCostCheckJob` (plan Q1 A). The proposed new text is "Process_PPC_WeeklyProgressPeriod / BusinessRuleTask_CheckCostVariance, ServiceTask_SendVarianceAlerts; Decision_CostVariance; DailyCloseCostCheckJob (scheduled job, no process)". Faraz or Khitaba should accept that no model is added; the DoR box "BPMN element IDs exist" stays open until then.
+  - **ASSUMPTIONs:** the email subject "Cost alert: <CBS>, <d MMM yyyy>"; the close window (3 days before the lock day up to and including it; from Jira) and that the daily check has no Camunda retries; a CBS with only `cbs_actual_cost` rows is checked (NO_FORECAST, NO_BUDGET); the weekly cost sums to the week ending's month and the daily to the current month; `costResult` on the read API is a copy of the decision's rules in Java; V6 (`alert_date`, `progress_period_id` nullable for Cost only, two partial unique indexes); a daily alert has no week and is linked to its week when the weekly check finds it the same day; `bpa-service` has GROUP READ on `project-manager` and CREATE_DECISION_INSTANCE on `Decision_CostVariance`; `GET /api/v1/me/variance-alerts` is open to every persona (own alerts only) and a supervisor gets 200 with an empty list; the Outline for the daily check reads "alerted" as one InSystem and one Email row for project-manager and one Email for the PCON address.
