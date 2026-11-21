@@ -28,7 +28,7 @@ import org.springframework.stereotype.Service;
  * </ul>
  * Once per period, CBS, alert type, recipient and channel: the row of {@code variance_alert} is the guard (a new week is a new period, so it alerts again). The in-system
  * row is written first and kept even if the mail server is down; an email is sent only when its row is not there and is recorded after it was sent (at-least-once, as
- * BPA-16): a retry sends nothing new. A mail failure is not caught: Camunda's tries, then an incident. The cost alert is BPA-65's and is not sent here.
+ * BPA-16): a retry sends nothing new. A mail failure is not caught: Camunda's tries, then an incident. The cost alert (BPA-65) is {@link #sendCostAlerts}.
  */
 @Service
 public class VarianceAlertService {
