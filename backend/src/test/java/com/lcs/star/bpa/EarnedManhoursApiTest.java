@@ -53,6 +53,7 @@ class EarnedManhoursApiTest {
     static final String PROCESS = "Process_PPC_WeeklyProgressPeriod";
     static final String EARNED = "ServiceTask_CalculateEarnedManhours";
     static final String VARIANCE = "ServiceTask_PrepareVarianceCheck";
+    static final String REVIEW = "UserTask_ReviewActualManhours"; // BPA-64: the variance worker now runs, so the instance moves on to the Cost Controller's review
     static final LocalDate W12 = LocalDate.of(2026, 11, 12);
     static final LocalDate W19 = LocalDate.of(2026, 11, 19);
 
@@ -91,7 +92,7 @@ class EarnedManhoursApiTest {
 
     private static void cancelWaiting() {
         for (String element : new String[] {"UserTask_ApproveCompletion", "ServiceTask_RecordCompletionApproval", "ServiceTask_PrepareProgressCheck",
-                "BusinessRuleTask_CheckProgressRule", "ServiceTask_RecordProgressResult", "UserTask_ApproveRetraction", EARNED, VARIANCE}) {
+                "BusinessRuleTask_CheckProgressRule", "ServiceTask_RecordProgressResult", "UserTask_ApproveRetraction", EARNED, VARIANCE, "BusinessRuleTask_CheckManhourVariance", "BusinessRuleTask_CheckCostVariance", "ServiceTask_SendVarianceAlerts", REVIEW, "ServiceTask_RecordCbsReview", "UserTask_ApproveWeeklyProgress"}) {
             CamundaSteps.cancelInstancesWaitingAt(element);
         }
     }
@@ -323,7 +324,7 @@ class EarnedManhoursApiTest {
     /** Runs the calculation for the week and waits until the instance has moved on to BPA-64's step. */
     private void run() {
         long instance = startAtEarned();
-        poll(() -> activeElements(instance).stream().map(e -> e.path("elementId").asText()).toList(), active -> active.contains(VARIANCE), VARIANCE + " of " + instance);
+        poll(() -> activeElements(instance).stream().map(e -> e.path("elementId").asText()).toList(), active -> active.contains(VARIANCE) || active.contains(REVIEW), VARIANCE + " or " + REVIEW + " of " + instance);
     }
 
     private Map<String, Object> row(String activity) {

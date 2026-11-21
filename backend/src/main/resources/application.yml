@@ -115,6 +115,9 @@ bpa:
       "[UserTask_ApproveRetraction]": # project-manager, BPA-63: retractionDecisions, one entry for each Work Pack waiting for a retraction ({workpackNumber, retractionDecision, reason}); read gives the week; the rows come from GET /api/v1/progress-periods/{weekEnding}/workpacks
         write: [retractionDecisions]
         read: [weekEnding]
+      "[UserTask_ReviewActualManhours]": # cost-controller, BPA-64: cbsReviews, one entry per CBS ({cbsCodeRef, remark}); read gives the week; the rows come from GET /api/v1/progress-periods/{weekEnding}/cbs-actuals
+        write: [cbsReviews]
+        read: [weekEnding]
       "[UserTask_CreateWorkPack]": # time-method-analyst (G9), BPA-6
         write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
         read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]

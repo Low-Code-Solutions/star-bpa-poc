@@ -123,7 +123,7 @@ class PersonaSyncTest {
     /** BPA-25 comment 10420 (shown to work, not proven minimal), plus RESOURCE CREATE so the app can auto-deploy the models (ASSUMPTION), plus GROUP READ on the two notified groups (BPA-16, ASSUMPTION). */
     static Map<String, Set<String>> expectedServicePermissions() {
         Set<String> process = Set.of("READ_USER_TASK", "UPDATE_USER_TASK", "COMPLETE_USER_TASK", "UPDATE_PROCESS_INSTANCE", "CREATE_PROCESS_INSTANCE");
-        return Map.of(
+        Map<String, Set<String>> expected = new java.util.HashMap<>(Map.of(
                 "PROCESS_DEFINITION:Process_PPC_WorkPackAssignment", process,
                 "PROCESS_DEFINITION:Process_PPC_WorkerReassignment", process,
                 "PROCESS_DEFINITION:Process_PPC_DrawingRevisionNotice", process,
@@ -134,7 +134,9 @@ class PersonaSyncTest {
                 "RESOURCE:*", Set.of("CREATE"),
                 // BPA-16: reads the members of the two groups that receive a drawing-revision notice (probe: without it the search answers an empty list)
                 "GROUP:workpack-owner", Set.of("READ"),
-                "GROUP:project-engineer", Set.of("READ"));
+                "GROUP:project-engineer", Set.of("READ")));
+        expected.put("GROUP:cost-controller", Set.of("READ")); // BPA-64: reads the members of the group that receives the man-hour variance alert
+        return expected;
     }
 
     /** Whichever password the shared bpa-service has: the sync's, or the one it had before the sync. */

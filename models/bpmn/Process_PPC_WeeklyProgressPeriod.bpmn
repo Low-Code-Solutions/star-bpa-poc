@@ -231,33 +231,41 @@
       <bpmn:outgoing>Flow_ToManhourVariance</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:businessRuleTask id="BusinessRuleTask_CheckManhourVariance" name="Check man-hour variance">
-      <bpmn:documentation>E2-14. Decision_ManhourVariance per CBS (FRD-22 §22.10: &gt; 15% against Current Forecast).</bpmn:documentation>
+      <bpmn:documentation>E2-14. Decision_ManhourVariance per CBS (FRD-22 §22.10: &gt; 15% against Current Forecast). BPA-64: the decision reads currentForecastManhours and actualManhours, so each pass maps them from its varianceCheck (without the mapping every CBS came out NO_FORECAST), and each result keeps its CBS and figures for ServiceTask_SendVarianceAlerts.</bpmn:documentation>
       <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:input source="=varianceCheck.actualManhours" target="actualManhours" />
+          <zeebe:input source="=varianceCheck.currentForecastManhours" target="currentForecastManhours" />
+        </zeebe:ioMapping>
         <zeebe:calledDecision decisionId="Decision_ManhourVariance" resultVariable="manhourCheck" />
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_ToManhourVariance</bpmn:incoming>
       <bpmn:outgoing>Flow_ToCostVariance</bpmn:outgoing>
       <bpmn:multiInstanceLoopCharacteristics>
         <bpmn:extensionElements>
-          <zeebe:loopCharacteristics inputCollection="=varianceChecks" inputElement="varianceCheck" outputCollection="manhourCheckResults" outputElement="=manhourCheck" />
+          <zeebe:loopCharacteristics inputCollection="=varianceChecks" inputElement="varianceCheck" outputCollection="manhourCheckResults" outputElement="={cbsCodeRef: varianceCheck.cbsCodeRef, actualManhours: varianceCheck.actualManhours, currentForecastManhours: varianceCheck.currentForecastManhours, manhourAlert: manhourCheck.manhourAlert, manhourResult: manhourCheck.manhourResult}" />
         </bpmn:extensionElements>
       </bpmn:multiInstanceLoopCharacteristics>
     </bpmn:businessRuleTask>
     <bpmn:businessRuleTask id="BusinessRuleTask_CheckCostVariance" name="Check cost variance">
-      <bpmn:documentation>E2-15. Decision_CostVariance per CBS (FRD-22 §22.10: &gt; 10% against Revised Budget).</bpmn:documentation>
+      <bpmn:documentation>E2-15. Decision_CostVariance per CBS (FRD-22 §22.10: &gt; 10% against Revised Budget). BPA-64: mapped like the man-hour check (revisedBudgetCost, actualCost from varianceCheck) and each result keeps its CBS; BPA-65 sends the cost alert.</bpmn:documentation>
       <bpmn:extensionElements>
+        <zeebe:ioMapping>
+          <zeebe:input source="=varianceCheck.revisedBudgetCost" target="revisedBudgetCost" />
+          <zeebe:input source="=varianceCheck.actualCost" target="actualCost" />
+        </zeebe:ioMapping>
         <zeebe:calledDecision decisionId="Decision_CostVariance" resultVariable="costCheck" />
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_ToCostVariance</bpmn:incoming>
       <bpmn:outgoing>Flow_ToSendAlerts</bpmn:outgoing>
       <bpmn:multiInstanceLoopCharacteristics>
         <bpmn:extensionElements>
-          <zeebe:loopCharacteristics inputCollection="=varianceChecks" inputElement="varianceCheck" outputCollection="costCheckResults" outputElement="=costCheck" />
+          <zeebe:loopCharacteristics inputCollection="=varianceChecks" inputElement="varianceCheck" outputCollection="costCheckResults" outputElement="={cbsCodeRef: varianceCheck.cbsCodeRef, revisedBudgetCost: varianceCheck.revisedBudgetCost, actualCost: varianceCheck.actualCost, costAlert: costCheck.costAlert, costResult: costCheck.costResult}" />
         </bpmn:extensionElements>
       </bpmn:multiInstanceLoopCharacteristics>
     </bpmn:businessRuleTask>
     <bpmn:serviceTask id="ServiceTask_SendVarianceAlerts" name="Send variance alerts">
-      <bpmn:documentation>E2-14, E2-15. Email (Mailpit, 09 S8) and in-system alert per CBS that alerts; man-hour alert to cost-controller, cost alert to project-manager. Idempotent on (period, CBS, alert type, recipient).</bpmn:documentation>
+      <bpmn:documentation>E2-14, E2-15. Email (Mailpit, 09 S8) and in-system alert per CBS that alerts; man-hour alert to cost-controller (email and in-system) and by email to the PCON Manager address (D3), cost alert (BPA-65) to project-manager. BPA-64 sends the man-hour alert from manhourCheckResults. Idempotent on (period, CBS, alert type, recipient, channel): the variance_alert unique index.</bpmn:documentation>
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="send-variance-alerts" retries="3" />
       </bpmn:extensionElements>

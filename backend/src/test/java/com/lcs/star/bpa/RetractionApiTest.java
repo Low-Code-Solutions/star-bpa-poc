@@ -57,6 +57,7 @@ class RetractionApiTest {
     static final String RETRACTION = "UserTask_ApproveRetraction";
     static final String EARNED = "ServiceTask_CalculateEarnedManhours";
     static final String VARIANCE = "ServiceTask_PrepareVarianceCheck";
+    static final String REVIEW = "UserTask_ReviewActualManhours"; // BPA-64: the variance worker now runs, so the instance moves on to the Cost Controller's review
     static final LocalDate W12 = LocalDate.of(2026, 11, 12);
     static final LocalDate W19 = LocalDate.of(2026, 11, 19);
     static final String REASON = "FMS double-counted cutting";
@@ -108,7 +109,7 @@ class RetractionApiTest {
         for (String element : new String[] {"ServiceTask_OpenProgressPeriod", "ServiceTask_GenerateFmsHoursFile", "UserTask_SendHoursToFms",
                 "ServiceTask_RecordFmsHandOff", "UserTask_UploadCompletionReport", "ServiceTask_ReadCompletionReport", APPROVE, "ServiceTask_RecordCompletionApproval",
                 "ServiceTask_PrepareProgressCheck", "BusinessRuleTask_CheckProgressRule", "ServiceTask_RecordProgressResult", RETRACTION,
-                "ServiceTask_RecordRetractionDecision", EARNED, VARIANCE}) {
+                "ServiceTask_RecordRetractionDecision", EARNED, VARIANCE, "BusinessRuleTask_CheckManhourVariance", "BusinessRuleTask_CheckCostVariance", "ServiceTask_SendVarianceAlerts", REVIEW, "ServiceTask_RecordCbsReview", "UserTask_ApproveWeeklyProgress"}) {
             CamundaSteps.cancelInstancesWaitingAt(element);
         }
     }
@@ -148,7 +149,7 @@ class RetractionApiTest {
         poll(() -> ruleResult("WP-000457"), "Accepted"::equals, "rule_result Accepted of WP-000457");
         assertThat(jdbc.queryForObject("SELECT approved_pct FROM bpa.workpack_progress p JOIN bpa.workpack w ON w.id = p.workpack_id WHERE w.workpack_number = 'WP-000457' AND p.progress_period_id = ?",
                 BigDecimal.class, period)).isEqualByComparingTo("25");
-        poll(() -> activeElements(instance).stream().map(e -> e.path("elementId").asText()).toList(), active -> active.contains(VARIANCE), VARIANCE + " of " + instance);
+        poll(() -> activeElements(instance).stream().map(e -> e.path("elementId").asText()).toList(), active -> active.contains(VARIANCE) || active.contains(REVIEW), VARIANCE + " or " + REVIEW + " of " + instance);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.activity_progress WHERE progress_period_id = ? AND activity_ref = 'A-2201'", Integer.class, period))
                 .as("Earned man-hours ran for week ending 19 Nov 2026").isEqualTo(1);
     }

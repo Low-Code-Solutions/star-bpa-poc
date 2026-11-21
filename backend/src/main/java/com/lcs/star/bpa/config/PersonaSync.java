@@ -58,6 +58,8 @@ public class PersonaSync implements SmartInitializingSingleton {
         // Camunda answers the member search with an empty list (probe, Bpa16GroupReadChecksTest), which would look like "nobody to notify".
         permissions.put("GROUP:workpack-owner", Set.of("READ"));
         permissions.put("GROUP:project-engineer", Set.of("READ"));
+        // BPA-64 (ASSUMPTION): read the members of the group that receives the man-hour variance alert (cost-controller), and only that one more. Same reason as above.
+        permissions.put("GROUP:cost-controller", Set.of("READ"));
         SERVICE_PERMISSIONS = Map.copyOf(permissions);
     }
 

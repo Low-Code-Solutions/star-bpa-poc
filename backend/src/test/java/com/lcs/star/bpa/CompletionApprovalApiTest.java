@@ -61,7 +61,7 @@ class CompletionApprovalApiTest {
     static final String APPROVE = "UserTask_ApproveCompletion";
     static final String NEXT = "ServiceTask_PrepareProgressCheck";
     /** Where the instance can rest once the approval is recorded: BPA-61 added workers after this step (BPA-61 edit of this test), so it no longer rests at NEXT. */
-    static final java.util.Set<String> AFTER_RECORD = java.util.Set.of(NEXT, "ServiceTask_CalculateEarnedManhours", "ServiceTask_PrepareVarianceCheck", "UserTask_ApproveRetraction");
+    static final java.util.Set<String> AFTER_RECORD = java.util.Set.of(NEXT, "ServiceTask_CalculateEarnedManhours", "ServiceTask_PrepareVarianceCheck", "UserTask_ReviewActualManhours", "UserTask_ApproveRetraction");
     static final LocalDate W12 = LocalDate.of(2026, 11, 12);
     static final LocalDate W19 = LocalDate.of(2026, 11, 19);
     static final String REMARK_REQUIRED = "A remark is required when the approved % differs from the reported %";
@@ -112,7 +112,7 @@ class CompletionApprovalApiTest {
     private static void cancelWaiting() {
         for (String element : new String[] {"ServiceTask_OpenProgressPeriod", "ServiceTask_GenerateFmsHoursFile", "UserTask_SendHoursToFms",
                 "ServiceTask_RecordFmsHandOff", "UserTask_UploadCompletionReport", "ServiceTask_ReadCompletionReport", APPROVE, "ServiceTask_RecordCompletionApproval",
-                NEXT, "ServiceTask_CalculateEarnedManhours", "ServiceTask_PrepareVarianceCheck"}) {
+                NEXT, "ServiceTask_CalculateEarnedManhours", "ServiceTask_PrepareVarianceCheck", "BusinessRuleTask_CheckManhourVariance", "BusinessRuleTask_CheckCostVariance", "ServiceTask_SendVarianceAlerts", "UserTask_ReviewActualManhours", "ServiceTask_RecordCbsReview", "UserTask_ApproveWeeklyProgress"}) {
             CamundaSteps.cancelInstancesWaitingAt(element);
         }
     }
