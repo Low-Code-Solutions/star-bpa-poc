@@ -1,8 +1,11 @@
 package com.lcs.star.bpa.api;
 
 import com.lcs.star.bpa.api.generated.ProgressPeriodsApi;
+import com.lcs.star.bpa.api.generated.model.EarnedManhoursRow;
+import com.lcs.star.bpa.api.generated.model.EarnedManhoursWeek;
 import com.lcs.star.bpa.api.generated.model.ProgressWeek;
 import com.lcs.star.bpa.api.generated.model.WorkpackProgressRow;
+import com.lcs.star.bpa.progress.EarnedManhoursReadService;
 import com.lcs.star.bpa.progress.ProgressReadService;
 import com.lcs.star.bpa.progress.ProgressReadService.Row;
 import com.lcs.star.bpa.progress.ProgressReadService.Week;
@@ -23,8 +26,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProgressPeriodController implements ProgressPeriodsApi {
 
     private final ProgressReadService service;
+    private final EarnedManhoursReadService earned;
 
-    public ProgressPeriodController(ProgressReadService service) {
+    public ProgressPeriodController(ProgressReadService service, EarnedManhoursReadService earned) {
+        this.earned = earned;
         this.service = service;
     }
 
@@ -34,6 +39,22 @@ public class ProgressPeriodController implements ProgressPeriodsApi {
                 ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Week not found"), null));
         List<WorkpackProgressRow> rows = week.rows().stream().map(ProgressPeriodController::map).toList();
         return ResponseEntity.ok(new ProgressWeek(week.weekEnding(), ProgressWeek.BasisEnum.fromValue(week.basis()), rows));
+    }
+
+    /** BPA-62: each activity's progress % and Earned man-hours for the week (EarnedManhoursReadService); a week with no progress period is 404 "Week not found" (ASSUMPTION text). */
+    @Override
+    public ResponseEntity<EarnedManhoursWeek> getProgressWeekEarnedManhours(LocalDate weekEnding) {
+        EarnedManhoursReadService.Week week = earned.week(weekEnding).orElseThrow(() -> new ErrorResponseException(HttpStatus.NOT_FOUND,
+                ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Week not found"), null));
+        List<EarnedManhoursRow> rows = week.rows().stream().map(row -> {
+            EarnedManhoursRow out = new EarnedManhoursRow(row.activityRef(), row.activityName(), row.actualPct());
+            out.setBudgetedUnits(row.budgetedUnits());
+            out.setEarnedManhours(row.earnedManhours());
+            out.setLastLockedEarnedManhours(row.lastLockedEarnedManhours());
+            out.setWeekIncrease(row.weekIncrease());
+            return out;
+        }).toList();
+        return ResponseEntity.ok(new EarnedManhoursWeek(week.weekEnding(), rows));
     }
 
     private static WorkpackProgressRow map(Row row) {

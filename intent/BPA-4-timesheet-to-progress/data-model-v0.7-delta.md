@@ -164,7 +164,7 @@ Rows of a Locked period never change (FRD-21 §21.9.1): **worker-checked**.
 | `progress_period_id` | uuid | NOT NULL | FK | POC database | |
 | `actual_pct` | numeric(5,2) | NOT NULL | CHECK (actual_pct BETWEEN 0 AND 100); hours-weighted roll-up (E2-D10 **(A)**) | POC database (real: D365 PMS) | |
 | `budgeted_units` | numeric(9,2) | NULL | snapshot of `activity.budgeted_units` used | P6 via D365 PMS | FRD-21 §21.5.2 #22 |
-| `earned_manhours` | numeric(11,2) | NULL | = actual_pct / 100 × budgeted_units, rounded half-up to 2 dp **(A)**; NULL when budgeted_units is NULL (A-2299 case) | POC database (real: D365 PMS) | FRD-21 §21.5.2.1 #3 |
+| `earned_manhours` | numeric(11,2) | NULL | = the unrounded activity % / 100 × budgeted_units, rounded half-up to 2 dp **(A)** (BPA-62, plan Q1: not the stored `actual_pct`, which is rounded); NULL when budgeted_units is NULL (A-2299 case) | POC database (real: D365 PMS) | FRD-21 §21.5.2.1 #3 |
 Never updated once its period is Locked (FRD-21 §21.9.1 "stored weeks are never overwritten").
 
 ## 4. New reference copies (domain A, seeded)

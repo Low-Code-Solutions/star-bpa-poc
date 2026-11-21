@@ -1317,6 +1317,48 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
               example: { status: 404, title: Not Found, detail: Week not found }
+  /api/v1/progress-periods/{weekEnding}/earned-manhours:
+    parameters:
+      - name: weekEnding
+        in: path
+        required: true
+        description: The week's Thursday, as progress_period.week_ending (YYYY-MM-DD)
+        schema:
+          type: string
+          format: date
+    get:
+      tags: [progress-periods]
+      operationId: getProgressWeekEarnedManhours
+      summary: Each activity's progress % and Earned man-hours for the week
+      description: |
+        BPA-62 (E2-13). One row per activity that has a Released, In Progress or Completed Work Pack, as `calculate-earned-manhours` stored it in
+        `activity_progress` for the week ending {weekEnding}: the activity % (hours-weighted roll-up of its Work Packs' latest approved %, 2 decimals),
+        the budgeted units snapshotted on the row, the cumulative Earned man-hours (activity % / 100 x budgeted units, rounded half-up to 2 decimals;
+        absent when the activity has no budgeted units), the Earned man-hours of the latest Locked week before this one, and the week's increase
+        (this week's Earned MH minus that one, 0 when there is none; derived, never stored). A week not calculated yet gives an empty list.
+        Groups ppc-team and cost-controller (delta §7). 404 when the week has no progress period.
+      x-assumption: true
+      x-assumption-note: the shape, the week's increase base (0 when no Locked week) and the 404 text are ASSUMPTIONs of the plan
+      responses:
+        '200':
+          description: The week's activities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EarnedManhoursWeek'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No progress period for this week ending
+          x-assumption: true
+          x-assumption-note: text not stated by any story
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 404, title: Not Found, detail: Week not found }
   /api/v1/fms-hours-exports/{fmsHoursExportId}/file:
     parameters:
       - name: fmsHoursExportId
@@ -2151,6 +2193,43 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/WorkpackProgressRow'
+    EarnedManhoursWeek:
+      type: object
+      description: The activities of a progress week with their progress % and Earned man-hours (BPA-62)
+      required: [weekEnding, activities]
+      properties:
+        weekEnding:
+          type: string
+          format: date
+        activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/EarnedManhoursRow'
+    EarnedManhoursRow:
+      type: object
+      description: One activity of the week. Numbers have 2 decimals; a value that does not exist is absent.
+      required: [activityRef, activityName, actualPct]
+      properties:
+        activityRef:
+          type: string
+          example: A-2201
+        activityName:
+          type: string
+        actualPct:
+          type: number
+          description: activity_progress.actual_pct, the hours-weighted roll-up (E2-D10), half-up to 2 decimals
+        budgetedUnits:
+          type: number
+          description: The activity's budgeted units snapshotted on the week's row; absent when the activity has none (P6 via D365 PMS)
+        earnedManhours:
+          type: number
+          description: Cumulative Earned man-hours = actual % / 100 x budgeted units, half-up to 2 decimals; absent without budgeted units
+        lastLockedEarnedManhours:
+          type: number
+          description: The Earned man-hours of the latest Locked week before this one; absent when the activity has no Locked row
+        weekIncrease:
+          type: number
+          description: This week's Earned man-hours minus the latest Locked week's (0 when none), derived and never stored; absent without Earned man-hours
     WorkpackProgressRow:
       type: object
       description: One Work Pack of the week. Percentages and hours are numbers with 2 decimals; a value that does not exist is absent.
