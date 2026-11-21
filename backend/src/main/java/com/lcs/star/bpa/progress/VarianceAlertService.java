@@ -7,6 +7,7 @@ import com.lcs.star.bpa.persistence.ProgressPeriodRepository.Period;
 import com.lcs.star.bpa.persistence.VarianceAlertRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -91,6 +92,15 @@ public class VarianceAlertService {
                 emailOnce(period, over, pct, pcon, true, pcon, subject, text, username);
             }
         }
+    }
+
+    /** A CBS found over the Revised Budget: its actual cost and revised budget cost (SAR). */
+    public record CostOver(String cbsCodeRef, BigDecimal actualCost, BigDecimal revisedBudgetCost) {
+    }
+
+    /** BPA-65 red stub: the cost alert (weekly with a period, daily with none) is built after its tests are shown red. */
+    public void sendCostAlerts(Period period, LocalDate checkDate, List<CostOver> overs, String username) {
+        throw new UnsupportedOperationException("BPA-65: not built yet");
     }
 
     private void record(Period period, Over over, BigDecimal pct, String recipient, boolean isEmail, String channel, String username) {

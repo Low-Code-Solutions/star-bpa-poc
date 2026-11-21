@@ -78,4 +78,34 @@ class VarianceAlertServiceTest {
         verify(mail).send(sent.capture());
         assertThat(sent.getValue().getTo()).containsExactly("pcon@star.example");
     }
+
+    // --- BPA-65: the cost alert goes to project-manager, never to cost-controller ------------------------------------------------
+
+    private final List<VarianceAlertService.CostOver> costOvers = List.of(new VarianceAlertService.CostOver("CBS-139-PIP-01", new BigDecimal("300000.00"), new BigDecimal("250000.00")));
+
+    @Test
+    void aCostAlertWithNobodyToAlertFailsLoudly() {
+        when(groups.usernames("project-manager")).thenReturn(List.of());
+        when(settings.pconManagerEmail()).thenReturn("");
+
+        assertThatThrownBy(() -> service.sendCostAlerts(period, LocalDate.of(2026, 11, 20), costOvers, "bpa-service")).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No recipient");
+
+        verifyNoInteractions(mail);
+    }
+
+    @Test
+    void aCostAlertAsksTheProjectManagerGroupOnly() {
+        when(groups.usernames("project-manager")).thenReturn(List.of("project-manager"));
+        when(notifications.emails(any())).thenReturn(Map.of("project-manager", "project-manager@example.com"));
+        when(settings.pconManagerEmail()).thenReturn("pcon@star.example");
+
+        service.sendCostAlerts(period, LocalDate.of(2026, 11, 20), costOvers, "bpa-service");
+
+        verify(groups, never()).usernames("cost-controller");
+        ArgumentCaptor<SimpleMailMessage> sent = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mail, org.mockito.Mockito.times(2)).send(sent.capture());
+        assertThat(sent.getAllValues()).extracting(m -> m.getTo()[0]).containsExactlyInAnyOrder("project-manager@example.com", "pcon@star.example");
+        assertThat(sent.getAllValues().get(0).getText()).isEqualTo("Cost on CBS-139-PIP-01 is 20.00% over the Revised Budget (300000.00 of 250000.00 SAR), 20 Nov 2026");
+    }
 }

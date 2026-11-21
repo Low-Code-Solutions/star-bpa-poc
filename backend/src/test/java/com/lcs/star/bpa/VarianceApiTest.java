@@ -370,7 +370,10 @@ class VarianceApiTest {
 
         assertThat(myAlerts("cost-controller")).hasSize(1);
         assertThat(myAlerts("project-manager")).as("the alert is the Cost Controller's").isEmpty();
-        assertThat(flow.loggedInAs("supervisor").get("/api/v1/me/variance-alerts").statusCode()).isEqualTo(403);
+        // BPA-65: any logged-in persona may ask and gets only its own alerts, so a supervisor gets an empty list (was 403 in BPA-64)
+        HttpResponse<String> supervisor = flow.loggedInAs("supervisor").get("/api/v1/me/variance-alerts");
+        assertThat(supervisor.statusCode()).isEqualTo(200);
+        assertThat(json(supervisor.body())).isEmpty();
     }
 
     @Test

@@ -136,6 +136,8 @@ class PersonaSyncTest {
                 "GROUP:workpack-owner", Set.of("READ"),
                 "GROUP:project-engineer", Set.of("READ")));
         expected.put("GROUP:cost-controller", Set.of("READ")); // BPA-64: reads the members of the group that receives the man-hour variance alert
+        expected.put("GROUP:project-manager", Set.of("READ")); // BPA-65: reads the members of the group that receives the cost variance alert
+        expected.put("DECISION_DEFINITION:Decision_CostVariance", Set.of("CREATE_DECISION_INSTANCE")); // BPA-65 (ASSUMPTION): evaluated by the daily close cost check
         return expected;
     }
 

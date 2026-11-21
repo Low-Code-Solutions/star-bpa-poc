@@ -1564,8 +1564,8 @@ paths:
       operationId: listMyVarianceAlerts
       summary: The logged-in user's in-system variance alerts
       description: |
-        BPA-64 (E2-14, E2-15). The man-hour alerts sent in the system to the session user only, newest first; no parameter selects another user. The
-        message is the alert text (D3). Groups cost-controller and project-manager (delta §7).
+        BPA-64 (E2-14), BPA-65 (E2-15). The in-system man-hour and cost alerts sent to the session user only, newest first; no parameter selects another user. The
+        message is the alert text (D3). Any logged-in persona may call it and gets only its own alerts, so a persona with none gets an empty list (BPA-65).
       x-assumption: true
       x-assumption-note: the shape and the list order are ASSUMPTIONs of the plan
       responses:
@@ -1579,8 +1579,6 @@ paths:
                   $ref: '#/components/schemas/VarianceAlert'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
 components:
   securitySchemes:
     sessionCookie:
@@ -2305,14 +2303,35 @@ components:
         remark:
           type: string
           description: The Cost Controller's remark for the CBS and week, if the review was recorded
+        actualCost:
+          type: number
+          description: Cumulative actual cost in SAR up to the check month (cbs_actual_cost, seeded copy, SOR D365 F&O Finance); absent when the CBS has none (BPA-65)
+        revisedBudgetCost:
+          type: number
+          description: cbs_forecast.revised_budget_cost in SAR (seeded copy, SOR D365 F&O Cost Control Report); absent when the CBS has none (BPA-65)
+        costVariancePct:
+          type: number
+          description: (actual cost - revised budget) / revised budget x 100, half-up to 2 decimals; absent without a revised budget (BPA-65)
+        costResult:
+          type: string
+          enum: [NO_BUDGET, OVER_10_PCT, WITHIN]
+          description: The result of Decision_CostVariance for the CBS (BPA-65)
+        costAlert:
+          type: boolean
+          description: True when a Cost alert was raised for the CBS and linked to this period (BPA-65)
     VarianceAlert:
       type: object
       description: An in-system variance alert of the session user (variance_alert, channel InSystem; data model §13.5)
-      required: [weekEnding, cbsCodeRef, alertType, message, sentAt]
+      required: [cbsCodeRef, alertType, message, alertDate, sentAt]
       properties:
         weekEnding:
           type: string
           format: date
+          description: The progress week the alert belongs to; absent for a daily close cost alert that no weekly check linked (BPA-65)
+        alertDate:
+          type: string
+          format: date
+          description: The business date (Asia/Riyadh) the alert was sent for; a Cost alert is once per CBS, recipient, channel and day (BPA-65)
         cbsCodeRef:
           type: string
           example: CBS-139-PIP-01

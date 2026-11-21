@@ -35,7 +35,10 @@ public class VarianceAlertController implements VarianceAlertsApi {
 
     private static VarianceAlert map(Mine alert) {
         String message = VarianceMessages.manhour(alert.cbsCodeRef(), alert.variancePct(), alert.actualValue(), alert.baselineValue(), alert.weekEnding());
-        return new VarianceAlert(alert.weekEnding(), alert.cbsCodeRef(), VarianceAlert.AlertTypeEnum.fromValue(alert.alertType()), message,
-                OffsetDateTime.ofInstant(alert.sentAt(), ZoneOffset.UTC));
+        // BPA-65 red stub: the alert date is taken from sentAt until V6 stores alert_date; weekEnding stays what it was
+        VarianceAlert out = new VarianceAlert(java.time.LocalDate.ofInstant(alert.sentAt(), java.time.ZoneId.of("Asia/Riyadh")), alert.cbsCodeRef(),
+                VarianceAlert.AlertTypeEnum.fromValue(alert.alertType()), message, OffsetDateTime.ofInstant(alert.sentAt(), ZoneOffset.UTC));
+        out.setWeekEnding(alert.weekEnding());
+        return out;
     }
 }
