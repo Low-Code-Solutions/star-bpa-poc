@@ -13,7 +13,7 @@ const two = (value?: number) => (value === undefined ? '' : value.toFixed(2));
  * actual man-hours (approved hours, POC), the Current Forecast, the ETC (forecast minus actual; a negative ETC is highlighted and raises no extra alert), the variance %,
  * the result of the check and whether an alert was raised, and a remark per CBS, required where an alert was raised (FRD-22 §22.5.6.5). The lines with no CBS (D40) are
  * shown as one "No CBS" row with their hours and no remark. Complete task sends cbsReviews, one entry for every CBS row (bpa.tasks write allow-list). The checks use the
- * backend's texts, which it checks again. The cost columns are BPA-65's.
+ * backend's texts, which it checks again. BPA-65: the read-only cost columns (cost, Revised Budget, cost variance %, cost result, all SAR) sit after the man-hour result and a cost alert needs a remark too.
  */
 export function ReviewActualManhours({ api, taskKey, onDone }: TaskScreenProps) {
   const [weekEnding, setWeekEnding] = useState('');
@@ -56,6 +56,10 @@ export function ReviewActualManhours({ api, taskKey, onDone }: TaskScreenProps) 
             <th scope="col">ETC</th>
             <th scope="col">Variance %</th>
             <th scope="col">Result</th>
+            <th scope="col">Cost SAR</th>
+            <th scope="col">Revised Budget SAR</th>
+            <th scope="col">Cost variance %</th>
+            <th scope="col">Cost result</th>
             <th scope="col">Alert</th>
             <th scope="col">Remark</th>
           </tr>
@@ -69,13 +73,17 @@ export function ReviewActualManhours({ api, taskKey, onDone }: TaskScreenProps) 
               <td className={row.etc !== undefined && row.etc < 0 ? 'sign-table__cell--negative' : undefined}>{two(row.etc)}</td>
               <td>{two(row.variancePct)}</td>
               <td>{row.result}</td>
-              <td>{row.alert ? 'Alert raised' : ''}</td>
+              <td>{two(row.actualCost)}</td>
+              <td>{two(row.revisedBudgetCost)}</td>
+              <td>{two(row.costVariancePct)}</td>
+              <td>{row.costResult}</td>
+              <td>{row.alert || row.costAlert ? 'Alert raised' : ''}</td>
               <td>
                 <input
                   type="text"
                   aria-label={`Remark for ${row.cbsCodeRef}`}
                   value={remarkOf(row.cbsCodeRef, row.remark)}
-                  placeholder={row.alert ? 'Required' : ''}
+                  placeholder={row.alert || row.costAlert ? 'Required' : ''}
                   onChange={(e) => setRemarks((all) => ({ ...all, [row.cbsCodeRef]: e.target.value }))}
                 />
               </td>
@@ -85,6 +93,10 @@ export function ReviewActualManhours({ api, taskKey, onDone }: TaskScreenProps) 
             <tr>
               <td>No CBS</td>
               <td>{two(week.data.noCbsManhours)}</td>
+              <td />
+              <td />
+              <td />
+              <td />
               <td />
               <td />
               <td />
