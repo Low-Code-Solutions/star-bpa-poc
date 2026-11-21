@@ -1,7 +1,7 @@
 # Plan: BPA-64 Cost Controller can review actual man-hours by CBS and is alerted above 15% over forecast
 Jira: BPA-64 (Story, epic BPA-4)
-Story last updated: 2026-11-17T11:45:51.610+0400
-Status: Approved (Ahsan, 21 Nov 2026)
+Story last updated: 2026-11-21T18:57:07.719+0400
+Status: Closed (21 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-64-cbs-manhour-review, from main f920187
 
@@ -330,3 +330,19 @@ Images rebuilt from this branch (`docker build` of `bpa-app` and the portal, `do
 - **Models:** the deployed `Process_PPC_WeeklyProgressPeriod` and `Decision_ManhourVariance` equal the repo files (same whitespace-normalised hash).
 - **Not run by hand:** the month lock and snapshot (the daily job runs at 00:10; covered by `MonthSnapshotTest`), a retry of the send step (covered by `BPA64_alertSentOncePerPeriod`), and the browser screens (covered by the React tests; not opened in a browser).
 - **Side effects on the local stack:** two Approved `digital_timesheet_line` rows (remarks "BPA-64 proof", dated 5 Oct 2026) and the 19 Nov week's alert and review rows remain; the instance waits at `UserTask_ApproveWeeklyProgress`.
+
+## After the `qa-reviewer` pass (21 Nov 2026; REVIEW.md "BPA-64 at 3496c77")
+- **Fixed after the review:**
+  - An over-forecast CBS with nobody to alert (no `cost-controller` member with an `app_user` row and no PCON address) now fails the send job with no retries ("No recipient for the man-hour alert…") instead of completing with no alert row. `VarianceAlertServiceTest` (2 tests, mocks) red first, then green. The same test pins that a controller with no `app_user` row is skipped (the recipient is a foreign key) and the PCON email still goes.
+  - `Flow_ToApproveWeek_di` no longer overlaps `Flow_ToIsWeekApproved_di`; the React extras lost the `BPA64_` prefix. After these, `VarianceApiTest` 19/19, `MonthSnapshotTest` 3/3, `ModelDeployTest`, `ModelResourcesTest`, `npm test` 134/134, lint and format green.
+- **Jira re-read (21 Nov 2026):** the only change since the "Story last updated" time is the status Ready → In Progress by Ahsan on 21 Nov 18:57; the description and acceptance criteria are unchanged since 10 Nov.
+- **Files in the diff that the plan did not list:** `progress/VarianceMath.java`, `progress/VarianceMessages.java`, `config/AlertSettings.java`, `config/SchedulingConfig.java`, `progress/MonthLockJob.java`, `persistence/CbsActualsRepository.java`, `frontend/src/types/api.ts`, `VarianceAlertServiceTest.java`. `MyVarianceAlerts` has no hook (the query is in the component).
+- **Accepted for the POC (recorded, not built):**
+  - `MonthLockJob` hardcodes `zone = "Asia/Riyadh"` in its annotation;
+  - `variance_pct numeric(7,2)` overflows for a tiny forecast (for example 0.01 MH);
+  - the column comment of `variance_alert.recipient_email` is a setting, not a named system (V5 has run on the local database);
+  - an empty or missing `cbsReviews` list is refused with "Reviews are required", so a week with no CBS rows could never complete the review (not reachable with the seed data);
+  - the waits of three earlier tests are weaker (`VARIANCE || REVIEW`).
+- **ASSUMPTIONs to comment in Jira (shown to Ahsan first; posted only on his yes):**
+  - texts: "Reviews are required", "Remark can be at most 500 characters", "CBS is not part of this review", "Week not found", "No recipient for the man-hour alert…" (a job failure, not a user text), and the email subject "Man-hour alert: <CBS>, week ending <d MMM yyyy>";
+  - rules: the new `ServiceTask_RecordCbsReview` (`record-cbs-review`) between the review and `UserTask_ApproveWeeklyProgress` (BPMN Reference), the V5 migration, `bpa-service` GROUP READ on `cost-controller`, every CBS with approved hours or a forecast is a row (Q3), the read API's result copied in Java (Q10), the month lock job at 00:10 Asia/Riyadh locking only the previous month, the December figure in scenario 13 read as the December snapshot, and the 1150.01 row of the Outline covered by an extra test.
