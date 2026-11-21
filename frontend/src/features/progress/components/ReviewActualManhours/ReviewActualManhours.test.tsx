@@ -27,9 +27,9 @@ const WEEK = {
 };
 
 type Call = { method: string; path: string; body: unknown };
-type Options = { completeStatus?: number; completeDetail?: string };
+type Options = { completeStatus?: number; completeDetail?: string; week?: unknown };
 
-function fakeBackend({ completeStatus = 204, completeDetail = '' }: Options = {}) {
+function fakeBackend({ completeStatus = 204, completeDetail = '', week = WEEK }: Options = {}) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -55,7 +55,7 @@ function fakeBackend({ completeStatus = 204, completeDetail = '' }: Options = {}
       });
     }
     if (path === '/api/v1/progress-periods/2026-11-19/cbs-actuals') {
-      return json(200, WEEK);
+      return json(200, week);
     }
     if (path === `/api/v1/tasks/${TASK}/complete`) {
       return completeStatus === 204 ? new Response(null, { status: 204 }) : json(completeStatus, { detail: completeDetail });
@@ -123,6 +123,46 @@ describe('ReviewActualManhours', () => {
       },
     });
     expect(screen.queryByLabelText('Remark for No CBS')).not.toBeInTheDocument();
+  });
+
+  // BPA-65: the Cost Controller's review also lists each CBS's cost variance, read-only (agreed 10 Nov 2026), and the remark rule covers a cost alert too. This CBS is
+  // within the man-hour forecast (5%), so only the cost alert raises the remark requirement.
+  it('BPA65_costVarianceOnCostControllerReview', async () => {
+    const week = {
+      weekEnding: '2026-11-19',
+      noCbsManhours: 0,
+      cbs: [
+        {
+          cbsCodeRef: 'CBS-139-PIP-01',
+          actualManhours: 1050,
+          currentForecastManhours: 1000,
+          etc: -50,
+          variancePct: 5,
+          result: 'WITHIN',
+          alert: false,
+          actualCost: 300000,
+          revisedBudgetCost: 250000,
+          costVariancePct: 20,
+          costResult: 'OVER_10_PCT',
+          costAlert: true,
+        },
+      ],
+    };
+    const { user, calls, onDone } = await renderScreen({ week });
+
+    const row = rowOf('CBS-139-PIP-01');
+    expect(within(row).getByText('300000.00')).toBeInTheDocument();
+    expect(within(row).getByText('250000.00')).toBeInTheDocument();
+    expect(within(row).getByText('20.00')).toBeInTheDocument();
+    expect(within(row).getByText('OVER_10_PCT')).toBeInTheDocument();
+    expect(within(row).getAllByRole('textbox')).toHaveLength(1); // the cost cells are read-only: only the remark can be typed
+    expect(screen.getByLabelText('Remark for CBS-139-PIP-01')).toHaveAttribute('placeholder', 'Required');
+
+    await user.click(screen.getByRole('button', { name: 'Complete task' }));
+
+    expect(await screen.findByText('A remark is required for CBS-139-PIP-01 (alert raised)')).toBeInTheDocument();
+    expect(calls.some((c) => c.path.endsWith('/complete'))).toBe(false);
+    expect(onDone).not.toHaveBeenCalled();
   });
 
   it('theServersRefusalIsShown', async () => {

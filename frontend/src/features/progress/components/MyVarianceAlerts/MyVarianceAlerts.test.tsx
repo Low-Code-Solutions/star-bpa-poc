@@ -51,6 +51,22 @@ describe('MyVarianceAlerts', () => {
     expect(texts[1]).toContain('19 Nov 2026');
   });
 
+  // BPA-65: a daily close cost alert belongs to no week (weekEnding is absent) and carries its alert date; it is listed with its text like the others.
+  it('aDailyCostAlertWithNoWeekIsListed', async () => {
+    const daily = {
+      alertDate: '2026-11-28',
+      cbsCodeRef: 'CBS-139-PIP-01',
+      alertType: 'Cost',
+      message: 'Cost on CBS-139-PIP-01 is 20.00% over the Revised Budget (300000.00 of 250000.00 SAR), 28 Nov 2026',
+      sentAt: '2026-11-28T03:00:00Z',
+    };
+    stub(200, [daily, ...ALERTS]);
+    render(<MyVarianceAlerts api={apiClient()} groups={['project-manager']} />);
+
+    expect(await screen.findByText(daily.message)).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
+
   it('showsAnEmptyListAndAFailure', async () => {
     stub(200, []);
     render(<MyVarianceAlerts api={apiClient()} groups={['project-manager']} />);
