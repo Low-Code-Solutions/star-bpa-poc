@@ -2277,6 +2277,9 @@ components:
         retractionDeclinedReason:
           type: string
           description: BPA-63. The Project Manager's reason when the latest request for the Work Pack's current approvedPct was declined ("Retraction declined, reason"); absent once PPC changes the %
+        retractionApproved:
+          type: boolean
+          description: BPA-63. True when an Approved retraction of this Work Pack is for exactly the stored approvedPct, so a % kept at it needs no new reason (the screen's check; the server decides)
     CompletionReportResult:
       type: object
       description: completion_report and its completion_report_row rows (data model §13.3.3)

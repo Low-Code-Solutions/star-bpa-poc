@@ -65,6 +65,10 @@ public class ProgressPeriodController implements ProgressPeriodsApi {
         out.setFmsActualHours(row.fmsActualHours());
         out.setHoursDifference(row.hoursDifference());
         out.setRemark(row.remark());
+        out.setRetractionReason(row.retractionReason());
+        out.setRetractionRequestedBy(row.retractionRequestedBy());
+        out.setRetractionDeclinedReason(row.retractionDeclinedReason());
+        out.setRetractionApproved(row.retractionApproved());
         return out;
     }
 }

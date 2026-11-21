@@ -42,6 +42,37 @@ public final class TaskValidity {
     static final String UPLOAD_COMPLETION_REPORT = "UserTask_UploadCompletionReport";
     static final String REPORT_REQUIRED = "Completion report is required";
 
+    /** BPA-63: the Project Manager's decision on each waiting retraction. "Reason is required" and the limit of 250 (D8) are the story's; the other texts are ASSUMPTIONs. */
+    static final String APPROVE_RETRACTION = "UserTask_ApproveRetraction";
+    static final String DECISIONS_REQUIRED = "Decisions are required";
+
+    private static Optional<String> checkRetractionDecisions(Map<String, Object> submitted) {
+        if (!(submitted.get("retractionDecisions") instanceof java.util.List<?> list) || list.isEmpty()) {
+            return Optional.of(DECISIONS_REQUIRED);
+        }
+        for (Object entry : list) {
+            Object decision = entry instanceof Map<?, ?> map ? map.get("retractionDecision") : null;
+            if (decision == null || (decision instanceof String text && text.isBlank())) {
+                return Optional.of(DECISION_REQUIRED);
+            }
+            if (!"Approved".equals(decision) && !"Declined".equals(decision)) {
+                return Optional.of(DECISION_UNKNOWN);
+            }
+        }
+        for (Object entry : list) {
+            Map<?, ?> map = (Map<?, ?>) entry;
+            if ("Declined".equals(map.get("retractionDecision"))) {
+                if (!(map.get("reason") instanceof String reason && !reason.isBlank())) {
+                    return Optional.of(REASON_REQUIRED);
+                }
+                if (reason.trim().length() > REASON_MAX) {
+                    return Optional.of(REASON_TOO_LONG);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     private TaskValidity() {
     }
 
@@ -58,6 +89,9 @@ public final class TaskValidity {
         }
         if (SEND_HOURS_TO_FMS.equals(elementId)) {
             return checkFmsHandOffs(submitted);
+        }
+        if (APPROVE_RETRACTION.equals(elementId)) {
+            return checkRetractionDecisions(submitted);
         }
         if (VALIDATE_HOURS.equals(elementId)) {
             return checkHoursDecision(submitted);

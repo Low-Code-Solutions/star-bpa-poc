@@ -25,7 +25,7 @@ class TaskConfig {
 
     @Bean
     TaskService taskService(CamundaTaskClient camunda, TaskAllowList allowList, HoursSegregationCheck segregation, FmsHandOffCheck fmsHandOff,
-            CompletionReportCheck completionReport, CompletionApprovalCheck completionApproval) {
-        return new TaskService(camunda, allowList, segregation, fmsHandOff, completionReport, completionApproval);
+            CompletionReportCheck completionReport, CompletionApprovalCheck completionApproval, RetractionDecisionCheck retractionDecision) {
+        return new TaskService(camunda, allowList, segregation, fmsHandOff, completionReport, completionApproval, retractionDecision);
     }
 }

@@ -154,7 +154,7 @@ SOR: the **values** are FMS's (completion report, FRD-21 §21.5.4, FRD-22 §22.6
 Rows of a Locked period never change (FRD-21 §21.9.1): **worker-checked**.
 
 ### 3.5 `progress_retraction`
-`id`; `workpack_progress_id` uuid NOT NULL FK; `requested_by` text NOT NULL (Camunda identity); `reason` text NOT NULL CHECK (btrim(reason) <> ''); `decision` text NULL CHECK IN (`Approved`, `Declined`); `decision_reason` text NULL (required when Declined **(A)**); `decided_by` text NULL; `decided_at` timestamptz NULL; `task_key` bigint NULL UNIQUE. SOR: POC database (FRD-21 §21.7 "documented justification and full audit trail").
+`id`; `workpack_progress_id` uuid NOT NULL FK; `requested_by` text NOT NULL (Camunda identity); `reason` text NOT NULL CHECK (btrim(reason) <> ''); `decision` text NULL CHECK IN (`Approved`, `Declined`); `decision_reason` text NULL (required when Declined **(A)**); `decided_by` text NULL; `decided_at` timestamptz NULL; `task_key` bigint NULL UNIQUE. SOR: POC database (FRD-21 §21.7 "documented justification and full audit trail"). **BPA-63 (V4): `task_key` is UNIQUE together with `workpack_progress_id`, because one retraction task decides several Work Packs; see data-model.md §13.3.5.**
 
 ### 3.6 `activity_progress`
 | Column | Type | Null | Constraint | SOR | Source |

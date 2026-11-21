@@ -334,6 +334,7 @@ class ProgressRuleApiTest {
             if (changes.containsKey(workpack)) {
                 approval.put("approvedPct", new BigDecimal(changes.get(workpack)));
                 approval.put("remark", "Changed by PPC");
+                approval.put("retractionReason", "FMS double-counted cutting"); // BPA-63: a decrease needs one; ignored when the change is not a decrease
             } else {
                 approval.put("approvedPct", row.path("approvedPct").decimalValue());
             }

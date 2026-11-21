@@ -9,6 +9,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.lcs.star.bpa.CamundaRest.Reply;
+import com.lcs.star.bpa.progress.CompletionApprovalService;
+import com.lcs.star.bpa.progress.RetractionDecisionService;
 import java.math.BigDecimal;
 import java.net.http.HttpResponse;
 import java.time.Instant;
@@ -80,6 +82,15 @@ class RetractionApiTest {
 
     @Autowired
     AssignmentFileApiTest.TestClock clock;
+
+    @Autowired
+    com.lcs.star.bpa.persistence.ProgressPeriodRepository periods;
+
+    @Autowired
+    RetractionDecisionService decisions;
+
+    @Autowired
+    CompletionApprovalService approvals;
 
     private AssignmentFlow flow;
     private long instance;
@@ -293,6 +304,49 @@ class RetractionApiTest {
         assertThat(json(refused.body()).path("detail").asText()).isEqualTo("Decisions must cover every Work Pack waiting for a retraction");
     }
 
+    // --- extras written after the code, at service level (no red run: plan, "Progress and departures") -------------------------------
+
+    @Test
+    void aRerunRecordsNothingTwice() {
+        toTheRetractionTask(Map.of("WP-000457", "25"), Map.of("WP-000457", REASON));
+        assertThat(decide(RETRACTION_TASK(), "project-manager", List.of(decision("WP-000457", "Approved", null))).statusCode()).isEqualTo(204);
+        long taskKey = ((Number) poll(() -> retractionRows("WP-000457").get(0).get("task_key"), key -> key != null, "the task key of the decided retraction")).longValue();
+        int auditBefore = jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'progress_retraction'", Integer.class);
+
+        String again = decisions.decide(periods.find(period).orElseThrow(), List.of(new RetractionDecisionService.Decision("WP-000457", "Approved", null)), "project-manager", taskKey);
+
+        assertThat(again).isEqualTo("Approved");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'progress_retraction'", Integer.class)).as("a retried job audits nothing again").isEqualTo(auditBefore);
+        assertThat(retractionRows("WP-000457")).hasSize(1);
+    }
+
+    @Test
+    void segregationAlsoFailsTheRecordStep() {
+        toTheRetractionTask(Map.of("WP-000457", "25"), Map.of("WP-000457", REASON));
+        jdbc.update("UPDATE bpa.progress_retraction SET requested_by = 'project-manager' WHERE decision IS NULL");
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> decisions.decide(periods.find(period).orElseThrow(),
+                List.of(new RetractionDecisionService.Decision("WP-000457", "Approved", null)), "project-manager", 99L))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("You cannot approve a retraction you requested");
+        assertThat(retractionRows("WP-000457").get(0).get("decision")).as("nothing was written").isNull();
+    }
+
+    @Test
+    void anOpenRequestFollowsTheReApprovalAndGoesWhenNotNeeded() {
+        toTheRetractionTask(Map.of("WP-000457", "25"), Map.of("WP-000457", REASON));
+        var week = periods.find(period).orElseThrow();
+
+        approvals.record(week, List.of(new CompletionApprovalService.Approval("WP-000457", new BigDecimal("20"), "Changed by PPC", "Recount")), "ppc-team");
+
+        assertThat(retractionRows("WP-000457")).as("the one open request is updated, not duplicated").hasSize(1);
+        assertThat((BigDecimal) retractionRows("WP-000457").get(0).get("approved_pct")).isEqualByComparingTo("20");
+        assertThat(retractionRows("WP-000457").get(0).get("reason")).isEqualTo("Recount");
+
+        approvals.record(week, List.of(new CompletionApprovalService.Approval("WP-000457", new BigDecimal("30"), "Changed by PPC", null)), "ppc-team");
+
+        assertThat(retractionRows("WP-000457")).as("at last week's % no retraction is needed").isEmpty();
+    }
+
     // --- helpers ----------------------------------------------------------------------------------------------------------------
 
     /** PPC approves the week (changes with their retraction reasons) and the instance waits at the retraction task. */
@@ -365,7 +419,8 @@ class RetractionApiTest {
             approval.put("workpackNumber", workpack);
             if (changes.containsKey(workpack)) {
                 approval.put("approvedPct", new BigDecimal(changes.get(workpack)));
-                if (new BigDecimal(changes.get(workpack)).compareTo(row.path("approvedPct").decimalValue()) != 0) {
+                BigDecimal reference = row.path("noReportRow").asBoolean() || !row.hasNonNull("reportedPct") ? row.path("lastLockedPct").decimalValue() : row.path("reportedPct").decimalValue();
+                if (new BigDecimal(changes.get(workpack)).compareTo(reference) != 0) { // the remark rule of BPA-60 compares with the reported % (or the last locked %)
                     approval.put("remark", "Changed by PPC");
                 }
             } else {

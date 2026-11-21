@@ -3,6 +3,8 @@ package com.lcs.star.bpa.progress;
 import com.lcs.star.bpa.config.ProgressSettings;
 import com.lcs.star.bpa.persistence.ProgressPeriodRepository;
 import com.lcs.star.bpa.persistence.ProgressPeriodRepository.Period;
+import com.lcs.star.bpa.persistence.ProgressRetractionRepository;
+import com.lcs.star.bpa.persistence.ProgressRetractionRepository.Request;
 import com.lcs.star.bpa.persistence.ProgressWeekRepository;
 import com.lcs.star.bpa.persistence.ProgressWeekRepository.Raw;
 import java.math.BigDecimal;
@@ -34,7 +36,7 @@ public class ProgressReadService {
     /** One row of the week. */
     public record Row(String workpackNumber, UUID workpackId, boolean noReportRow, BigDecimal reportedPct, BigDecimal lastLockedPct, BigDecimal hoursBasedPct,
             BigDecimal reportedByProductionPct, BigDecimal fmsActualHours, BigDecimal approvedHours, BigDecimal hoursDifference, BigDecimal approvedPct,
-            BigDecimal referencePct, String remark) {
+            BigDecimal referencePct, String remark, String retractionReason, String retractionRequestedBy, String retractionDeclinedReason, boolean retractionApproved) {
     }
 
     /** The week: its period, the basis in force and the rows. */
@@ -44,11 +46,13 @@ public class ProgressReadService {
     private final ProgressPeriodRepository periods;
     private final ProgressWeekRepository weeks;
     private final ProgressSettings settings;
+    private final ProgressRetractionRepository retractions;
 
-    public ProgressReadService(ProgressPeriodRepository periods, ProgressWeekRepository weeks, ProgressSettings settings) {
+    public ProgressReadService(ProgressPeriodRepository periods, ProgressWeekRepository weeks, ProgressSettings settings, ProgressRetractionRepository retractions) {
         this.periods = periods;
         this.weeks = weeks;
         this.settings = settings;
+        this.retractions = retractions;
     }
 
     /** The week ending's rows, or empty when the week has no progress period. */
@@ -58,11 +62,12 @@ public class ProgressReadService {
 
     public Week week(Period period) {
         String basis = settings.basis();
-        List<Row> rows = weeks.workpacks(period.id(), period.weekEnding()).stream().map(raw -> row(raw, basis)).toList();
+        List<Request> requests = retractions.ofPeriod(period.id());
+        List<Row> rows = weeks.workpacks(period.id(), period.weekEnding()).stream().map(raw -> row(raw, basis, requests)).toList();
         return new Week(period.id(), period.weekEnding(), basis, rows);
     }
 
-    private static Row row(Raw raw, String basis) {
+    private static Row row(Raw raw, String basis, List<Request> requests) {
         boolean noReportRow = raw.reportedPct() == null;
         BigDecimal reported = scale(raw.reportedPct());
         BigDecimal lastLocked = scale(raw.lastLockedPct());
@@ -82,8 +87,15 @@ public class ProgressReadService {
         } else {
             prefilled = reported;
         }
+        List<Request> mine = requests.stream().filter(r -> r.workpackId().equals(raw.workpackId())).toList();
+        Request open = mine.stream().filter(Request::open).findFirst().orElse(null);
+        boolean approvedHere = mine.stream().anyMatch(r -> "Approved".equals(r.decision()) && r.approvedPct().compareTo(prefilled) == 0);
+        // BPA-63 (plan Q5): the latest Project Manager decline for the % now approved; it goes once PPC changes the % or a new request is open
+        Request declined = open != null ? null
+                : mine.stream().filter(r -> "Declined".equals(r.decision()) && r.approvedPct().compareTo(prefilled) == 0).reduce((first, last) -> last).orElse(null);
         return new Row(raw.workpackNumber(), raw.workpackId(), noReportRow, reported, lastLocked, hoursBased, scale(raw.reportedByProduction()), fms, approvedHours,
-                difference, prefilled, reference, raw.storedRemark());
+                difference, prefilled, reference, raw.storedRemark(), open == null ? null : open.reason(), open == null ? null : open.requestedBy(),
+                declined == null ? null : declined.decisionReason(), approvedHere);
     }
 
     private static BigDecimal scale(BigDecimal value) {
