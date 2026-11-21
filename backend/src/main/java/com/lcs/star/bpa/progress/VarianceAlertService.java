@@ -68,17 +68,21 @@ public class VarianceAlertService {
         }
         Map<String, String> emails = notifications.emails(controllers);
         String pcon = settings.pconManagerEmail();
+        // QA review of BPA-64: the alert row names a user (a foreign key to app_user), so a controller with no app_user row cannot be alerted; and a CBS that is over the
+        // forecast with nobody to tell must not complete silently: "alert raised" (and the remark rule) comes from the recorded rows, so this fails the job loudly
+        List<String> reachable = controllers.stream().filter(emails::containsKey).toList();
+        controllers.stream().filter(c -> !emails.containsKey(c)).forEach(c -> LOG.warn("{} has no app_user row, so cannot be alerted: skipped", c));
+        if (reachable.isEmpty() && pcon.isBlank()) {
+            throw new IllegalStateException("No recipient for the man-hour alert: group " + COST_CONTROLLER
+                    + " has no member with an app_user row and no PCON Manager address is configured (bpa.alerts.pcon-manager-email)");
+        }
         for (Over over : overs) {
             BigDecimal pct = VarianceMath.variancePct(over.actualManhours(), over.currentForecastManhours());
             String text = VarianceMessages.manhour(over.cbsCodeRef(), pct, over.actualManhours(), over.currentForecastManhours(), period.weekEnding());
             String subject = VarianceMessages.subject(over.cbsCodeRef(), period.weekEnding());
-            for (String controller : controllers) {
+            for (String controller : reachable) {
                 record(period, over, pct, controller, false, VarianceAlertRepository.IN_SYSTEM, username);
                 String email = emails.get(controller);
-                if (email == null) {
-                    LOG.warn("{} has no app_user row, so no email address: only the in-system alert for {}", controller, over.cbsCodeRef());
-                    continue;
-                }
                 emailOnce(period, over, pct, controller, false, email, subject, text, username);
             }
             if (pcon.isBlank()) {

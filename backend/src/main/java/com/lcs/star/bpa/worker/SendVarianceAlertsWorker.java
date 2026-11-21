@@ -54,7 +54,13 @@ public class SendVarianceAlertsWorker {
             client.newFailCommand(job.getKey()).retries(0).errorMessage(e.getMessage()).send().join();
             return;
         }
-        service.sendManhourAlerts(period.get(), overs, OpenProgressPeriodWorker.SERVICE_USER);
+        try {
+            service.sendManhourAlerts(period.get(), overs, OpenProgressPeriodWorker.SERVICE_USER);
+        } catch (IllegalStateException e) {
+            LOG.warn("send-variance-alerts job {}: {}", job.getKey(), e.getMessage());
+            client.newFailCommand(job.getKey()).retries(0).errorMessage(e.getMessage()).send().join();
+            return;
+        }
         LOG.info("send-variance-alerts job {}: {} CBS over the forecast for week ending {}", job.getKey(), overs.size(), period.get().weekEnding());
         client.newCompleteCommand(job.getKey()).send().join();
     }

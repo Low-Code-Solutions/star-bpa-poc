@@ -125,7 +125,7 @@ describe('ReviewActualManhours', () => {
     expect(screen.queryByLabelText('Remark for No CBS')).not.toBeInTheDocument();
   });
 
-  it('BPA64_theServersRefusalIsShown', async () => {
+  it('theServersRefusalIsShown', async () => {
     const detail = 'Remark can be at most 500 characters';
     const { user, onDone } = await renderScreen({ completeStatus: 400, completeDetail: detail });
 

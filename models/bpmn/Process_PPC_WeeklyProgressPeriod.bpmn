@@ -668,10 +668,8 @@
         <di:waypoint x="4285" y="760" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ToApproveWeek_di" bpmnElement="Flow_ToApproveWeek">
-        <di:waypoint x="4385" y="760" />
-        <di:waypoint x="4435" y="760" />
-        <di:waypoint x="4435" y="360" />
-        <di:waypoint x="4410" y="360" />
+        <di:waypoint x="4335" y="720" />
+        <di:waypoint x="4335" y="400" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ToIsWeekApproved_di" bpmnElement="Flow_ToIsWeekApproved">
         <di:waypoint x="4410" y="360" />

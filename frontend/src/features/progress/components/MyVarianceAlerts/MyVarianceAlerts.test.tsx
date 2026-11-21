@@ -40,7 +40,7 @@ describe('MyVarianceAlerts', () => {
     vi.unstubAllGlobals();
   });
 
-  it('BPA64_theCostControllerSeesTheirAlerts', async () => {
+  it('theCostControllerSeesTheirAlerts', async () => {
     stub(200, ALERTS);
     render(<MyVarianceAlerts api={apiClient()} groups={['cost-controller']} />);
 
