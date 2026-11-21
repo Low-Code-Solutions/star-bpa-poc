@@ -1,6 +1,7 @@
 package com.lcs.star.bpa.api;
 
 import com.lcs.star.bpa.api.generated.ProgressPeriodsApi;
+import com.lcs.star.bpa.api.generated.model.CbsActualsWeek;
 import com.lcs.star.bpa.api.generated.model.EarnedManhoursRow;
 import com.lcs.star.bpa.api.generated.model.EarnedManhoursWeek;
 import com.lcs.star.bpa.api.generated.model.ProgressWeek;
@@ -55,6 +56,12 @@ public class ProgressPeriodController implements ProgressPeriodsApi {
             return out;
         }).toList();
         return ResponseEntity.ok(new EarnedManhoursWeek(week.weekEnding(), rows));
+    }
+
+    /** BPA-64: stub in the contract and red-test commit, replaced by the implementation (plan, "Progress and departures"). */
+    @Override
+    public ResponseEntity<CbsActualsWeek> getProgressWeekCbsActuals(LocalDate weekEnding) {
+        throw new ErrorResponseException(HttpStatus.NOT_IMPLEMENTED, ProblemDetail.forStatusAndDetail(HttpStatus.NOT_IMPLEMENTED, "Not implemented yet (BPA-64)"), null);
     }
 
     private static WorkpackProgressRow map(Row row) {

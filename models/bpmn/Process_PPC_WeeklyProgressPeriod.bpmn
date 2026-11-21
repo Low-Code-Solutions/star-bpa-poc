@@ -41,6 +41,7 @@
         <bpmn:flowNodeRef>BusinessRuleTask_CheckManhourVariance</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>BusinessRuleTask_CheckCostVariance</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>ServiceTask_SendVarianceAlerts</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ServiceTask_RecordCbsReview</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Gateway_IsWeekApproved</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>ServiceTask_LockProgressPeriod</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>EndEvent_PeriodLocked</bpmn:flowNodeRef>
@@ -276,8 +277,16 @@
         <zeebe:assignmentDefinition candidateGroups="cost-controller" />
       </bpmn:extensionElements>
       <bpmn:incoming>Flow_ToReviewManhours</bpmn:incoming>
-      <bpmn:outgoing>Flow_ToApproveWeek</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ToRecordCbsReview</bpmn:outgoing>
     </bpmn:userTask>
+    <bpmn:serviceTask id="ServiceTask_RecordCbsReview" name="Record CBS review">
+      <bpmn:documentation>E2-14 (BPA-64, plan Q9). Reads cbsReviews (one entry per CBS: cbsCodeRef, remark) and writes cbs_review for the week of the instance's progress period: remark, reviewed_by = completedBy, reviewed_at; one row per CBS, updated when the week comes back from the Project Manager (BPA-66). Re-run key: the (period, CBS) row and its values, so a retried job writes nothing again. A week with no progress period or a Locked week fails the job with no retries.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="record-cbs-review" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ToRecordCbsReview</bpmn:incoming>
+      <bpmn:outgoing>Flow_ToApproveWeek</bpmn:outgoing>
+    </bpmn:serviceTask>
     <bpmn:userTask id="UserTask_ApproveWeeklyProgress" name="Approve weekly progress">
       <bpmn:documentation>E2-19. FRD-21 §21.7 and FRD-10 §10.10: the Project Manager approves weekly progress / period close; variance beyond tolerance is escalated to the PM. weekDecision Approved | ChangesRequested (reason required) with weekChangeTarget Progress | CostReview (options ASSUMPTION). The PM must not be the PPC user who approved the % (FRD-21 §21.8.1).</bpmn:documentation>
       <bpmn:extensionElements>
@@ -350,7 +359,8 @@
     <bpmn:sequenceFlow id="Flow_ToSendAlerts" sourceRef="BusinessRuleTask_CheckCostVariance" targetRef="ServiceTask_SendVarianceAlerts" />
     <bpmn:sequenceFlow id="Flow_ToMergeReview" sourceRef="ServiceTask_SendVarianceAlerts" targetRef="Gateway_MergeReview" />
     <bpmn:sequenceFlow id="Flow_ToReviewManhours" sourceRef="Gateway_MergeReview" targetRef="UserTask_ReviewActualManhours" />
-    <bpmn:sequenceFlow id="Flow_ToApproveWeek" sourceRef="UserTask_ReviewActualManhours" targetRef="UserTask_ApproveWeeklyProgress" />
+    <bpmn:sequenceFlow id="Flow_ToRecordCbsReview" sourceRef="UserTask_ReviewActualManhours" targetRef="ServiceTask_RecordCbsReview" />
+    <bpmn:sequenceFlow id="Flow_ToApproveWeek" sourceRef="ServiceTask_RecordCbsReview" targetRef="UserTask_ApproveWeeklyProgress" />
     <bpmn:sequenceFlow id="Flow_ToIsWeekApproved" sourceRef="UserTask_ApproveWeeklyProgress" targetRef="Gateway_IsWeekApproved" />
     <bpmn:sequenceFlow id="Flow_WeekApproved" name="Approved" sourceRef="Gateway_IsWeekApproved" targetRef="ServiceTask_CompleteWorkPacks">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=weekDecision = "Approved"</bpmn:conditionExpression>
@@ -482,6 +492,9 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_ReviewActualManhours_di" bpmnElement="UserTask_ReviewActualManhours">
         <dc:Bounds x="4160" y="520" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ServiceTask_RecordCbsReview_di" bpmnElement="ServiceTask_RecordCbsReview">
+        <dc:Bounds x="4285" y="720" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="UserTask_ApproveWeeklyProgress_di" bpmnElement="UserTask_ApproveWeeklyProgress">
         <dc:Bounds x="4310" y="320" width="100" height="80" />
@@ -641,11 +654,16 @@
         <di:waypoint x="4085" y="560" />
         <di:waypoint x="4160" y="560" />
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToRecordCbsReview_di" bpmnElement="Flow_ToRecordCbsReview">
+        <di:waypoint x="4210" y="600" />
+        <di:waypoint x="4210" y="760" />
+        <di:waypoint x="4285" y="760" />
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ToApproveWeek_di" bpmnElement="Flow_ToApproveWeek">
-        <di:waypoint x="4260" y="560" />
-        <di:waypoint x="4285" y="560" />
-        <di:waypoint x="4285" y="360" />
-        <di:waypoint x="4310" y="360" />
+        <di:waypoint x="4385" y="760" />
+        <di:waypoint x="4435" y="760" />
+        <di:waypoint x="4435" y="360" />
+        <di:waypoint x="4410" y="360" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ToIsWeekApproved_di" bpmnElement="Flow_ToIsWeekApproved">
         <di:waypoint x="4410" y="360" />
