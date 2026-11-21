@@ -3,6 +3,8 @@ export const PHASES = ['Engineering', 'Cutting', 'Welding', 'Finishing'];
 
 /** The groups that may read a Workpack print and see the list of prints (BPA-10; the backend enforces it, 09 S6). */
 export const PRINT_GROUPS = ['time-method-analyst', 'production-planner', 'production-team'];
+/** BPA-64: the groups that see their in-system variance alerts (cost-controller, project-manager; delta section 7). */
+export const VARIANCE_ALERT_GROUPS = ['cost-controller', 'project-manager'];
 
 /** BPMN element IDs of the user tasks the portal has a screen for (Process_PPC_WorkPackAssignment). */
 export const USER_TASKS = {
@@ -26,4 +28,6 @@ export const USER_TASKS = {
   approveCompletion: 'UserTask_ApproveCompletion',
   // BPA-63
   approveRetraction: 'UserTask_ApproveRetraction',
+  // BPA-64
+  reviewActualManhours: 'UserTask_ReviewActualManhours',
 } as const;

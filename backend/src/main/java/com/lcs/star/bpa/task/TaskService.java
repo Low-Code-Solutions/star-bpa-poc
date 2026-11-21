@@ -45,9 +45,10 @@ public class TaskService {
     private final CompletionReportCheck completionReport;
     private final CompletionApprovalCheck completionApproval;
     private final RetractionDecisionCheck retractionDecision;
+    private final CbsReviewCheck cbsReview;
 
     public TaskService(CamundaTaskClient camunda, TaskAllowList allowList, HoursSegregationCheck segregation, FmsHandOffCheck fmsHandOff,
-            CompletionReportCheck completionReport, CompletionApprovalCheck completionApproval, RetractionDecisionCheck retractionDecision) {
+            CompletionReportCheck completionReport, CompletionApprovalCheck completionApproval, RetractionDecisionCheck retractionDecision, CbsReviewCheck cbsReview) {
         this.camunda = camunda;
         this.allowList = allowList;
         this.segregation = segregation;
@@ -55,6 +56,7 @@ public class TaskService {
         this.completionReport = completionReport;
         this.completionApproval = completionApproval;
         this.retractionDecision = retractionDecision;
+        this.cbsReview = cbsReview;
     }
 
     /** Open tasks whose candidate groups include one of the user's groups, oldest first. */
@@ -155,6 +157,12 @@ public class TaskService {
             // BPA-63: the decisions must cover every Work Pack waiting for a retraction (400) and not be the requester's (409, FRD-21 §21.8.1); the task stays open
             if (retractionDecision.appliesTo(task.elementId())) {
                 retractionDecision.refusal(Long.parseLong(task.processInstanceKey()), username, submitted).ifPresent(refusal -> {
+                    throw problem(refusal.status(), refusal.message());
+                });
+            }
+            // BPA-64: every CBS with a man-hour alert needs a remark (400, FRD-22 §22.5.6.5) and the CBS must be of the week; the task stays open
+            if (cbsReview.appliesTo(task.elementId())) {
+                cbsReview.refusal(Long.parseLong(task.processInstanceKey()), submitted).ifPresent(refusal -> {
                     throw problem(refusal.status(), refusal.message());
                 });
             }

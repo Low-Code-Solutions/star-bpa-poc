@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_ManhourVariance" name="Man-hour variance" namespace="http://lowcodesol.com/star-bpa-poc" exporter="LCS generator (Claude)" exporterVersion="0.1" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.10.1">
   <decision id="Decision_ManhourVariance" name="Man-hour variance">
-    <description>E2-14. Per CBS code per week. FRD-22 §22.10: 'Manhour variance &gt; 15% against Current Forecast for any CBS' -&gt; Cost Control Engineer + PCON Manager (POC: cost-controller). Variance % = (actual - forecast) / forecast x 100. Over-run only and exactly 15% = no alert are ASSUMPTIONS. No forecast (null or 0) gives no alert.</description>
+    <description>E2-14. Per CBS code per week. FRD-22 §22.10: 'Manhour variance &gt; 15% against Current Forecast for any CBS' -&gt; Cost Control Engineer + PCON Manager. Variance % = (actual - forecast) / forecast x 100. Over-run only (under the forecast gives no alert) is an ASSUMPTION; exactly 15% = no alert follows the strict "&gt;" of FRD-22 §22.10 and is sourced (D3, BPA-64). The PCON Manager gets the alert by email at the configured address (alerts.pconManagerEmail). No forecast (null or 0) gives no alert.</description>
     <decisionTable id="DecisionTable_ManhourVariance" hitPolicy="FIRST">
       <input id="Input_CurrentForecastManhours" label="Current Forecast MH">
         <inputExpression id="InputExpression_CurrentForecastManhours" typeRef="number">

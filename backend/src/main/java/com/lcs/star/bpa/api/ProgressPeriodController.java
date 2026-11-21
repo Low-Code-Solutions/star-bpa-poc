@@ -1,10 +1,13 @@
 package com.lcs.star.bpa.api;
 
 import com.lcs.star.bpa.api.generated.ProgressPeriodsApi;
+import com.lcs.star.bpa.api.generated.model.CbsActualRow;
+import com.lcs.star.bpa.api.generated.model.CbsActualsWeek;
 import com.lcs.star.bpa.api.generated.model.EarnedManhoursRow;
 import com.lcs.star.bpa.api.generated.model.EarnedManhoursWeek;
 import com.lcs.star.bpa.api.generated.model.ProgressWeek;
 import com.lcs.star.bpa.api.generated.model.WorkpackProgressRow;
+import com.lcs.star.bpa.progress.CbsActualsReadService;
 import com.lcs.star.bpa.progress.EarnedManhoursReadService;
 import com.lcs.star.bpa.progress.ProgressReadService;
 import com.lcs.star.bpa.progress.ProgressReadService.Row;
@@ -27,8 +30,10 @@ public class ProgressPeriodController implements ProgressPeriodsApi {
 
     private final ProgressReadService service;
     private final EarnedManhoursReadService earned;
+    private final CbsActualsReadService cbsActuals;
 
-    public ProgressPeriodController(ProgressReadService service, EarnedManhoursReadService earned) {
+    public ProgressPeriodController(ProgressReadService service, EarnedManhoursReadService earned, CbsActualsReadService cbsActuals) {
+        this.cbsActuals = cbsActuals;
         this.earned = earned;
         this.service = service;
     }
@@ -56,6 +61,23 @@ public class ProgressPeriodController implements ProgressPeriodsApi {
         }).toList();
         return ResponseEntity.ok(new EarnedManhoursWeek(week.weekEnding(), rows));
     }
+
+    /** BPA-64: each CBS's actual man-hours against the Current Forecast for the week (CbsActualsReadService); a week with no progress period is 404 "Week not found" (ASSUMPTION text). */
+    @Override
+    public ResponseEntity<CbsActualsWeek> getProgressWeekCbsActuals(LocalDate weekEnding) {
+        CbsActualsReadService.Week week = cbsActuals.week(weekEnding).orElseThrow(() -> new ErrorResponseException(HttpStatus.NOT_FOUND,
+                ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Week not found"), null));
+        List<CbsActualRow> rows = week.rows().stream().map(row -> {
+            CbsActualRow out = new CbsActualRow(row.cbsCodeRef(), row.actualManhours(), CbsActualRow.ResultEnum.fromValue(row.result()), row.alert());
+            out.setCurrentForecastManhours(row.currentForecastManhours());
+            out.setEtc(row.etc());
+            out.setVariancePct(row.variancePct());
+            out.setRemark(row.remark());
+            return out;
+        }).toList();
+        return ResponseEntity.ok(new CbsActualsWeek(week.weekEnding(), rows, week.noCbsManhours()));
+    }
+
 
     private static WorkpackProgressRow map(Row row) {
         WorkpackProgressRow out = new WorkpackProgressRow(row.workpackNumber(), row.noReportRow(), row.lastLockedPct(), row.approvedHours(), row.approvedPct());

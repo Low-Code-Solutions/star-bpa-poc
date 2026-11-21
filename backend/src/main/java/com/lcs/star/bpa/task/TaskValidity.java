@@ -73,6 +73,23 @@ public final class TaskValidity {
         return Optional.empty();
     }
 
+    /** BPA-64: the Cost Controller's review of the week's CBS. "Reviews are required" and "Remark can be at most 500 characters" (the column's limit) are ASSUMPTION texts. */
+    static final String REVIEW_ACTUAL_MANHOURS = "UserTask_ReviewActualManhours";
+    static final String REVIEWS_REQUIRED = "Reviews are required";
+    static final String REMARK_TOO_LONG = "Remark can be at most 500 characters";
+
+    private static Optional<String> checkCbsReviews(Map<String, Object> submitted) {
+        if (!(submitted.get("cbsReviews") instanceof java.util.List<?> list) || list.isEmpty()) {
+            return Optional.of(REVIEWS_REQUIRED);
+        }
+        for (Object entry : list) {
+            if (entry instanceof Map<?, ?> map && map.get("remark") instanceof String remark && remark.trim().length() > 500) {
+                return Optional.of(REMARK_TOO_LONG);
+            }
+        }
+        return Optional.empty();
+    }
+
     private TaskValidity() {
     }
 
@@ -92,6 +109,9 @@ public final class TaskValidity {
         }
         if (APPROVE_RETRACTION.equals(elementId)) {
             return checkRetractionDecisions(submitted);
+        }
+        if (REVIEW_ACTUAL_MANHOURS.equals(elementId)) {
+            return checkCbsReviews(submitted);
         }
         if (VALIDATE_HOURS.equals(elementId)) {
             return checkHoursDecision(submitted);

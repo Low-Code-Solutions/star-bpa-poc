@@ -60,6 +60,8 @@ tags:
     description: POC trigger standing in for a D365 Document Control event (BPA-16; S20, S28; 07 §10)
   - name: notifications
     description: The logged-in user's drawing-revision notices (BPA-16; D44)
+  - name: variance-alerts
+    description: The logged-in user's in-system variance alerts (BPA-64; D3)
   - name: progress-periods
     description: The Work Packs of a progress week for the completion % approval (BPA-60; E2-10)
   - name: completion-reports
@@ -1359,6 +1361,48 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
               example: { status: 404, title: Not Found, detail: Week not found }
+  /api/v1/progress-periods/{weekEnding}/cbs-actuals:
+    parameters:
+      - name: weekEnding
+        in: path
+        required: true
+        description: The week's Thursday, as progress_period.week_ending (YYYY-MM-DD)
+        schema:
+          type: string
+          format: date
+    get:
+      tags: [progress-periods]
+      operationId: getProgressWeekCbsActuals
+      summary: Actual man-hours by CBS against the Current Forecast for the week
+      description: |
+        BPA-64 (E2-14). One row per CBS that has approved man-hours up to the week ending {weekEnding} or a Current Forecast: the actual man-hours (cumulative
+        Approved line hours dated on or before the week ending whose time sheet carries the CBS), the Current Forecast (absent when there is none), the ETC
+        (forecast minus actual; negative when over, never an extra alert), the variance % ((actual - forecast) / forecast x 100, 2 decimals half-up, absent
+        without a forecast), the result of Decision_ManhourVariance (NO_FORECAST, OVER_15_PCT, WITHIN; worked out with the decision's rules), whether a man-hour
+        alert was raised for the CBS in this period, and the Cost Controller's remark. Lines whose time sheet has no CBS (D40) are the single total
+        `noCbsManhours`; they never alert. Groups cost-controller and project-manager (delta §7). 404 when the week has no progress period.
+      x-assumption: true
+      x-assumption-note: the shape, the live calculation of the actuals and the 404 text are ASSUMPTIONs of the plan
+      responses:
+        '200':
+          description: The week's CBS rows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CbsActualsWeek'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No progress period for this week ending
+          x-assumption: true
+          x-assumption-note: text not stated by any story
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 404, title: Not Found, detail: Week not found }
   /api/v1/fms-hours-exports/{fmsHoursExportId}/file:
     parameters:
       - name: fmsHoursExportId
@@ -1514,6 +1558,29 @@ paths:
                   $ref: '#/components/schemas/Notification'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/v1/me/variance-alerts:
+    get:
+      tags: [variance-alerts]
+      operationId: listMyVarianceAlerts
+      summary: The logged-in user's in-system variance alerts
+      description: |
+        BPA-64 (E2-14, E2-15). The man-hour alerts sent in the system to the session user only, newest first; no parameter selects another user. The
+        message is the alert text (D3). Groups cost-controller and project-manager (delta §7).
+      x-assumption: true
+      x-assumption-note: the shape and the list order are ASSUMPTIONs of the plan
+      responses:
+        '200':
+          description: The user's alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VarianceAlert'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 components:
   securitySchemes:
     sessionCookie:
@@ -1726,7 +1793,7 @@ components:
         elementId:
           type: string
           description: BPMN element ID of the user task
-          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction, UserTask_ApproveHoursPpc, UserTask_SendHoursToFms, UserTask_UploadCompletionReport, UserTask_ApproveCompletion, UserTask_ApproveRetraction]
+          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction, UserTask_ApproveHoursPpc, UserTask_SendHoursToFms, UserTask_UploadCompletionReport, UserTask_ApproveCompletion, UserTask_ApproveRetraction, UserTask_ReviewActualManhours]
         processInstanceKey:
           $ref: '#/components/schemas/CamundaKey'
         workpackNumber:
@@ -1782,7 +1849,7 @@ components:
             line's id, data model §6.3); UserTask_SignOffRelease takes signOffDecision (Approved or Declined) and
             declineReason; UserTask_ScheduleWorkPack takes plannedStartDate and plannedEndDate; UserTask_SendHoursToFms
             (BPA-58) takes fmsHandOffs [{fmsHoursExportId, outcome (Sent to FMS or Rejected by FMS), reason}], one entry for
-            each file of the task (the reason is required, at most 250 characters, for Rejected by FMS). UserTask_ApproveCompletion (BPA-60) takes completionApprovals [{workpackNumber, approvedPct, remark}], one entry for each Work Pack of the week (the whole week is approved at once; approvedPct has at most 2 decimals and lies between 0 and 100; the remark is required, at most 250 characters, when approvedPct differs from the reported %; a 409 "Week ending <date> must be locked first" when the week before is not Locked; "Approvals are required", "Approvals must cover every Work Pack of the week", "Completion % must be between 0 and 100" and "Remark can be at most 250 characters" are ASSUMPTIONs); UserTask_ApproveCompletion also takes, per entry, retractionReason, required (at most 250 characters, ASSUMPTION text "Retraction reason can be at most 250 characters") when approvedPct is below the last locked % and no Approved retraction exists for that %, else 400 "A retraction reason is required when completion falls below last week (<prev>%)"; UserTask_ApproveRetraction (BPA-63, project-manager) takes retractionDecisions [{workpackNumber, retractionDecision (Approved or Declined), reason}], one entry for each Work Pack waiting for a retraction (Declined needs a reason of at most 250 characters, 400 "Reason is required"; 409 "You cannot approve a retraction you requested"; "Decisions must cover every Work Pack waiting for a retraction" and "Reason can be at most 250 characters" are ASSUMPTIONs); UserTask_UploadCompletionReport (BPA-59) takes completionReportId, the id of the upload that counts ("Completion report is required" and "Completion report is not for this week" are ASSUMPTIONs). The 400 texts "Outcome is required for each file", "Outcome must be Sent to FMS or Rejected by FMS", "Reason can be at most 250 characters" and "File is not part of this task" are ASSUMPTIONs ("Reason is required" is the story's).
+            each file of the task (the reason is required, at most 250 characters, for Rejected by FMS). UserTask_ApproveCompletion (BPA-60) takes completionApprovals [{workpackNumber, approvedPct, remark}], one entry for each Work Pack of the week (the whole week is approved at once; approvedPct has at most 2 decimals and lies between 0 and 100; the remark is required, at most 250 characters, when approvedPct differs from the reported %; a 409 "Week ending <date> must be locked first" when the week before is not Locked; "Approvals are required", "Approvals must cover every Work Pack of the week", "Completion % must be between 0 and 100" and "Remark can be at most 250 characters" are ASSUMPTIONs); UserTask_ApproveCompletion also takes, per entry, retractionReason, required (at most 250 characters, ASSUMPTION text "Retraction reason can be at most 250 characters") when approvedPct is below the last locked % and no Approved retraction exists for that %, else 400 "A retraction reason is required when completion falls below last week (<prev>%)"; UserTask_ApproveRetraction (BPA-63, project-manager) takes retractionDecisions [{workpackNumber, retractionDecision (Approved or Declined), reason}], one entry for each Work Pack waiting for a retraction (Declined needs a reason of at most 250 characters, 400 "Reason is required"; 409 "You cannot approve a retraction you requested"; "Decisions must cover every Work Pack waiting for a retraction" and "Reason can be at most 250 characters" are ASSUMPTIONs); UserTask_ReviewActualManhours (BPA-64, cost-controller) takes cbsReviews [{cbsCodeRef, remark}], one entry for each CBS of the week (the remark is required for a CBS with a man-hour alert, 400 "A remark is required for <CBS> (alert raised)", at most 500 characters; "Reviews are required", "Remark can be at most 500 characters" and "CBS is not part of this review" are ASSUMPTIONs); UserTask_UploadCompletionReport (BPA-59) takes completionReportId, the id of the upload that counts ("Completion report is required" and "Completion report is not for this week" are ASSUMPTIONs). The 400 texts "Outcome is required for each file", "Outcome must be Sent to FMS or Rejected by FMS", "Reason can be at most 250 characters" and "File is not part of this task" are ASSUMPTIONs ("Reason is required" is the story's).
             The backend adds `completedBy`, the session user's Camunda username, to every completion, so the save workers
             record who did the work (D63; BPA-6). It is on no allow-list: a request that sends it is refused with 400.
             Likewise it adds `completedTaskKey`, the key of the task being completed, the re-run key of a worker that records a
@@ -2193,6 +2260,71 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/WorkpackProgressRow'
+    CbsActualsWeek:
+      type: object
+      description: The CBS man-hour actuals of a progress week against the Current Forecast (BPA-64)
+      required: [weekEnding, cbs, noCbsManhours]
+      properties:
+        weekEnding:
+          type: string
+          format: date
+        cbs:
+          type: array
+          items:
+            $ref: '#/components/schemas/CbsActualRow'
+        noCbsManhours:
+          type: number
+          description: Approved man-hours of lines whose time sheet has no CBS (D40), shown as "No CBS"; never part of a check or an alert
+    CbsActualRow:
+      type: object
+      description: One CBS of the week. Numbers have 2 decimals; a value that does not exist is absent.
+      required: [cbsCodeRef, actualManhours, result, alert]
+      properties:
+        cbsCodeRef:
+          type: string
+          example: CBS-139-PIP-01
+        actualManhours:
+          type: number
+          description: Cumulative Approved line hours up to the week ending
+        currentForecastManhours:
+          type: number
+          description: cbs_forecast.current_forecast_mh (seeded copy, SOR D365 F&O Cost Control Report); absent when the CBS has none
+        etc:
+          type: number
+          description: Estimate to complete = forecast minus actual; negative when over the forecast (the screen highlights it); absent without a forecast
+        variancePct:
+          type: number
+          description: (actual - forecast) / forecast x 100, half-up to 2 decimals; absent without a forecast
+        result:
+          type: string
+          enum: [NO_FORECAST, OVER_15_PCT, WITHIN]
+          description: The result of Decision_ManhourVariance for the CBS
+        alert:
+          type: boolean
+          description: True when a Manhour alert was raised for the CBS in this period
+        remark:
+          type: string
+          description: The Cost Controller's remark for the CBS and week, if the review was recorded
+    VarianceAlert:
+      type: object
+      description: An in-system variance alert of the session user (variance_alert, channel InSystem; data model §13.5)
+      required: [weekEnding, cbsCodeRef, alertType, message, sentAt]
+      properties:
+        weekEnding:
+          type: string
+          format: date
+        cbsCodeRef:
+          type: string
+          example: CBS-139-PIP-01
+        alertType:
+          type: string
+          enum: [Manhour, Cost]
+        message:
+          type: string
+          example: Man-hours on CBS-139-PIP-01 are 20.00% over the Current Forecast (1200.00 of 1000.00 MH), week ending 19 Nov 2026
+        sentAt:
+          type: string
+          format: date-time
     EarnedManhoursWeek:
       type: object
       description: The activities of a progress week with their progress % and Earned man-hours (BPA-62)

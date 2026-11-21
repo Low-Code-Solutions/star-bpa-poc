@@ -1,0 +1,91 @@
+package com.lcs.star.bpa.worker;
+
+import com.lcs.star.bpa.persistence.ProgressPeriodRepository.Period;
+import com.lcs.star.bpa.progress.ProgressCheckService;
+import com.lcs.star.bpa.progress.VarianceAlertService;
+import com.lcs.star.bpa.progress.VarianceAlertService.Over;
+import com.lcs.star.bpa.progress.VarianceMath;
+import io.camunda.client.annotation.JobWorker;
+import io.camunda.client.api.response.ActivatedJob;
+import io.camunda.client.api.worker.JobClient;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+/**
+ * Job type {@code send-variance-alerts} on {@code ServiceTask_SendVarianceAlerts} (BPA-64; E2-14; D3; ADR 0007 and 0012). Reads {@code manhourCheckResults} (one entry
+ * per CBS: {@code cbsCodeRef}, {@code actualManhours}, {@code currentForecastManhours}, {@code manhourResult}) and sends the man-hour alert for each entry that is
+ * OVER_15_PCT ({@link VarianceAlertService}): the Cost Controller by email and in the system, the PCON Manager's address by email. Once per period, CBS, recipient and
+ * channel, so a retry sends nothing new. The cost alert and {@code costCheckResults} are BPA-65's and are not read here. A week with no progress period fails the job with
+ * no retries; a mail failure is not caught (Camunda's tries, then an incident), as BPA-16. No output variable.
+ */
+@Component
+public class SendVarianceAlertsWorker {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SendVarianceAlertsWorker.class);
+
+    private final ProgressCheckService periods;
+    private final VarianceAlertService service;
+
+    public SendVarianceAlertsWorker(ProgressCheckService periods, VarianceAlertService service) {
+        this.periods = periods;
+        this.service = service;
+    }
+
+    @JobWorker(type = "send-variance-alerts", autoComplete = false)
+    public void handle(JobClient client, ActivatedJob job) {
+        Map<String, Object> variables = job.getVariablesAsMap();
+        Optional<Period> period = periods.periodOf(job.getProcessInstanceKey(), variables.get("progressPeriodId"));
+        if (period.isEmpty()) {
+            LOG.warn("send-variance-alerts job {}: the week of this instance has no progress period", job.getKey());
+            client.newFailCommand(job.getKey()).retries(0).errorMessage("The week of this instance has no progress period").send().join();
+            return;
+        }
+        List<Over> overs;
+        try {
+            overs = overs(variables.get("manhourCheckResults"));
+        } catch (IllegalArgumentException e) {
+            LOG.warn("send-variance-alerts job {}: {}", job.getKey(), e.getMessage());
+            client.newFailCommand(job.getKey()).retries(0).errorMessage(e.getMessage()).send().join();
+            return;
+        }
+        try {
+            service.sendManhourAlerts(period.get(), overs, OpenProgressPeriodWorker.SERVICE_USER);
+        } catch (IllegalStateException e) {
+            LOG.warn("send-variance-alerts job {}: {}", job.getKey(), e.getMessage());
+            client.newFailCommand(job.getKey()).retries(0).errorMessage(e.getMessage()).send().join();
+            return;
+        }
+        LOG.info("send-variance-alerts job {}: {} CBS over the forecast for week ending {}", job.getKey(), overs.size(), period.get().weekEnding());
+        client.newCompleteCommand(job.getKey()).send().join();
+    }
+
+    private static List<Over> overs(Object results) {
+        List<Over> overs = new ArrayList<>();
+        if (results instanceof List<?> entries) {
+            for (Object entry : entries) {
+                if (!(entry instanceof Map<?, ?> map) || !(map.get("cbsCodeRef") instanceof String cbs)) {
+                    throw new IllegalArgumentException("A man-hour check result has no CBS");
+                }
+                if (VarianceMath.OVER_15_PCT.equals(map.get("manhourResult"))) {
+                    BigDecimal actual = number(map.get("actualManhours"));
+                    BigDecimal forecast = number(map.get("currentForecastManhours"));
+                    if (actual == null || forecast == null) {
+                        throw new IllegalArgumentException("The man-hour check result of " + cbs + " has no actual or forecast");
+                    }
+                    overs.add(new Over(cbs, actual, forecast));
+                }
+            }
+        }
+        return overs;
+    }
+
+    private static BigDecimal number(Object value) {
+        return value instanceof Number ? new BigDecimal(value.toString()) : null;
+    }
+}

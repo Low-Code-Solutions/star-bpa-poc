@@ -514,6 +514,12 @@ textarea {
   resize: vertical;
 }
 
+/* BPA-64: a negative ETC (the CBS is over its Current Forecast) is highlighted on the Review actual man-hours screen (ASSUMPTION styling). */
+.sign-table__cell--negative {
+  color: var(--signal-red);
+  font-weight: 600;
+}
+
 .sign-table {
   width: 100%;
   margin-top: var(--space-3);

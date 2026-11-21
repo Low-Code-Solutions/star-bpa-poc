@@ -72,4 +72,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-61](BPA-4-timesheet-to-progress/plans/BPA-61.md) | System can block a Work Pack's progress above 100% or below last week without a retraction | Closed (20 Nov 2026) |
 | [BPA-62](BPA-4-timesheet-to-progress/plans/BPA-62.md) | System can calculate each activity's Earned man-hours for the week | Closed (20 Nov 2026) |
 | [BPA-63](BPA-4-timesheet-to-progress/plans/BPA-63.md) | Project Manager can approve or decline a Work Pack's progress retraction | Closed (21 Nov 2026) |
+| [BPA-64](BPA-4-timesheet-to-progress/plans/BPA-64.md) | Cost Controller can review actual man-hours by CBS and is alerted above 15% over forecast | Closed (21 Nov 2026) |
 

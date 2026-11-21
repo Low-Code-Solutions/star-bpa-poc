@@ -1,6 +1,7 @@
 import { useAuth } from '@/context/AuthContext';
 import { AssignmentFileUpload } from '@/features/assignment-files';
 import { TaskList } from '@/features/tasks';
+import { MyVarianceAlerts } from '@/features/progress/components/MyVarianceAlerts';
 import { WorkPackPrints } from '@/features/workpacks';
 import type { Api } from '@/services/apiClient';
 
@@ -15,6 +16,7 @@ export function TasksPage({ api }: { api: Api }) {
     <>
       <TaskList api={api} groups={groups} />
       <WorkPackPrints api={api} groups={groups} />
+      <MyVarianceAlerts api={api} groups={groups} />
       <AssignmentFileUpload api={api} groups={groups} />
     </>
   );
