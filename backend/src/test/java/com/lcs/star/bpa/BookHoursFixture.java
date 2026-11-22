@@ -38,6 +38,11 @@ final class BookHoursFixture {
                 "activity_progress", "variance_alert", "cbs_review", "cbs_manhour_snapshot", "hours_month_lock", "progress_period", "audit_log"}) {
             jdbc.update("DELETE FROM bpa." + table);
         }
+        // BPA-65: the cost tests change the seeded cost rows; restore them (CBS-139-PIP-01: 1000.00 MH, 250000.00 SAR budget, 180000.00 actual cost for Nov 2026) and drop any other
+        jdbc.update("DELETE FROM bpa.cbs_actual_cost");
+        jdbc.update("INSERT INTO bpa.cbs_actual_cost (cbs_code_ref, period_month, actual_cost, created_by, updated_by) VALUES ('CBS-139-PIP-01', DATE '2026-11-01', 180000.00, 'seed', 'seed')");
+        jdbc.update("DELETE FROM bpa.cbs_forecast WHERE cbs_code_ref <> 'CBS-139-PIP-01'");
+        jdbc.update("UPDATE bpa.cbs_forecast SET current_forecast_mh = 1000.00, revised_budget_cost = 250000.00 WHERE cbs_code_ref = 'CBS-139-PIP-01'");
         UUID workpack = jdbc.queryForObject("""
                 INSERT INTO bpa.workpack (workpack_number, activity_ref, drawing_ref, department_ref, completion_date, status, assignment_state,
                                           process_instance_key, created_by, updated_by)

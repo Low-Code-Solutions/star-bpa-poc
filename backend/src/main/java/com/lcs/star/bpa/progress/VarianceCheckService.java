@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The variance checks of a week (BPA-64; E2-14; plan section 1): one check per CBS that has Approved hours up to the week ending or a Current Forecast row (plan Q3).
+ * BPA-65 (plan Q5, an ASSUMPTION): a CBS that has only actual cost rows up to the month is a check too, so its cost shows on the review (NO_BUDGET without a revised budget).
  * {@code actualManhours} is the cumulative Approved line hours whose time sheet carries the CBS; lines with no CBS are the "No CBS" total and never a check (D40).
  * {@code revisedBudgetCost} and {@code actualCost} are passed for BPA-65's cost decision (either may be null: the cost decision then gives NO_BUDGET). Pure reads, so
  * the same week gives the same checks; the read API and the Prepare step share this.
@@ -48,6 +49,7 @@ public class VarianceCheckService {
         Map<String, Forecast> forecasts = actuals.forecasts();
         TreeSet<String> codes = new TreeSet<>(hours.keySet());
         codes.addAll(forecasts.keySet());
+        codes.addAll(actuals.costCbs(weekEnding)); // BPA-65 (plan Q5): a CBS with only actual cost rows is checked too (NO_BUDGET)
         List<Check> checks = new ArrayList<>();
         for (String code : codes) {
             Forecast forecast = forecasts.get(code);

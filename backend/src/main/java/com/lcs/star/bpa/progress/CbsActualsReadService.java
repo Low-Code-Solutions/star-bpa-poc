@@ -24,7 +24,7 @@ public class CbsActualsReadService {
 
     /** One CBS of the week. */
     public record Row(String cbsCodeRef, BigDecimal actualManhours, BigDecimal currentForecastManhours, BigDecimal etc, BigDecimal variancePct, String result, boolean alert,
-            String remark) {
+            String remark, BigDecimal actualCost, BigDecimal revisedBudgetCost, BigDecimal costVariancePct, String costResult, boolean costAlert) {
     }
 
     public record Week(LocalDate weekEnding, List<Row> rows, BigDecimal noCbsManhours) {
@@ -48,16 +48,18 @@ public class CbsActualsReadService {
 
     public Week week(Period period) {
         Set<String> alerted = alerts.alertedCbs(period.id(), VarianceAlertRepository.MANHOUR);
+        Set<String> costAlerted = alerts.alertedCbs(period.id(), VarianceAlertRepository.COST);
         Map<String, String> remarks = reviews.remarks(period.id());
-        List<Row> rows = checks.checks(period.weekEnding()).stream().map(check -> row(check, alerted.contains(check.cbsCodeRef()), remarks.get(check.cbsCodeRef()))).toList();
+        List<Row> rows = checks.checks(period.weekEnding()).stream().map(check -> row(check, alerted.contains(check.cbsCodeRef()), costAlerted.contains(check.cbsCodeRef()), remarks.get(check.cbsCodeRef()))).toList();
         return new Week(period.weekEnding(), rows, checks.noCbsManhours(period.weekEnding()));
     }
 
-    private static Row row(Check check, boolean alert, String remark) {
+    private static Row row(Check check, boolean alert, boolean costAlert, String remark) {
         BigDecimal actual = check.actualManhours();
         BigDecimal forecast = check.currentForecastManhours();
         boolean has = VarianceMath.hasForecast(forecast);
         return new Row(check.cbsCodeRef(), actual, forecast, has ? VarianceMath.etc(actual, forecast) : null, VarianceMath.variancePct(actual, forecast),
-                VarianceMath.result(actual, forecast), alert, remark);
+                VarianceMath.result(actual, forecast), alert, remark, check.actualCost(), check.revisedBudgetCost(), CostVarianceMath.variancePct(check.actualCost(), check.revisedBudgetCost()),
+                CostVarianceMath.result(check.actualCost(), check.revisedBudgetCost()), costAlert);
     }
 }

@@ -28,7 +28,7 @@ function AlertsSection({ api }: { api: Api }) {
       {alerts && alerts.length > 0 && (
         <ul className="prints__list">
           {alerts.map((alert) => (
-            <li key={`${alert.weekEnding}-${alert.cbsCodeRef}-${alert.sentAt}`} className="prints__row">
+            <li key={`${alert.alertType}-${alert.alertDate}-${alert.cbsCodeRef}-${alert.sentAt}`} className="prints__row">
               <span>{alert.message}</span>
             </li>
           ))}
