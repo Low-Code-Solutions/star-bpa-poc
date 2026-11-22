@@ -276,10 +276,12 @@ class EarnedManhoursApiTest {
     }
 
     @Test
-    void earnedManhoursEndpointIsForPpcAndCostController() {
+    void earnedManhoursEndpointIsForPpcCostControllerAndProjectManager() {
         assertThat(flow.loggedInAs("ppc-team").get("/api/v1/progress-periods/2026-11-19/earned-manhours").statusCode()).isEqualTo(200);
         assertThat(flow.loggedInAs("cost-controller").get("/api/v1/progress-periods/2026-11-19/earned-manhours").statusCode()).isEqualTo(200);
-        assertThat(flow.loggedInAs("project-manager").get("/api/v1/progress-periods/2026-11-19/earned-manhours").statusCode()).isEqualTo(403);
+        // BPA-66: the Project Manager reads Earned man-hours for the Approve weekly progress screen (was 403 in BPA-62)
+        assertThat(flow.loggedInAs("project-manager").get("/api/v1/progress-periods/2026-11-19/earned-manhours").statusCode()).isEqualTo(200);
+        assertThat(flow.loggedInAs("supervisor").get("/api/v1/progress-periods/2026-11-19/earned-manhours").statusCode()).isEqualTo(403);
         assertThat(flow.loggedInAs("cost-controller").get("/api/v1/progress-periods/2026-11-19/workpacks").statusCode()).as("BPA-60's screen stays PPC and PM").isEqualTo(403);
     }
 

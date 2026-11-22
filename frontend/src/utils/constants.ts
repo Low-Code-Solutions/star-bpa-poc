@@ -30,4 +30,6 @@ export const USER_TASKS = {
   approveRetraction: 'UserTask_ApproveRetraction',
   // BPA-64
   reviewActualManhours: 'UserTask_ReviewActualManhours',
+  // BPA-66
+  approveWeeklyProgress: 'UserTask_ApproveWeeklyProgress',
 } as const;

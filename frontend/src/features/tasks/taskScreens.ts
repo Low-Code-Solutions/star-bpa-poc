@@ -11,6 +11,7 @@ import { UploadCompletionReport } from '@/features/progress/components/UploadCom
 import { ApproveCompletion } from '@/features/progress/components/ApproveCompletion';
 import { ApproveRetraction } from '@/features/progress/components/ApproveRetraction';
 import { ReviewActualManhours } from '@/features/progress/components/ReviewActualManhours';
+import { ApproveWeeklyProgress } from '@/features/progress/components/ApproveWeeklyProgress';
 import { USER_TASKS } from '@/utils/constants';
 import type { TaskScreen } from './tasks.types';
 
@@ -32,6 +33,7 @@ const screens: Record<string, TaskScreen> = {
   [USER_TASKS.approveCompletion]: ApproveCompletion,
   [USER_TASKS.approveRetraction]: ApproveRetraction,
   [USER_TASKS.reviewActualManhours]: ReviewActualManhours,
+  [USER_TASKS.approveWeeklyProgress]: ApproveWeeklyProgress,
 };
 
 /** The screen for this element ID, or undefined. Own keys only, so a name like "constructor" is never a screen. */

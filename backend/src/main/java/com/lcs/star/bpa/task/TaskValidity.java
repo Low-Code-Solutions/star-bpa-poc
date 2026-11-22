@@ -73,6 +73,38 @@ public final class TaskValidity {
         return Optional.empty();
     }
 
+    /**
+     * BPA-66: the Project Manager's decision on the week. "Reason is required" is the story's text; the unknown-decision and target texts are ASSUMPTIONs (plan Q8). The gateway
+     * after the task sends any decision that is not Approved or a Cost review target to PPC by default, so the values are checked here and again in the record step.
+     */
+    static final String APPROVE_WEEKLY_PROGRESS = "UserTask_ApproveWeeklyProgress";
+    static final String WEEK_DECISION_UNKNOWN = "Decision must be Approved or ChangesRequested";
+    static final String TARGET_REQUIRED = "Target is required";
+
+    private static Optional<String> checkWeekDecision(Map<String, Object> submitted) {
+        Object decision = submitted.get("weekDecision");
+        if (decision == null || (decision instanceof String text && text.isBlank())) {
+            return Optional.of(DECISION_REQUIRED);
+        }
+        if (!"Approved".equals(decision) && !"ChangesRequested".equals(decision)) {
+            return Optional.of(WEEK_DECISION_UNKNOWN);
+        }
+        if ("Approved".equals(decision)) {
+            return Optional.empty(); // a target or reason sent with Approved is ignored (ASSUMPTION, plan Q8)
+        }
+        if (!(submitted.get("weekDecisionReason") instanceof String reason && !reason.isBlank())) {
+            return Optional.of(REASON_REQUIRED);
+        }
+        Object target = submitted.get("weekChangeTarget");
+        if (target == null || (target instanceof String text && text.isBlank())) {
+            return Optional.of(TARGET_REQUIRED);
+        }
+        if (!"Progress".equals(target) && !"CostReview".equals(target)) {
+            return Optional.of("Target " + target + " is not allowed");
+        }
+        return Optional.empty();
+    }
+
     /** BPA-64: the Cost Controller's review of the week's CBS. "Reviews are required" and "Remark can be at most 500 characters" (the column's limit) are ASSUMPTION texts. */
     static final String REVIEW_ACTUAL_MANHOURS = "UserTask_ReviewActualManhours";
     static final String REVIEWS_REQUIRED = "Reviews are required";
@@ -112,6 +144,9 @@ public final class TaskValidity {
         }
         if (REVIEW_ACTUAL_MANHOURS.equals(elementId)) {
             return checkCbsReviews(submitted);
+        }
+        if (APPROVE_WEEKLY_PROGRESS.equals(elementId)) {
+            return checkWeekDecision(submitted);
         }
         if (VALIDATE_HOURS.equals(elementId)) {
             return checkHoursDecision(submitted);

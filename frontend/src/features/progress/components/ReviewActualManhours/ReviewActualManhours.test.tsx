@@ -27,9 +27,14 @@ const WEEK = {
 };
 
 type Call = { method: string; path: string; body: unknown };
-type Options = { completeStatus?: number; completeDetail?: string; week?: unknown };
+type Options = { completeStatus?: number; completeDetail?: string; week?: unknown; variables?: Record<string, unknown> };
 
-function fakeBackend({ completeStatus = 204, completeDetail = '', week = WEEK }: Options = {}) {
+function fakeBackend({
+  completeStatus = 204,
+  completeDetail = '',
+  week = WEEK,
+  variables = { weekEnding: '2026-11-19' },
+}: Options = {}) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -50,7 +55,7 @@ function fakeBackend({ completeStatus = 204, completeDetail = '', week = WEEK }:
         elementId: 'UserTask_ReviewActualManhours',
         processInstanceKey: '2251799813692800',
         creationDate: '2026-11-20T07:00:00Z',
-        variables: { weekEnding: '2026-11-19' },
+        variables,
         validationMessages: [],
       });
     }
@@ -174,5 +179,40 @@ describe('ReviewActualManhours', () => {
 
     expect(await screen.findByText(detail)).toBeInTheDocument();
     expect(onDone).not.toHaveBeenCalled();
+  });
+});
+
+// BPA-66: when the Project Manager sends the week back to the Cost Controller (target CostReview), the review screen shows "Week sent back: <reason>" (the story's
+// text); a send-back to PPC (target Progress) shows no notice here. Written before the code.
+describe('ReviewActualManhours, a week sent back', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('BPA66_changesCanGoBackToCostReview', async () => {
+    await renderScreen({
+      variables: {
+        weekEnding: '2026-11-19',
+        weekDecision: 'ChangesRequested',
+        weekChangeTarget: 'CostReview',
+        weekDecisionReason: 'Explain the spool rework cost',
+      },
+    });
+
+    expect(await screen.findByText('Week sent back: Explain the spool rework cost')).toBeInTheDocument();
+  });
+
+  it('noNoticeForASendBackToProgress', async () => {
+    await renderScreen({
+      variables: {
+        weekEnding: '2026-11-19',
+        weekDecision: 'ChangesRequested',
+        weekChangeTarget: 'Progress',
+        weekDecisionReason: 'WP-000461 cannot be 100%',
+      },
+    });
+
+    expect(screen.queryByText(/Week sent back/)).not.toBeInTheDocument();
   });
 });

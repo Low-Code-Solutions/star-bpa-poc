@@ -36,7 +36,8 @@ public class ProgressReadService {
     /** One row of the week. */
     public record Row(String workpackNumber, UUID workpackId, boolean noReportRow, BigDecimal reportedPct, BigDecimal lastLockedPct, BigDecimal hoursBasedPct,
             BigDecimal reportedByProductionPct, BigDecimal fmsActualHours, BigDecimal approvedHours, BigDecimal hoursDifference, BigDecimal approvedPct,
-            BigDecimal referencePct, String remark, String retractionReason, String retractionRequestedBy, String retractionDeclinedReason, boolean retractionApproved) {
+            BigDecimal referencePct, String remark, String retractionReason, String retractionRequestedBy, String retractionDeclinedReason, boolean retractionApproved,
+            List<ProgressWeekRepository.Unsent> unsentLines) {
     }
 
     /** The week: its period, the basis in force and the rows. */
@@ -63,11 +64,11 @@ public class ProgressReadService {
     public Week week(Period period) {
         String basis = settings.basis();
         List<Request> requests = retractions.ofPeriod(period.id());
-        List<Row> rows = weeks.workpacks(period.id(), period.weekEnding()).stream().map(raw -> row(raw, basis, requests)).toList();
+        List<Row> rows = weeks.workpacks(period.id(), period.weekEnding()).stream().map(raw -> row(raw, basis, requests, weeks)).toList();
         return new Week(period.id(), period.weekEnding(), basis, rows);
     }
 
-    private static Row row(Raw raw, String basis, List<Request> requests) {
+    private static Row row(Raw raw, String basis, List<Request> requests, ProgressWeekRepository weeks) {
         boolean noReportRow = raw.reportedPct() == null;
         BigDecimal reported = scale(raw.reportedPct());
         BigDecimal lastLocked = scale(raw.lastLockedPct());
@@ -95,7 +96,12 @@ public class ProgressReadService {
                 : mine.stream().filter(r -> "Declined".equals(r.decision()) && r.approvedPct().compareTo(prefilled) == 0).reduce((first, last) -> last).orElse(null);
         return new Row(raw.workpackNumber(), raw.workpackId(), noReportRow, reported, lastLocked, hoursBased, scale(raw.reportedByProduction()), fms, approvedHours,
                 difference, prefilled, reference, raw.storedRemark(), open == null ? null : open.reason(), open == null ? null : open.requestedBy(),
-                declined == null ? null : declined.decisionReason(), approvedHere);
+                declined == null ? null : declined.decisionReason(), approvedHere, unsent(raw, prefilled, weeks));
+    }
+
+    /** BPA-66 (BPA-67 rule (c)): the Draft and Returned lines of a Work Pack approved at exactly 100%, so the Project Manager sees them before approving the week; none for any other %. */
+    private static List<ProgressWeekRepository.Unsent> unsent(Raw raw, BigDecimal approvedPct, ProgressWeekRepository weeks) {
+        return approvedPct != null && approvedPct.compareTo(HUNDRED) == 0 ? weeks.unsentLines(raw.workpackId()) : List.of();
     }
 
     private static BigDecimal scale(BigDecimal value) {

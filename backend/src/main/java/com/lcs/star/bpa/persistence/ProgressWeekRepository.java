@@ -89,4 +89,24 @@ public class ProgressWeekRepository {
                                  WHERE p.workpack_id = ? AND d.status = 'Locked' AND d.week_ending < ? AND p.approved_pct IS NOT NULL
                                  ORDER BY d.week_ending DESC LIMIT 1), 0)""", BigDecimal.class, workpackId, Date.valueOf(weekEnding));
     }
+
+    /** BPA-66 (FRD-21 §21.8.1): true when {@code username} approved the % of any Work Pack of the week, so may not approve the week. */
+    public boolean approvedBy(UUID periodId, String username) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM bpa.workpack_progress WHERE progress_period_id = ? AND approved_by = ?)""", Boolean.class, periodId, username));
+    }
+
+    /** One time sheet line of a Work Pack that was not sent for approval (Draft or Returned), for the Project Manager's screen (BPA-66; BPA-67 rule (c)). */
+    public record Unsent(String employeeRef, LocalDate workDate, String phase, BigDecimal hours, String status) {
+    }
+
+    /** The Work Pack's Draft and Returned lines, by date, Worker and phase. Information only; no date bound (ASSUMPTION, plan Q5). */
+    public List<Unsent> unsentLines(UUID workpackId) {
+        return jdbc.query("""
+                SELECT w.employee_ref, l.work_date, l.phase, l.hours, l.status
+                FROM bpa.digital_timesheet_line l JOIN bpa.digital_timesheet t ON t.id = l.digital_timesheet_id JOIN bpa.worker w ON w.id = t.worker_id
+                WHERE t.workpack_id = ? AND l.status IN ('Draft', 'Returned') ORDER BY l.work_date, w.employee_ref, l.phase""",
+                (rs, n) -> new Unsent(rs.getString("employee_ref"), rs.getDate("work_date").toLocalDate(), rs.getString("phase"), rs.getBigDecimal("hours"), rs.getString("status")),
+                workpackId);
+    }
 }

@@ -6,6 +6,7 @@ import com.lcs.star.bpa.api.generated.model.CbsActualsWeek;
 import com.lcs.star.bpa.api.generated.model.EarnedManhoursRow;
 import com.lcs.star.bpa.api.generated.model.EarnedManhoursWeek;
 import com.lcs.star.bpa.api.generated.model.ProgressWeek;
+import com.lcs.star.bpa.api.generated.model.UnsentLine;
 import com.lcs.star.bpa.api.generated.model.WorkpackProgressRow;
 import com.lcs.star.bpa.progress.CbsActualsReadService;
 import com.lcs.star.bpa.progress.EarnedManhoursReadService;
@@ -96,6 +97,9 @@ public class ProgressPeriodController implements ProgressPeriodsApi {
         out.setRetractionRequestedBy(row.retractionRequestedBy());
         out.setRetractionDeclinedReason(row.retractionDeclinedReason());
         out.setRetractionApproved(row.retractionApproved());
+        if (!row.unsentLines().isEmpty()) {
+            out.setUnsentLines(row.unsentLines().stream().map(u -> new UnsentLine(u.employeeRef(), u.workDate(), u.phase(), u.hours(), UnsentLine.StatusEnum.fromValue(u.status()))).toList());
+        }
         return out;
     }
 }

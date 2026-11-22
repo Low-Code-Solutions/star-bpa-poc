@@ -1,5 +1,5 @@
 import type { Api } from '@/services/apiClient';
-import type { CbsActualsWeek, ProgressWeek, VarianceAlert } from '@/types/api';
+import type { CbsActualsWeek, EarnedManhoursWeek, ProgressWeek, VarianceAlert } from '@/types/api';
 
 // The week's Work Packs for the completion % approval (BPA-60; E2-10). React never calls Camunda; the backend works out every figure.
 
@@ -27,6 +27,16 @@ export async function getCbsActuals(api: Api, weekEnding: string): Promise<CbsAc
 export async function listMyVarianceAlerts(api: Api): Promise<VarianceAlert[] | null> {
   try {
     const { data } = await api.GET('/api/v1/me/variance-alerts');
+    return data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** GET /api/v1/progress-periods/{weekEnding}/earned-manhours (BPA-62; the Project Manager reads it for BPA-66): each activity, its % and Earned man-hours; null when the call failed. */
+export async function getEarnedManhours(api: Api, weekEnding: string): Promise<EarnedManhoursWeek | null> {
+  try {
+    const { data } = await api.GET('/api/v1/progress-periods/{weekEnding}/earned-manhours', { params: { path: { weekEnding } } });
     return data ?? null;
   } catch {
     return null;

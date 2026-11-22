@@ -33,9 +33,21 @@ const ROWS = [
 ];
 
 type Call = { method: string; path: string; body: unknown };
-type Options = { completeStatus?: number; completeDetail?: string; weekStatus?: number; rows?: unknown[] };
+type Options = {
+  completeStatus?: number;
+  completeDetail?: string;
+  weekStatus?: number;
+  rows?: unknown[];
+  variables?: Record<string, unknown>;
+};
 
-function fakeBackend({ completeStatus = 204, completeDetail = '', weekStatus = 200, rows = ROWS }: Options = {}) {
+function fakeBackend({
+  completeStatus = 204,
+  completeDetail = '',
+  weekStatus = 200,
+  rows = ROWS,
+  variables = { weekEnding: '2026-11-19' },
+}: Options = {}) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -56,7 +68,7 @@ function fakeBackend({ completeStatus = 204, completeDetail = '', weekStatus = 2
         elementId: 'UserTask_ApproveCompletion',
         processInstanceKey: '2251799813692700',
         creationDate: '2026-11-20T07:00:00Z',
-        variables: { weekEnding: '2026-11-19' },
+        variables,
         validationMessages: [],
       });
     }
@@ -268,5 +280,48 @@ describe('ApproveCompletion, an approved retraction', () => {
       approvedPct: 25,
       remark: 'FMS double-counted cutting',
     });
+  });
+});
+
+// BPA-66: when the Project Manager sends the week back to PPC (target Progress), the Approve completion screen shows "Week sent back: <reason>" (the story's text).
+// The notice is shown only for a Progress send-back: the variables are on the task's read allow-list. Written before the code.
+describe('ApproveCompletion, a week sent back', () => {
+  const REASON = 'WP-000461 cannot be 100%: punch list open';
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('BPA66_changesRequestedGoBackToPpc', async () => {
+    await renderScreen({
+      variables: {
+        weekEnding: '2026-11-19',
+        weekDecision: 'ChangesRequested',
+        weekChangeTarget: 'Progress',
+        weekDecisionReason: REASON,
+      },
+    });
+
+    expect(await screen.findByText(`Week sent back: ${REASON}`)).toBeInTheDocument();
+  });
+
+  it('noNoticeForAWeekThatWasNotSentBack', async () => {
+    await renderScreen();
+
+    expect(screen.queryByText(/Week sent back/)).not.toBeInTheDocument();
+  });
+
+  it('noNoticeForASendBackToCostReview', async () => {
+    await renderScreen({
+      variables: {
+        weekEnding: '2026-11-19',
+        weekDecision: 'ChangesRequested',
+        weekChangeTarget: 'CostReview',
+        weekDecisionReason: 'Explain the spool rework cost',
+      },
+    });
+
+    expect(screen.queryByText(/Week sent back/)).not.toBeInTheDocument();
   });
 });
