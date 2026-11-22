@@ -29,7 +29,12 @@ const WEEK = {
 type Call = { method: string; path: string; body: unknown };
 type Options = { completeStatus?: number; completeDetail?: string; week?: unknown; variables?: Record<string, unknown> };
 
-function fakeBackend({ completeStatus = 204, completeDetail = '', week = WEEK, variables = { weekEnding: '2026-11-19' } }: Options = {}) {
+function fakeBackend({
+  completeStatus = 204,
+  completeDetail = '',
+  week = WEEK,
+  variables = { weekEnding: '2026-11-19' },
+}: Options = {}) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -187,7 +192,12 @@ describe('ReviewActualManhours, a week sent back', () => {
 
   it('BPA66_changesCanGoBackToCostReview', async () => {
     await renderScreen({
-      variables: { weekEnding: '2026-11-19', weekDecision: 'ChangesRequested', weekChangeTarget: 'CostReview', weekDecisionReason: 'Explain the spool rework cost' },
+      variables: {
+        weekEnding: '2026-11-19',
+        weekDecision: 'ChangesRequested',
+        weekChangeTarget: 'CostReview',
+        weekDecisionReason: 'Explain the spool rework cost',
+      },
     });
 
     expect(await screen.findByText('Week sent back: Explain the spool rework cost')).toBeInTheDocument();
@@ -195,7 +205,12 @@ describe('ReviewActualManhours, a week sent back', () => {
 
   it('noNoticeForASendBackToProgress', async () => {
     await renderScreen({
-      variables: { weekEnding: '2026-11-19', weekDecision: 'ChangesRequested', weekChangeTarget: 'Progress', weekDecisionReason: 'WP-000461 cannot be 100%' },
+      variables: {
+        weekEnding: '2026-11-19',
+        weekDecision: 'ChangesRequested',
+        weekChangeTarget: 'Progress',
+        weekDecisionReason: 'WP-000461 cannot be 100%',
+      },
     });
 
     expect(screen.queryByText(/Week sent back/)).not.toBeInTheDocument();

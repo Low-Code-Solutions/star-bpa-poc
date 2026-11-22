@@ -111,12 +111,15 @@ bpa:
         read: [weekEnding]
       "[UserTask_ApproveCompletion]": # ppc-team, BPA-60: one approval per Work Pack of the week (completionApprovals); read gives the week; the rows come from GET /api/v1/progress-periods/{weekEnding}/workpacks
         write: [completionApprovals]
-        read: [weekEnding]
+        read: [weekEnding, weekDecision, weekChangeTarget, weekDecisionReason] # BPA-66: why the Project Manager sent the week back
       "[UserTask_ApproveRetraction]": # project-manager, BPA-63: retractionDecisions, one entry for each Work Pack waiting for a retraction ({workpackNumber, retractionDecision, reason}); read gives the week; the rows come from GET /api/v1/progress-periods/{weekEnding}/workpacks
         write: [retractionDecisions]
         read: [weekEnding]
       "[UserTask_ReviewActualManhours]": # cost-controller, BPA-64: cbsReviews, one entry per CBS ({cbsCodeRef, remark}); read gives the week; the rows come from GET /api/v1/progress-periods/{weekEnding}/cbs-actuals
         write: [cbsReviews]
+        read: [weekEnding, weekDecision, weekChangeTarget, weekDecisionReason] # BPA-66: why the Project Manager sent the week back
+      "[UserTask_ApproveWeeklyProgress]": # project-manager, BPA-66: the decision on the week (Approved or ChangesRequested) and, for ChangesRequested, the target (Progress or CostReview) and the reason; read gives the week; the rows come from GET /api/v1/progress-periods/{weekEnding}/workpacks, earned-manhours and cbs-actuals
+        write: [weekDecision, weekChangeTarget, weekDecisionReason]
         read: [weekEnding]
       "[UserTask_CreateWorkPack]": # time-method-analyst (G9), BPA-6
         write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]

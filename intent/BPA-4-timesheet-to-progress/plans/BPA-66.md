@@ -225,5 +225,22 @@ The PM's screen gets a new client function `getEarnedManhours` in `progressServi
 - **Q2, Q4, Q6 to Q8:** as recommended. The test asserts the instance reaches `ServiceTask_CompleteWorkPacks`; the history is in `audit_log`; the variable is `weekDecisionReason`; earned-manhours is opened to project-manager (one existing test goes from 403 to 200); the texts are ASSUMPTIONs as listed; segregation applies to Approved only.
 - **Q9:** ask before any Jira transition.
 
+## Progress and departures (22 Nov 2026)
+**Commits:** f24a60f plan Approved; bfb699b contract, compile stub and red backend tests; 78d057d red React tests, screen stub and registration; then the green commit (backend, BPMN, screen, notices, data model).
+
+**Red runs shown before any production code:**
+- Backend (bfb699b): `WeekApprovalApiTest` 12 of 12 red. Ten fail on the completion (404 "Task not found": `UserTask_ApproveWeeklyProgress` had no allow-list entry), `BPA66_weekShowsAlertsAndRemarks` on the PM's 403 for earned-manhours, and `segregationAlsoFailsTheRecordStep` on the stub's `UnsupportedOperationException`.
+- React (78d057d): 8 of 11 red: the six `ApproveWeeklyProgress` tests (the stub renders no week), `BPA66_changesRequestedGoBackToPpc` and `BPA66_changesCanGoBackToCostReview` (no notice). **Three guard tests passed before any change** (`noNoticeForAWeekThatWasNotSentBack`, `noNoticeForASendBackToCostReview`, `noNoticeForASendBackToProgress`): a screen with no notice shows none. They are guards, not red-first tests.
+
+**Departures from the plan:**
+1. **The unknown-decision text is new.** The plan said "the existing unknown-decision text", but that one reads "Decision must be Approved or Declined" (the sign-off). `TaskValidity` and `WeekDecisionService` use "Decision must be Approved or ChangesRequested" (ASSUMPTION, plan Q8).
+2. **Existing tests edited:** `EarnedManhoursApiTest.earnedManhoursEndpointIsForPpcAndCostController` is renamed `earnedManhoursEndpointIsForPpcCostControllerAndProjectManager` (project-manager 403 to 200, plus a supervisor 403 check); `ProcessTestApplication` leaves `RecordWeekDecisionWorker` out of its scan (it needs the database). The two React test helpers `fakeBackend` in `ApproveCompletion.test.tsx` and `ReviewActualManhours.test.tsx` gained a `variables` option (no assertion changed). Prettier reformatted the new React tests.
+3. **Test helper:** `ppcApprove` sends a remark for every Work Pack. The seeded approvals have no report row, so any approved % differs from the reference (the last locked %) and BPA-60 asks for a remark. The first green run had two failures (400) because of that; the code was not the cause.
+4. **Files in the diff that the plan did not list:** `progress/WeekDecisionService` is the real service (planned); `ProgressPeriodRepository.State`, `lockState`, `recordApproval`, `recordReason`; `ProgressWeekRepository.approvedBy` and `unsentLines`; `VarianceAlertRepository.existsCostInPeriod`; `features/progress/weekDecisionMessages.ts`; `EarnedManhoursWeek`, `EarnedManhoursRow` and `UnsentLine` names in `types/api.ts`.
+5. **BPMN layout:** the new task sits at x 4422 to 4502, y 320 (between the user task and the gateway); `Flow_ToIsWeekApproved` keeps its ID and now leaves the new task; the new `Flow_ToRecordWeekDecision` leaves the user task.
+6. **Contract:** `UserTask_ApproveWeeklyProgress` is documented on the complete-task variables; `UnsentLine` is a new schema; the earned-manhours description names the project-manager.
+
+**Verification so far:** `WeekApprovalApiTest` 12/12 and `EarnedManhoursApiTest` 14/14 green; React `src/features/progress` and `src/features/tasks` 43/43; lint, `format:check` and `lint:bpmn` clean.
+
 ## Human-gap log
 - None yet.

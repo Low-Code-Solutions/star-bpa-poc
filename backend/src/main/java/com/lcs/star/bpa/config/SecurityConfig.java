@@ -105,8 +105,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/progress-periods/*/cbs-actuals").hasAnyAuthority(COST_CONTROLLER, PROJECT_MANAGER)
                         // BPA-65: any logged-in persona may ask for its own variance alerts (the list is the session user's only); a persona with none gets an empty list, not a 403
                         .requestMatchers("/api/v1/me/variance-alerts").authenticated()
-                        // BPA-62: the PPC Team and the Cost Controller read the week's Earned man-hours (delta section 7); before the BPA-60 rule below, which keeps the Cost Controller out of the Work Packs
-                        .requestMatchers("/api/v1/progress-periods/*/earned-manhours").hasAnyAuthority(PPC_TEAM, COST_CONTROLLER)
+                        // BPA-62: the PPC Team and the Cost Controller read the week's Earned man-hours (delta section 7), and (BPA-66) the Project Manager, for the Approve weekly progress screen; before the BPA-60 rule below, which keeps the Cost Controller out of the Work Packs
+                        .requestMatchers("/api/v1/progress-periods/*/earned-manhours").hasAnyAuthority(PPC_TEAM, COST_CONTROLLER, PROJECT_MANAGER)
                         // BPA-60: the PPC Team and the Project Manager read the week's Work Packs for the completion % approval (delta section 7)
                         .requestMatchers("/api/v1/progress-periods/**").hasAnyAuthority(PPC_TEAM, PROJECT_MANAGER)
                         .anyRequest().authenticated())

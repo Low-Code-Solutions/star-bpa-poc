@@ -86,6 +86,48 @@ public class ProgressPeriodRepository {
         return new Period(id, weekEnding);
     }
 
+    /** BPA-66: a period with its week decision columns, read with the row locked ({@link #lockState}). */
+    public record State(UUID id, LocalDate weekEnding, String status, String weekApprovedBy, Timestamp weekApprovedAt, String weekDecisionReason) {
+    }
+
+    /** BPA-66: the period row locked for the rest of the transaction, so a decision and the lock (BPA-67) never interleave; empty when there is no such period. */
+    public Optional<State> lockState(UUID id) {
+        return jdbc.query("""
+                SELECT id, week_ending, status, week_approved_by, week_approved_at, week_decision_reason FROM bpa.progress_period WHERE id = ? FOR UPDATE""",
+                (rs, n) -> new State(rs.getObject("id", UUID.class), rs.getDate("week_ending").toLocalDate(), rs.getString("status"), rs.getString("week_approved_by"),
+                        rs.getTimestamp("week_approved_at"), rs.getString("week_decision_reason")), id).stream().findFirst();
+    }
+
+    /**
+     * BPA-66: the Project Manager approved the week: {@code week_approved_by} and {@code week_approved_at} (now, from the injected clock), one audit row per changed column
+     * (D64). The same approver again writes nothing and keeps the first time (the re-run key is the values). Call in the transaction that holds {@link #lockState}.
+     */
+    public void recordApproval(State before, String username) {
+        if (username.equals(before.weekApprovedBy()) && before.weekApprovedAt() != null) {
+            return;
+        }
+        Timestamp at = Timestamp.from(clock.instant().truncatedTo(ChronoUnit.MICROS));
+        jdbc.update("UPDATE bpa.progress_period SET week_approved_by = ?, week_approved_at = ?, updated_at = ?, updated_by = ? WHERE id = ?", username, at, at, username, before.id());
+        audit(before.id(), "week_approved_by", before.weekApprovedBy(), username, username, at);
+        audit(before.id(), "week_approved_at", before.weekApprovedAt() == null ? null : before.weekApprovedAt().toInstant().toString(), at.toInstant().toString(), username, at);
+    }
+
+    /** BPA-66: the Project Manager sent the week back: {@code week_decision_reason} is the latest reason; who and when are in {@code audit_log}. The same reason writes nothing. */
+    public void recordReason(State before, String reason, String username) {
+        if (reason.equals(before.weekDecisionReason())) {
+            return;
+        }
+        Timestamp at = Timestamp.from(clock.instant().truncatedTo(ChronoUnit.MICROS));
+        jdbc.update("UPDATE bpa.progress_period SET week_decision_reason = ?, updated_at = ?, updated_by = ? WHERE id = ?", reason, at, username, before.id());
+        audit(before.id(), "week_decision_reason", before.weekDecisionReason(), reason, username, at);
+    }
+
+    private void audit(UUID recordId, String column, String oldValue, String newValue, String username, Timestamp at) {
+        jdbc.update("""
+                INSERT INTO bpa.audit_log (table_name, record_id, column_name, old_value, new_value, username, changed_at)
+                VALUES ('progress_period', ?, ?, ?, ?, ?, ?)""", recordId, column, oldValue, newValue, username, at);
+    }
+
     private void audit(UUID recordId, String column, String newValue, String username, Timestamp at) {
         jdbc.update("""
                 INSERT INTO bpa.audit_log (table_name, record_id, column_name, old_value, new_value, username, changed_at)

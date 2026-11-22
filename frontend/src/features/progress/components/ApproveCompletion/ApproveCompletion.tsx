@@ -19,6 +19,7 @@ const two = (value?: number) => (value === undefined ? '' : value.toFixed(2));
  */
 export function ApproveCompletion({ api, taskKey, onDone }: TaskScreenProps) {
   const [weekEnding, setWeekEnding] = useState('');
+  const [notice, setNotice] = useState('');
   const [edits, setEdits] = useState<Record<string, Edit>>({});
   const week = useQuery({
     queryKey: ['progress-week', weekEnding],
@@ -30,6 +31,13 @@ export function ApproveCompletion({ api, taskKey, onDone }: TaskScreenProps) {
   function loaded(task: Task) {
     const v = (task.variables ?? {}) as Record<string, unknown>;
     setWeekEnding(typeof v.weekEnding === 'string' ? v.weekEnding : '');
+    // BPA-66: why the Project Manager sent the week back to this screen (read allow-list weekDecision, weekChangeTarget, weekDecisionReason)
+    const reason = typeof v.weekDecisionReason === 'string' ? v.weekDecisionReason : '';
+    setNotice(
+      v.weekDecision === 'ChangesRequested' && v.weekChangeTarget === 'Progress' && reason !== ''
+        ? `Week sent back: ${reason}`
+        : '',
+    );
   }
 
   const change = (workpack: string, edit: Edit) => setEdits((all) => ({ ...all, [workpack]: { ...all[workpack], ...edit } }));
@@ -59,6 +67,7 @@ export function ApproveCompletion({ api, taskKey, onDone }: TaskScreenProps) {
       })}
     >
       {weekEnding !== '' && <p>{`Week ending ${showDate(weekEnding)}`}</p>}
+      {notice !== '' && <p className="notice notice--return">{notice}</p>}
       <table className="sign-table">
         <caption>Completion % of the week</caption>
         <thead>

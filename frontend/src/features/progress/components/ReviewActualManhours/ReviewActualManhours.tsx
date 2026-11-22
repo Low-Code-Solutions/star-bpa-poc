@@ -17,6 +17,7 @@ const two = (value?: number) => (value === undefined ? '' : value.toFixed(2));
  */
 export function ReviewActualManhours({ api, taskKey, onDone }: TaskScreenProps) {
   const [weekEnding, setWeekEnding] = useState('');
+  const [notice, setNotice] = useState('');
   const [remarks, setRemarks] = useState<Record<string, string>>({});
   const week = useQuery({
     queryKey: ['cbs-actuals', weekEnding],
@@ -29,6 +30,13 @@ export function ReviewActualManhours({ api, taskKey, onDone }: TaskScreenProps) 
   function loaded(task: Task) {
     const v = (task.variables ?? {}) as Record<string, unknown>;
     setWeekEnding(typeof v.weekEnding === 'string' ? v.weekEnding : '');
+    // BPA-66: why the Project Manager sent the week back to this screen (read allow-list weekDecision, weekChangeTarget, weekDecisionReason)
+    const reason = typeof v.weekDecisionReason === 'string' ? v.weekDecisionReason : '';
+    setNotice(
+      v.weekDecision === 'ChangesRequested' && v.weekChangeTarget === 'CostReview' && reason !== ''
+        ? `Week sent back: ${reason}`
+        : '',
+    );
   }
 
   return (
@@ -46,6 +54,7 @@ export function ReviewActualManhours({ api, taskKey, onDone }: TaskScreenProps) 
       })}
     >
       {weekEnding !== '' && <p>{`Week ending ${showDate(weekEnding)}`}</p>}
+      {notice !== '' && <p className="notice notice--return">{notice}</p>}
       <table className="sign-table">
         <caption>Actual man-hours by CBS</caption>
         <thead>

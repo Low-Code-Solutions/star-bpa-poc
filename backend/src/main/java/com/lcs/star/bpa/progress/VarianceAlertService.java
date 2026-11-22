@@ -129,7 +129,10 @@ public class VarianceAlertService {
             String text = VarianceMessages.cost(over.cbsCodeRef(), pct, over.actualCost(), over.revisedBudgetCost(), checkDate);
             String subject = VarianceMessages.costSubject(over.cbsCodeRef(), checkDate);
             for (String manager : reachable) {
-                recordCost(periodId, checkDate, over, pct, manager, false, VarianceAlertRepository.IN_SYSTEM, username);
+                // BPA-66 (decision (c)): once per week per CBS; a send-back re-run of the weekly check on a later day finds this week's alert and sends nothing more
+                if (periodId == null || !alerts.existsCostInPeriod(periodId, over.cbsCodeRef(), manager, VarianceAlertRepository.IN_SYSTEM)) {
+                    recordCost(periodId, checkDate, over, pct, manager, false, VarianceAlertRepository.IN_SYSTEM, username);
+                }
                 costEmailOnce(periodId, checkDate, over, pct, manager, false, emails.get(manager), subject, text, username);
             }
             if (pcon.isBlank()) {
@@ -150,7 +153,8 @@ public class VarianceAlertService {
     /** Sends the cost email unless its row is already recorded for the CBS and the day, then records it. */
     private void costEmailOnce(UUID periodId, LocalDate checkDate, CostOver over, BigDecimal pct, String recipient, boolean isEmail, String address, String subject, String text,
             String username) {
-        if (alerts.existsCost(over.cbsCodeRef(), recipient, VarianceAlertRepository.EMAIL, checkDate)) {
+        if (alerts.existsCost(over.cbsCodeRef(), recipient, VarianceAlertRepository.EMAIL, checkDate)
+                || (periodId != null && alerts.existsCostInPeriod(periodId, over.cbsCodeRef(), recipient, VarianceAlertRepository.EMAIL))) {
             LOG.info("The cost email about {} for {} to {} was already sent; nothing more to do", over.cbsCodeRef(), checkDate, recipient);
             return;
         }

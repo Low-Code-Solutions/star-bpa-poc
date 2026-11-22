@@ -60,6 +60,16 @@ public class VarianceAlertRepository {
                                AND coalesce(recipient_username, recipient_email) = ?)""", Boolean.class, cbs, channel, Date.valueOf(alertDate), recipient);
     }
 
+    /**
+     * BPA-66 (decision (c): once per week per CBS): true when a Cost alert for the CBS, recipient and channel is already linked to this period, whatever day it was sent, so a
+     * send-back re-run of the weekly check on a later day does not send it again. The daily close check (no period) keeps BPA-65's once per day.
+     */
+    public boolean existsCostInPeriod(UUID periodId, String cbs, String recipient, String channel) {
+        return jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM bpa.variance_alert WHERE alert_type = 'Cost' AND progress_period_id = ? AND cbs_code_ref = ? AND channel = ?
+                               AND coalesce(recipient_username, recipient_email) = ?)""", Boolean.class, periodId, cbs, channel, recipient);
+    }
+
     /** Records the Manhour alert; returns false (and writes nothing) when this recipient already has it on this channel for the period and CBS. */
     public boolean record(UUID periodId, String cbs, String type, BigDecimal actual, BigDecimal baseline, BigDecimal pct, String recipient, boolean recipientIsEmail,
             String channel, String username, Instant sentAt) {

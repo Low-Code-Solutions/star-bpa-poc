@@ -132,7 +132,9 @@ describe('ApproveWeeklyProgress', () => {
     expect(within(row).getByText('Rework on spools')).toBeInTheDocument();
     expect(within(rowOf('WP-000457')).getByText('40.00')).toBeInTheDocument(); // approved %
     expect(within(rowOf('WP-000457')).getByText('30.00')).toBeInTheDocument(); // last week's %
-    expect(within(await screen.findByText('A-2201').then((cell) => cell.closest('tr') as HTMLElement)).getByText('600.00')).toBeInTheDocument();
+    expect(
+      within(await screen.findByText('A-2201').then((cell) => cell.closest('tr') as HTMLElement)).getByText('600.00'),
+    ).toBeInTheDocument();
   });
 
   it('BPA66_changesNeedAReason', async () => {
@@ -166,7 +168,11 @@ describe('ApproveWeeklyProgress', () => {
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     expect(completeCall(calls)?.body).toEqual({
-      variables: { weekDecision: 'ChangesRequested', weekChangeTarget: 'CostReview', weekDecisionReason: 'Explain the spool rework cost' },
+      variables: {
+        weekDecision: 'ChangesRequested',
+        weekChangeTarget: 'CostReview',
+        weekDecisionReason: 'Explain the spool rework cost',
+      },
     });
   });
 

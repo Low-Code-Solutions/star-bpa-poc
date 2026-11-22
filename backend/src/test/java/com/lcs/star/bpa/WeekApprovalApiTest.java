@@ -192,7 +192,8 @@ class WeekApprovalApiTest {
         assertThat(decide("project-manager", "ChangesRequested", "Progress", PUNCH_LIST).statusCode()).isEqualTo(204);
         String ppc = awaitTask(instance, COMPLETION);
 
-        assertThat(ppcApprove(ppc, "WP-000461", "95").statusCode()).isEqualTo(204);
+        HttpResponse<String> approvedAgain = ppcApprove(ppc, "WP-000461", "95");
+        assertThat(approvedAgain.statusCode()).as(approvedAgain.body()).isEqualTo(204);
         String review = awaitTask(instance, REVIEW);
         assertThat(completeReview(review, "Rework on spools").statusCode()).isEqualTo(204);
 
@@ -318,7 +319,8 @@ class WeekApprovalApiTest {
         String ppc = awaitTask(instance, COMPLETION);
         clock.set(TODAY.plusSeconds(24 * 3600)); // 21 Nov
 
-        assertThat(ppcApprove(ppc, "WP-000461", "95").statusCode()).isEqualTo(204);
+        HttpResponse<String> approvedAgain = ppcApprove(ppc, "WP-000461", "95");
+        assertThat(approvedAgain.statusCode()).as(approvedAgain.body()).isEqualTo(204);
         awaitTask(instance, REVIEW);
 
         assertThat(costAlertRows()).as("no second cost alert for the same week").isEqualTo(cost);
@@ -382,6 +384,7 @@ class WeekApprovalApiTest {
                 approval.put("remark", "Punch list items open");
             } else {
                 approval.put("approvedPct", row.path("approvedPct").decimalValue());
+                approval.put("remark", row.path("remark").asText("Approved by PPC")); // the seeded approvals have no report row, so any % differs from the reference and needs a remark (BPA-60)
             }
             approvals.add(approval);
         }

@@ -33,9 +33,21 @@ const ROWS = [
 ];
 
 type Call = { method: string; path: string; body: unknown };
-type Options = { completeStatus?: number; completeDetail?: string; weekStatus?: number; rows?: unknown[]; variables?: Record<string, unknown> };
+type Options = {
+  completeStatus?: number;
+  completeDetail?: string;
+  weekStatus?: number;
+  rows?: unknown[];
+  variables?: Record<string, unknown>;
+};
 
-function fakeBackend({ completeStatus = 204, completeDetail = '', weekStatus = 200, rows = ROWS, variables = { weekEnding: '2026-11-19' } }: Options = {}) {
+function fakeBackend({
+  completeStatus = 204,
+  completeDetail = '',
+  weekStatus = 200,
+  rows = ROWS,
+  variables = { weekEnding: '2026-11-19' },
+}: Options = {}) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -283,7 +295,12 @@ describe('ApproveCompletion, a week sent back', () => {
 
   it('BPA66_changesRequestedGoBackToPpc', async () => {
     await renderScreen({
-      variables: { weekEnding: '2026-11-19', weekDecision: 'ChangesRequested', weekChangeTarget: 'Progress', weekDecisionReason: REASON },
+      variables: {
+        weekEnding: '2026-11-19',
+        weekDecision: 'ChangesRequested',
+        weekChangeTarget: 'Progress',
+        weekDecisionReason: REASON,
+      },
     });
 
     expect(await screen.findByText(`Week sent back: ${REASON}`)).toBeInTheDocument();
@@ -297,7 +314,12 @@ describe('ApproveCompletion, a week sent back', () => {
 
   it('noNoticeForASendBackToCostReview', async () => {
     await renderScreen({
-      variables: { weekEnding: '2026-11-19', weekDecision: 'ChangesRequested', weekChangeTarget: 'CostReview', weekDecisionReason: 'Explain the spool rework cost' },
+      variables: {
+        weekEnding: '2026-11-19',
+        weekDecision: 'ChangesRequested',
+        weekChangeTarget: 'CostReview',
+        weekDecisionReason: 'Explain the spool rework cost',
+      },
     });
 
     expect(screen.queryByText(/Week sent back/)).not.toBeInTheDocument();
