@@ -127,6 +127,8 @@ class WeekLockApiTest {
     private BookHoursFixture fixture;
     private UUID period;
     private long weekly;
+    /** Work Pack 461 under a number of its own for each test: WorkPackCompleted is buffered for P7D with the number as message id and correlation key (ADR 0008), so a message of an earlier test would otherwise reach this test's time sheet instance. */
+    private String wp461;
 
     /** All test classes share one Camunda: no instance left waiting by another class may take this class's jobs. */
     @BeforeAll
@@ -150,12 +152,14 @@ class WeekLockApiTest {
         BookHoursFixture.Ids ids = fixture.reset();
         fixture.completionBackground(); // WP-000457 and WP-000461 In Progress (A-2201), WP-000480 Released
         fixture.fmsBackground(ids); // WP-000470 In Progress
+        wp461 = "WP-9" + String.format("%05d", java.util.concurrent.ThreadLocalRandom.current().nextInt(100000));
+        jdbc.update("UPDATE bpa.workpack SET workpack_number = ? WHERE workpack_number = 'WP-000461'", wp461);
         flow = new AssignmentFlow(port, jdbc);
         // the last locked week (12 Nov): approved 30 / 60
         jdbc.update("UPDATE bpa.progress_period SET status = 'Locked', locked_at = now() WHERE week_ending = ?", java.sql.Date.valueOf(W12));
         UUID locked = jdbc.queryForObject("SELECT id FROM bpa.progress_period WHERE week_ending = ?", UUID.class, java.sql.Date.valueOf(W12));
         approved(locked, "WP-000457", "30");
-        approved(locked, "WP-000461", "60");
+        approved(locked, wp461, "60");
         period = null;
     }
 
@@ -194,11 +198,11 @@ class WeekLockApiTest {
     @Test
     void BPA67_hundredPercentCompletesTheWorkPack() {
         approvedWeek("100", "40");
-        long timesheets = timesheetInstanceAtBookHours("WP-000461");
+        long timesheets = timesheetInstanceAtBookHours(wp461);
 
         weekly = startWeekly(COMPLETE_WORKPACKS);
 
-        poll(() -> workPackStatus("WP-000461"), "Completed"::equals, "WP-000461 Completed");
+        poll(() -> workPackStatus(wp461), "Completed"::equals, "WP-000461 Completed");
         poll(() -> completed(timesheets, TIMESHEETS_CLOSED, 1), done -> done, "the time sheet instance of WP-000461 ended at " + TIMESHEETS_CLOSED);
         assertThat(workPackStatus("WP-000457")).as("40% stays In Progress").isEqualTo("In Progress");
     }
@@ -207,10 +211,10 @@ class WeekLockApiTest {
     @Test
     void BPA67_completionWaitsForApprovalInProgress() {
         approvedWeek("100", "40");
-        long timesheets = timesheetInstanceAtPpcApproval("WP-000461");
+        long timesheets = timesheetInstanceAtPpcApproval(wp461);
 
         weekly = startWeekly(COMPLETE_WORKPACKS);
-        poll(() -> workPackStatus("WP-000461"), "Completed"::equals, "WP-000461 Completed");
+        poll(() -> workPackStatus(wp461), "Completed"::equals, "WP-000461 Completed");
         poll(() -> completed(weekly, PERIOD_LOCKED, 1), done -> done, "the weekly instance ended at " + PERIOD_LOCKED);
 
         assertThat(openTasks(timesheets, APPROVE_PPC)).as("the instance still waits for PPC").hasSize(1);
@@ -228,7 +232,7 @@ class WeekLockApiTest {
 
         poll(() -> completed(weekly, PERIOD_LOCKED, 1), done -> done, "the weekly instance ended at " + PERIOD_LOCKED);
         assertThat(workPackStatus("WP-000457")).isEqualTo("In Progress");
-        assertThat(workPackStatus("WP-000461")).isEqualTo("In Progress");
+        assertThat(workPackStatus(wp461)).isEqualTo("In Progress");
     }
 
     @Test
@@ -249,10 +253,10 @@ class WeekLockApiTest {
     @Test
     void BPA67_sentBackWeekLeavesWorkPackInProgress() {
         approvedWeek("100", "40");
-        fixture.line(timesheetId("WP-000461", "E1021"), D16, "Cutting", new BigDecimal("6"), "Draft");
-        long timesheets = timesheetInstanceAtBookHours("WP-000461");
+        fixture.line(timesheetId(wp461, "E1021"), D16, "Cutting", new BigDecimal("6"), "Draft");
+        long timesheets = timesheetInstanceAtBookHours(wp461);
         weekly = startWeekly(APPROVE_WEEK);
-        JsonNode row = rowOf("WP-000461", json(flow.loggedInAs("project-manager").get("/api/v1/progress-periods/2026-11-19/workpacks").body()));
+        JsonNode row = rowOf(wp461, json(flow.loggedInAs("project-manager").get("/api/v1/progress-periods/2026-11-19/workpacks").body()));
         assertThat(row.path("unsentLines")).hasSize(1);
         assertThat(row.path("unsentLines").get(0).path("hours").decimalValue()).isEqualByComparingTo("6");
 
@@ -261,7 +265,7 @@ class WeekLockApiTest {
 
         assertThat(sentBack.statusCode()).as(sentBack.body()).isEqualTo(204);
         awaitTask(weekly, COMPLETION);
-        assertThat(workPackStatus("WP-000461")).isEqualTo("In Progress");
+        assertThat(workPackStatus(wp461)).isEqualTo("In Progress");
         assertThat(isActive(timesheets)).as("its time sheet instance is still running").isTrue();
         assertThat(jdbc.queryForObject("SELECT status FROM bpa.progress_period WHERE id = ?", String.class, period)).isEqualTo("CutOff");
     }
@@ -272,14 +276,14 @@ class WeekLockApiTest {
     @Test
     void aRerunOfCompleteWorkPacksPublishesOnce() {
         approvedWeek("100", "40");
-        long timesheets = timesheetInstanceAtBookHours("WP-000461");
+        long timesheets = timesheetInstanceAtBookHours(wp461);
         weekly = startWeekly(COMPLETE_WORKPACKS);
         poll(() -> completed(timesheets, TIMESHEETS_CLOSED, 1), done -> done, "the time sheet instance ended");
         int audits = jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'workpack' AND column_name = 'status' AND new_value = 'Completed'", Integer.class);
 
         completeWorker.handle(mock(JobClient.class, RETURNS_DEEP_STUBS), job(weekly));
 
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.published_message WHERE sha256 = 'WorkPackCompleted' AND workpack_number = 'WP-000461'", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.published_message WHERE sha256 = 'WorkPackCompleted' AND workpack_number = ?", Integer.class, wp461)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'workpack' AND column_name = 'status' AND new_value = 'Completed'", Integer.class))
                 .as("no second Completed row").isEqualTo(audits);
         assertThat(audits).isEqualTo(1);
@@ -330,7 +334,7 @@ class WeekLockApiTest {
                 VALUES (?, ?, 'CutOff', 9000000019, 'test', 'test')""", java.sql.Date.valueOf(W19), Timestamp.from(CUT_OFF));
         period = jdbc.queryForObject("SELECT id FROM bpa.progress_period WHERE week_ending = ?", UUID.class, java.sql.Date.valueOf(W19));
         approved(period, "WP-000457", pct457);
-        approved(period, "WP-000461", pct461);
+        approved(period, wp461, pct461);
     }
 
     private void approved(UUID periodId, String workpack, String pct) {

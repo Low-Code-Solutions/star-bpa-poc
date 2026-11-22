@@ -98,6 +98,7 @@ public class HourLineService {
     public Line add(UUID timesheetId, LocalDate date, String phase, BigDecimal hours, String remarks, BigDecimal completion, UUID timesheetFileId,
             String username) {
         Sheet sheet = sheet(timesheetId);
+        checkWorkPackOpen(sheet); // BPA-67: a Completed Work Pack takes no hours (409, Jira's text), before any rule about the date
         if ("Cancelled".equals(sheet.submissionStatus())) {
             throw new Refused(409, "Time sheet for " + sheet.employeeRef() + " on " + sheet.workpackNumber() + " is Cancelled");
         }
@@ -107,6 +108,7 @@ public class HourLineService {
         }
         checkValues(hours, remarks, completion);
         refuse(HourLineChecks.notInTheFuture(date, today()));
+        checkMonthOpen(date); // BPA-67 (S5): the month text first when the week is closed too (ASSUMPTION, plan Q9)
         checkWeekOpen(date);
         BigDecimal budget = lines.phaseBudget(sheet.workpackId(), phase)
                 .orElseThrow(() -> new Refused(400, "Phase " + phase + " is not on this Work Pack"));
@@ -155,6 +157,8 @@ public class HourLineService {
         if (!"Submitted".equals(old.status()) || !submissions.stageOfLine(lineId).map("Timekeeper"::equals).orElse(false)) {
             throw new Refused(409, "Line is not editable (status " + old.status() + ")");
         }
+        checkWorkPackOpen(old.sheet()); // BPA-67
+        checkMonthOpen(old.workDate()); // BPA-67
         if (reason == null || reason.isBlank()) {
             throw new Refused(400, "Reason is required");
         }
@@ -190,8 +194,24 @@ public class HourLineService {
         if (!List.of("Draft", "Returned").contains(line.status())) {
             throw new Refused(409, "Line is not editable (status " + line.status() + ")");
         }
+        checkWorkPackOpen(line.sheet()); // BPA-67: no change or delete on a Completed Work Pack (ASSUMPTION, plan Q7)
+        checkMonthOpen(line.workDate()); // BPA-67 (S5): after the lock no line of the month changes, a Returned one included; before it a Returned line can still be corrected
         if ("Draft".equals(line.status())) {
             checkWeekOpen(line.workDate());
+        }
+    }
+
+    /** BPA-67: 409 "Work Pack <WP> is Completed". */
+    private void checkWorkPackOpen(Sheet sheet) {
+        if ("Completed".equals(sheet.workpackStatus())) {
+            throw new Refused(409, HourLineChecks.completedMessage(sheet.workpackNumber()));
+        }
+    }
+
+    /** BPA-67 (S5): 400 "Hours for <Month YYYY> are locked" once BPA-64's month lock has run for the month of the work date. */
+    private void checkMonthOpen(LocalDate date) {
+        if (lines.monthLocked(date)) {
+            throw new Refused(400, HourLineChecks.monthLockedMessage(date));
         }
     }
 

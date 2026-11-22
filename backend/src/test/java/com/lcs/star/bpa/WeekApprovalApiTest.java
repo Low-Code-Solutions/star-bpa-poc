@@ -1,6 +1,7 @@
 package com.lcs.star.bpa;
 
 import static com.lcs.star.bpa.CamundaSteps.activeElements;
+import static com.lcs.star.bpa.CamundaSteps.completed;
 import static com.lcs.star.bpa.CamundaSteps.json;
 import static com.lcs.star.bpa.CamundaSteps.openTasks;
 import static com.lcs.star.bpa.CamundaSteps.poll;
@@ -146,11 +147,11 @@ class WeekApprovalApiTest {
         HttpResponse<String> done = decide("project-manager", "Approved", null, null);
 
         assertThat(done.statusCode()).as(done.body()).isEqualTo(204);
-        poll(() -> activeNames(), active -> active.contains(COMPLETE_WORKPACKS), COMPLETE_WORKPACKS + " of " + instance);
+        poll(() -> completed(instance, "EndEvent_PeriodLocked", 1), ended -> ended, "the weekly instance ended at EndEvent_PeriodLocked (BPA-67 completes the Work Packs and locks the week)");
         Map<String, Object> row = jdbc.queryForMap("SELECT week_approved_by, week_approved_at, status FROM bpa.progress_period WHERE id = ?", period);
         assertThat(row.get("week_approved_by")).isEqualTo("project-manager");
         assertThat((Timestamp) row.get("week_approved_at")).isEqualTo(Timestamp.from(TODAY));
-        assertThat(row.get("status")).as("the lock is BPA-67").isEqualTo("CutOff");
+        assertThat(row.get("status")).as("BPA-67 locks the week after the approval").isEqualTo("Locked");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'progress_period' AND record_id = ?", Integer.class, period))
                 .as("one audit row per changed column").isGreaterThanOrEqualTo(2);
     }
@@ -287,25 +288,21 @@ class WeekApprovalApiTest {
         assertThat(openTasks(instance, APPROVE_WEEK)).hasSize(1);
     }
 
-    /** A job retry of the record step for the same decision writes nothing new (re-run key: the values). */
+    /**
+     * A retry of the record step for the same decision writes nothing new (re-run key: the values). BPA-67: once the week is approved it is locked, so the retry is the service
+     * called twice on the open week (before BPA-67 it was a second instance started at the step).
+     */
     @Test
     void aRerunOfRecordWeekDecisionChangesNothing() {
         toTheWeekTask(false);
-        assertThat(decide("project-manager", "Approved", null, null).statusCode()).isEqualTo(204);
-        poll(() -> activeNames(), active -> active.contains(COMPLETE_WORKPACKS), COMPLETE_WORKPACKS + " of " + instance);
+        decisions.record(period, "Approved", null, null, "project-manager");
         Timestamp approvedAt = jdbc.queryForObject("SELECT week_approved_at FROM bpa.progress_period WHERE id = ?", Timestamp.class, period);
         int audits = jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'progress_period' AND record_id = ?", Integer.class, period);
+        assertThat(approvedAt).isEqualTo(Timestamp.from(TODAY));
 
         clock.set(TODAY.plusSeconds(3600));
-        Map<String, Object> variables = new LinkedHashMap<>();
-        variables.put("progressPeriodId", period.toString());
-        variables.put("weekEnding", W19.toString());
-        variables.put("weekDecision", "Approved");
-        variables.put("completedBy", "project-manager");
-        long second = startAt(RECORD_DECISION, variables);
+        decisions.record(period, "Approved", null, null, "project-manager");
 
-        // the second instance ran the record step if it has moved on to the next step (QA review: the first wait was already true and proved nothing)
-        poll(() -> activeElements(second).stream().map(e -> e.path("elementId").asText()).toList(), active -> active.contains(COMPLETE_WORKPACKS), COMPLETE_WORKPACKS + " of the second instance " + second);
         assertThat(jdbc.queryForObject("SELECT week_approved_at FROM bpa.progress_period WHERE id = ?", Timestamp.class, period)).isEqualTo(approvedAt);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'progress_period' AND record_id = ?", Integer.class, period)).isEqualTo(audits);
     }

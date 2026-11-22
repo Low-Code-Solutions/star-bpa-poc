@@ -1,6 +1,6 @@
 # 0008 Messaging and instance state
 
-- Status: Accepted (G7 amended by D61)
+- Status: Accepted (G7 amended by D61; WorkPackCompleted added by BPA-67)
 - Date: 2026-10-27 (decided, 09 LOCKED); G7 amended 2026-10-28 (D61, D67); written 2026-10-29 (BPA-37)
 - Deciders: Ahsan (Build Lead), Usama (Lead Developer); D49 by Khitaba (BA); D61 accepted 28 Oct
   (build-team answer relayed by Khitaba); D62 accepted 28 Oct; D67 by Faraz (Product Owner)
@@ -51,6 +51,13 @@ process starts (07 G6).
   | `AssignmentFileReplaced` | `workpackNumber` | 0 (G7) | Upload endpoint, setting `Replacing` in the same transaction (D61) |
   | `DrawingRevised` | `drawingRef:revision` | 0 | `POST /api/v1/drawing-revisions` (G6) |
   | `WorkPackAssigned` | `workpackNumber` (messageId the same) | 0 (ASSUMPTION; BPA-49) | Job worker `publish-workpack-assigned` behind the Epic 1 message end event, and `POST /api/v1/timesheet-processes` (E2-D18); starts `Process_PPC_TimesheetToProgress`. Duplicate guard: `published_message`, published first and recorded after |
+  | `WorkPackCompleted` | `workpackNumber` (messageId the same) | **P7D** (ASSUMPTION, Jira BPA-67; agreed by Ahsan 22 Nov 2026) | Job worker `complete-workpacks` after the Project Manager approves the week (BPA-67, `ServiceTask_CompleteWorkPacks`); ends the Work Pack's `Process_PPC_TimesheetToProgress` instance through `BoundaryEvent_WorkPackCompleted` |
+
+  `WorkPackCompleted` is the one message here that is **buffered**: the boundary event exists only while the instance is at `UserTask_BookHours`, so when the hours are in approval
+  (`UserTask_ValidateHours`, `UserTask_ApproveHoursProduction` or `UserTask_ApproveHoursPpc`) the message waits, with its time to live, until the instance is back at Book hours
+  (ASSUMPTION, Jira). A message nothing receives within 7 days expires and the instance keeps running (a logged gap: the three approval tasks have 24 h reminders). The message id (the
+  Work Pack number) stops a duplicate while the message is buffered, and a publish that Camunda answers with `ALREADY_EXISTS` counts as done (ADR 0007); the database guard is
+  `published_message` as for `WorkPackAssigned` (publish, then record).
 
   The message ID for assignment files is in ADR 0007 (G10).
 - **Upload while busy.** Upload while `Assigning` → "Assignment still in progress; try again later";

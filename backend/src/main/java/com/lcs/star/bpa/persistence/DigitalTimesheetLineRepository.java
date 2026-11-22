@@ -116,6 +116,11 @@ public class DigitalTimesheetLineRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM bpa.progress_period WHERE week_ending = ?)", Boolean.class, Date.valueOf(weekEnding)));
     }
 
+    /** BPA-67: true when the month of the work date is locked (BPA-64's {@code hours_month_lock}; its month is the first day). */
+    public boolean monthLocked(LocalDate workDate) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM bpa.hours_month_lock WHERE month = ?)", Boolean.class, Date.valueOf(workDate.withDayOfMonth(1))));
+    }
+
     public Optional<LocalDate> latestClosedWeekEnding() {
         return jdbc.queryForList("SELECT max(week_ending) FROM bpa.progress_period", Date.class).stream().filter(d -> d != null).map(Date::toLocalDate).findFirst();
     }

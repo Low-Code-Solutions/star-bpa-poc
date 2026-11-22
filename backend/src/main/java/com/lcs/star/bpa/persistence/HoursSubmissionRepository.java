@@ -226,4 +226,12 @@ public class HoursSubmissionRepository {
                 INSERT INTO bpa.audit_log (table_name, record_id, column_name, old_value, new_value, username, changed_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)""", table, recordId, column, oldValue, newValue, username, at);
     }
+
+    /** BPA-67 (S5): the date of the first line of the submission that falls in a month BPA-64 has locked, or empty when none does. */
+    public Optional<LocalDate> lockedMonthOf(UUID submissionId) {
+        return jdbc.queryForList("""
+                SELECT l.work_date FROM bpa.digital_timesheet_line l
+                WHERE l.hours_submission_id = ? AND EXISTS (SELECT 1 FROM bpa.hours_month_lock m WHERE m.month = date_trunc('month', l.work_date)::date)
+                ORDER BY l.work_date LIMIT 1""", java.sql.Date.class, submissionId).stream().map(java.sql.Date::toLocalDate).findFirst();
+    }
 }

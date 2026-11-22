@@ -2,6 +2,7 @@ package com.lcs.star.bpa.progress;
 
 import com.lcs.star.bpa.persistence.CompletionReportRepository;
 import com.lcs.star.bpa.persistence.CompletionReportRepository.ReadRow;
+import com.lcs.star.bpa.persistence.ProgressPeriodRepository;
 import com.lcs.star.bpa.persistence.WorkpackProgressRepository;
 import java.math.BigDecimal;
 import java.util.Collection;
@@ -25,10 +26,12 @@ public class CompletionProgressService {
 
     private final CompletionReportRepository reports;
     private final WorkpackProgressRepository progress;
+    private final ProgressPeriodRepository periods;
 
-    public CompletionProgressService(CompletionReportRepository reports, WorkpackProgressRepository progress) {
+    public CompletionProgressService(CompletionReportRepository reports, WorkpackProgressRepository progress, ProgressPeriodRepository periods) {
         this.reports = reports;
         this.progress = progress;
+        this.periods = periods;
     }
 
     @Transactional
@@ -44,6 +47,7 @@ public class CompletionProgressService {
             // a file-level line ("File cannot be read", ...): the report has no row to read; the line stays as it is (QA review: GET result keeps its meaning)
             return Decision.INVALID;
         }
+        periods.requireOpen(periodId); // BPA-67: a Locked week's reported % never changes (plan Q3)
         List<ReadRow> read = reports.readRows(reportId);
         if (read.isEmpty()) {
             reports.setOutcome(reportId, "Invalid", username);

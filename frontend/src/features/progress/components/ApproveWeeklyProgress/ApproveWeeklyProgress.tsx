@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Field } from '@/components/common/Field';
 import { TaskScreenShell } from '@/features/tasks/components/TaskScreenShell';
@@ -9,6 +9,10 @@ import { getCbsActuals, getEarnedManhours, getProgressWeek } from '../../service
 
 const two = (value?: number) => (value === undefined ? '' : value.toFixed(2));
 const EMPTY: WeekChoice = { decision: '', target: 'Progress', reason: '' };
+
+/** The sum of a Work Pack's unsent hours as the story writes it: 6 for 6.00 and 14.5 for 14.50 (ASSUMPTION, plan Q6). */
+const unsentHours = (lines: { hours: number }[] = []) =>
+  String(Number(lines.reduce((sum, line) => sum + line.hours, 0).toFixed(2)));
 
 /**
  * BPA-66: the Approve weekly progress screen on the shared TaskScreenShell (UserTask_ApproveWeeklyProgress, group project-manager). Read-only: per Work Pack the approved % and
@@ -79,29 +83,32 @@ export function ApproveWeeklyProgress({ api, taskKey, onDone }: TaskScreenProps)
       {workpacks
         .filter((row) => (row.unsentLines ?? []).length > 0)
         .map((row) => (
-          <table className="sign-table" key={`unsent-${row.workpackNumber}`}>
-            <caption>{`Unsent hours of ${row.workpackNumber} (approved at 100%)`}</caption>
-            <thead>
-              <tr>
-                <th scope="col">Worker</th>
-                <th scope="col">Date</th>
-                <th scope="col">Phase</th>
-                <th scope="col">Hours</th>
-                <th scope="col">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(row.unsentLines ?? []).map((line) => (
-                <tr key={`${line.employeeRef}-${line.workDate}-${line.phase}-${line.status}`}>
-                  <td>{line.employeeRef}</td>
-                  <td>{showDate(line.workDate)}</td>
-                  <td>{line.phase}</td>
-                  <td>{two(line.hours)}</td>
-                  <td>{line.status}</td>
+          <Fragment key={`unsent-${row.workpackNumber}`}>
+            <p className="notice">{`${row.workpackNumber}: ${unsentHours(row.unsentLines)} h not sent`}</p>
+            <table className="sign-table">
+              <caption>{`Unsent hours of ${row.workpackNumber} (approved at 100%)`}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Worker</th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Phase</th>
+                  <th scope="col">Hours</th>
+                  <th scope="col">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(row.unsentLines ?? []).map((line) => (
+                  <tr key={`${line.employeeRef}-${line.workDate}-${line.phase}-${line.status}`}>
+                    <td>{line.employeeRef}</td>
+                    <td>{showDate(line.workDate)}</td>
+                    <td>{line.phase}</td>
+                    <td>{two(line.hours)}</td>
+                    <td>{line.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Fragment>
         ))}
       <table className="sign-table">
         <caption>Earned man-hours</caption>

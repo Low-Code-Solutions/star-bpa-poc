@@ -43,9 +43,7 @@ public class EarnedManhoursService {
     /** Calculates and stores the week; a Locked week is an {@link IllegalArgumentException} and nothing is written. */
     @Transactional
     public void calculate(Period period, String username) {
-        if (periods.statusOfWeek(period.weekEnding()).filter("Locked"::equals).isPresent()) {
-            throw new IllegalArgumentException("Week ending " + period.weekEnding().format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)) + " is locked");
-        }
+        periods.requireOpen(period); // BPA-67: Locked week refused, the period row held for this transaction (plan Q3)
         Map<String, Stored> stored = new HashMap<>();
         rows.storedForUpdate(period.id()).forEach(row -> stored.put(row.activityRef(), row));
         for (Result result : roll(rows.counted(period.id(), period.weekEnding()))) {

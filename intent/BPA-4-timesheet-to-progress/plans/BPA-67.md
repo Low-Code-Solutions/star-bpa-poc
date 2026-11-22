@@ -289,5 +289,25 @@ Both classes use the injected `TestClock` and set the month-lock day through an 
   - the month text and order as written.
 - **Q10:** ask before any Jira transition.
 
+## Progress and departures (22 Nov 2026)
+**Commits:** 32bcc13 plan Approved; 2afa92e compile stubs and red backend and React tests; then the green commit (workers, guards, hours rules, summary line, ADR 0008 and data model).
+
+**Red runs shown before any production code (2afa92e):**
+- Backend: `WeekLockApiTest` 7 of 10 red, `HoursLockApiTest` 8 of 10 red (15 of 20). The three week scenarios 3, 5 and 6 and the lock scenario 7 waited 60 s for the work that no worker did (the stub workers have no `@JobWorker`, so the instance waits as before); the hours tests failed on the status (201 or 200 instead of 400 or 409) and the send test on the missing return to Book hours.
+- **Green before any code, as the plan said:** `BPA67_cutOffOpensThePeriod`, `BPA67_onePeriodPerWeekOnRetry` (BPA-58, BPA-50), `BPA67_sentBackWeekLeavesWorkPackInProgress` (the Java part, BPA-66), `BPA67_returnedLineInCutOffWeekCanBeCorrected` and `BPA67_returnedLineCorrectableBeforeMonthLock` (BPA-50, BPA-53). They are guards, not red-first tests.
+- React: `BPA67_sentBackWeekLeavesWorkPackInProgress` red (no summary line); the other 6 tests of the screen passed.
+
+**Departures from the plan:**
+1. **`WorkPackCompleted` answered 409 `ALREADY_EXISTS` counts as published.** The plan said "checked in the build": Camunda rejects a publish whose message id is still buffered, so a retry after a crash between publish and record would have failed forever. `CamundaProcessClient.publish` returns on that 409 (and only that one); `publish` has a time-to-live overload, BPA-49's call keeps 0.
+2. **Tests: Work Pack 461 gets a number of its own in each `WeekLockApiTest` test** (`WP-9nnnnn`). The message is buffered for P7D with the Work Pack number as id and key (ADR 0008), so in the one Camunda that all test classes share a message of an earlier test would end the next test's time sheet instance at once, or a second publish of the same id would be dropped. The first green run showed it (nine 409s). The Jira text "WP-000461" is kept in the scenario names and the React test.
+3. **`BPA67_returnedLineInCutOffWeekCanBeCorrected`:** the new-line refusal "Week ending 19 Nov 2026 is closed" is asserted **before** the send (the story's text). After the send the hours are in approval, and BPA-53's rule "Hours for <WP> are in approval; book them after the decision" comes first, so the test only asserts that the line is still refused (400 or 409). The story's "still refused" holds either way.
+4. **Existing tests edited:** `WeekApprovalApiTest.BPA66_projectManagerApprovesTheWeek` (the instance now ends at `EndEvent_PeriodLocked` and the period is Locked, was: waits at `ServiceTask_CompleteWorkPacks` and CutOff) and `aRerunOfRecordWeekDecisionChangesNothing` (the week is locked after the approval, so a second instance at the record step would fail; it is now the service called twice on the open week); `ProcessTestApplication` leaves both new workers out of its scan. `CompletionApprovalApiTest.aLockedWeekIsNeverChanged` and `EarnedManhoursApiTest.aLockedWeekIsRefused` kept their texts and pass.
+5. **Files in the diff that the plan did not list:** `ProgressPeriodRepository.requireOpen` and `lock`; `ProgressWeekRepository.approvedAtHundred` and `markCompleted`; `DigitalTimesheetLineRepository.monthLocked`; `HoursSubmissionRepository.lockedMonthOf`; `task/HoursMonthLockCheck` (named in the plan as "a decision check"); the `CompletionProgressService` constructor now takes `ProgressPeriodRepository`.
+6. **The guard is used in all six writers of the week's rows** (plan Q3), through one `requireOpen` that holds the period row `FOR UPDATE` in the writer's own transaction; the new ones are `CompletionProgressService.decide` (reported %) and `ProgressCheckService.record` (rule result).
+7. **Summary line (plan Q6):** one `<p class="notice">` per Work Pack above its unsent lines table, "<WP>: <hours> h not sent", hours as a plain number (6 for 6.00).
+8. **Docs:** ADR 0008 has the `WorkPackCompleted` row and why it is the one buffered message; data model §13.3.1 has "As built by BPA-67"; the contract texts (lines endpoints, upload outcomes, task decisions) name the new refusals.
+
+**Verification so far:** `WeekLockApiTest` 10/10, `HoursLockApiTest` 10/10, `WeekApprovalApiTest` 12/12; full `./mvnw -B verify` **696 tests, 0 failures**; frontend lint, `format:check`, build and `lint:bpmn` clean, `npm test` 148/148 (one run of the whole suite timed out in `CreateWorkPack.test.tsx` `BPA6_dateToCompleteBoundary` under load, 5.3 s against the 5 s limit; it passes alone, 9/9, and in the next full run).
+
 ## Human-gap log
 - None yet.

@@ -66,9 +66,7 @@ public class RetractionDecisionService {
     /** Writes the decisions and returns the outcome, "Approved" or "Declined". Anything the checks refuse is an {@link IllegalArgumentException}. */
     @Transactional
     public String decide(Period period, List<Decision> decisions, String username, long taskKey) {
-        if (periods.statusOfWeek(period.weekEnding()).filter("Locked"::equals).isPresent()) {
-            throw new IllegalArgumentException("Week ending " + period.weekEnding().format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)) + " is locked");
-        }
+        periods.requireOpen(period); // BPA-67: Locked week refused, the period row held for this transaction (plan Q3)
         List<Request> all = retractions.ofPeriod(period.id());
         List<Request> already = all.stream().filter(r -> r.taskKey() != null && r.taskKey() == taskKey).toList();
         if (!already.isEmpty()) {
