@@ -1,7 +1,7 @@
 # Plan: BPA-66 Project Manager can approve or send back a week's progress before the period locks
 Jira: BPA-66 (Story, epic BPA-4)
 Story last updated: 2026-11-22T13:23:18.828+0400
-Status: Approved (Ahsan, 22 Nov 2026)
+Status: Closed (22 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-66-pm-approve-week, from main 7ea3907
 
@@ -255,5 +255,20 @@ The PM's screen gets a new client function `getEarnedManhours` in `progressServi
 - **Not run by hand:** the later-day cost alert (the clock is the real clock; `aSendBackOnALaterDaySendsNoSecondCostAlert` proves it) and the browser screens (covered by the React tests; not opened in a browser).
 - **Side effects on the local stack:** the 19 Nov week's period has the approval and the last reason; WP-000030's approved % is now 95 (it was 60 before the proof); its variance alert and review rows remain; the instance waits at `ServiceTask_CompleteWorkPacks`.
 
+## After the `qa-reviewer` pass (22 Nov 2026; REVIEW.md "BPA-66 at e8912d7")
+- **Fixed after the review:**
+  - `aRerunOfRecordWeekDecisionChangesNothing` now waits for the second instance to reach `ServiceTask_CompleteWorkPacks` (it only gets there after the record step ran); before, its wait was already true and the test proved nothing. `WeekApprovalApiTest` 12/12 green after it.
+  - The once-per-week cost guard was shown failing: with the two `existsCostInPeriod` checks taken out of `VarianceAlertService` (a temporary edit, reverted, not committed), `aSendBackOnALaterDaySendsNoSecondCostAlert` fails "expected: 3 but was: 6"; with the guard it passes. The other BPA-66 scenario tests were red on the 404 only (no allow-list entry), which the PR says.
+  - The unsent line row key includes the status, so a Draft and a Returned line of the same Worker, date and phase do not collide.
+- **Accepted for the POC (recorded, not built):** a `weekChangeTarget` or `weekDecisionReason` sent with Approved is stored as a process variable although ignored (plan Q8); a second send-back with the identical reason writes no `audit_log` row and the target is stored only in Camunda history (plan Q4); the screen's `check()` lets the Project Manager submit while the week is still loading and a failed `earned-manhours` or `cbs-actuals` call shows empty tables (as the BPA-60, 63 and 64 screens); the task API does not check a Locked week (the record step fails the job; unreachable until BPA-67's lock, which comes after the approval); the daily close check on a later day still sends a cost alert for the same CBS and week (BPA-65's once per day, plan Q3 (b)); Jira's "Development" panel on BPA-66 shows a merged pull request from 21 Nov although this branch has none (not checked).
+- **For Ahsan and Jira (shown first, posted only on a yes):**
+  - **BPMN Reference:** the new step is not in Jira's reference. Proposed text: "Process_PPC_WeeklyProgressPeriod / UserTask_ApproveWeeklyProgress, ServiceTask_RecordWeekDecision, Gateway_IsWeekApproved (Flow_WeekApproved, Flow_WeekChangesRequested, Flow_WeekCostReviewRequested), Gateway_MergeReview". I never edit the field; Faraz or Khitaba accept it. The DoR box "BPMN element IDs exist" holds for the IDs Jira names.
+  - **ASSUMPTIONs:** the variable name `weekDecisionReason`; the 400 texts "Decision must be Approved or ChangesRequested", "Target is required" and "Target <x> is not allowed"; a target or reason sent with Approved is ignored; segregation is checked on Approved only (a send-back by the % approver is allowed); "Week ending <d MMM yyyy> is locked" in the record step; the unsent-lines rule (Draft and Returned lines of a Work Pack approved at exactly 100%, no date bound, information only); the history of each send-back reason is `audit_log` (no history table), the target is not stored; the weekly cost alert is once per period, CBS, recipient and channel, the daily close check once per day; the new step's worker is keyed on the values, not the process instance key; `earned-manhours` is opened to project-manager; the screen texts ("Approve week", "Request changes", "Send back to", "Reason", "Week sent back: <reason>" is the story's).
+- **Recorded after the review (plan vs diff):** no file is in the diff that the plan's "Progress and departures" does not list; `REVIEW.md` is the only planned file written in this commit.
+
 ## Human-gap log
-- None yet.
+- Demoed at sprint review: a human step (Ahsan, sprint review).
+- The Product Owner has not accepted the epic's `intent.md` and `spec.md` (the Definition of Ready box stays open, as for BPA-58 to BPA-65).
+- Jira write-backs wait for Ahsan's yes: the linkage comment, the BPMN Reference proposal and the ASSUMPTIONs above; Faraz or Khitaba accept the new step `ServiceTask_RecordWeekDecision`.
+- The Approve weekly progress screen and the two notices were covered by the React tests and the API on the local stack; no one opened them in a browser yet.
+- The lock after the approval (`ServiceTask_LockProgressPeriod`) is proved by BPA-67, which builds its worker.

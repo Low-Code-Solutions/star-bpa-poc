@@ -302,9 +302,10 @@ class WeekApprovalApiTest {
         variables.put("weekEnding", W19.toString());
         variables.put("weekDecision", "Approved");
         variables.put("completedBy", "project-manager");
-        startAt(RECORD_DECISION, variables);
+        long second = startAt(RECORD_DECISION, variables);
 
-        poll(() -> jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'progress_period' AND record_id = ?", Integer.class, period), n -> n >= audits, "the second run");
+        // the second instance ran the record step if it has moved on to the next step (QA review: the first wait was already true and proved nothing)
+        poll(() -> activeElements(second).stream().map(e -> e.path("elementId").asText()).toList(), active -> active.contains(COMPLETE_WORKPACKS), COMPLETE_WORKPACKS + " of the second instance " + second);
         assertThat(jdbc.queryForObject("SELECT week_approved_at FROM bpa.progress_period WHERE id = ?", Timestamp.class, period)).isEqualTo(approvedAt);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'progress_period' AND record_id = ?", Integer.class, period)).isEqualTo(audits);
     }

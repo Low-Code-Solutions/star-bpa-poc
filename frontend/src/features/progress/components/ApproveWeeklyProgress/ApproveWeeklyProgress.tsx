@@ -92,7 +92,7 @@ export function ApproveWeeklyProgress({ api, taskKey, onDone }: TaskScreenProps)
             </thead>
             <tbody>
               {(row.unsentLines ?? []).map((line) => (
-                <tr key={`${line.employeeRef}-${line.workDate}-${line.phase}`}>
+                <tr key={`${line.employeeRef}-${line.workDate}-${line.phase}-${line.status}`}>
                   <td>{line.employeeRef}</td>
                   <td>{showDate(line.workDate)}</td>
                   <td>{line.phase}</td>
