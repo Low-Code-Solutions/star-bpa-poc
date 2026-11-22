@@ -1,7 +1,7 @@
 # Plan: BPA-67 System can lock a week's progress and complete Work Packs approved at 100%
 Jira: BPA-67 (Story, epic BPA-4)
 Story last updated: 2026-11-22T16:03:09.233+0400
-Status: Approved (Ahsan, 22 Nov 2026)
+Status: Closed (22 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-67-lock-week-complete-workpacks, from main 7111793
 
@@ -113,7 +113,7 @@ After the Project Manager approves a week (BPA-66), the weekly instance stops at
   | A add (and E upload, as a row outcome) | refused. Checked before the week check (ASSUMPTION: the month text when both apply) |
   | B change, C delete | refused for **any** status once the month is locked, Returned included. Before the lock day a Returned line can still be changed (scenario 12) |
   | D amend (Timekeeper) | refused |
-  | F send (`PrepareHoursSubmissionWorker`) | a Draft or Returned line dated in a locked month stops the send with the BPMN error `HOURS_INVALID` and "Hours for <MMMM yyyy> are locked", shown on Book hours (ASSUMPTION) |
+  | F send (`PrepareHoursSubmissionWorker`, `HoursSubmissionRepository.send`) | **Changed after the review (Ahsan, 22 Nov 2026):** a Draft or Returned line dated in a locked month is left out of the send (never sent, stays Draft or Returned) and the rest is sent; when only such lines are left the step returns to Book hours with "Hours for <MMMM yyyy> are locked". Before the review the send stopped on the first such line (a dead end for the whole Work Pack) |
   | G decisions (Q2) | the task API refuses **Validated and Approved** for a submission with any line dated in a locked month: 409 "Hours for <MMMM yyyy> are locked". Returned and Rejected stay allowed so the hours do not get stuck (ASSUMPTION) |
   | H FMS export | unchanged: lines approved before the lock still go to FMS (exporting does not change a line) |
 
@@ -310,7 +310,7 @@ Both classes use the injected `TestClock` and set the month-lock day through an 
 **Verification so far:** `WeekLockApiTest` 10/10, `HoursLockApiTest` 10/10, `WeekApprovalApiTest` 12/12; full `./mvnw -B verify` **696 tests, 0 failures**; frontend lint, `format:check`, build and `lint:bpmn` clean, `npm test` 148/148 (one run of the whole suite timed out in `CreateWorkPack.test.tsx` `BPA6_dateToCompleteBoundary` under load, 5.3 s against the 5 s limit; it passes alone, 9/9, and in the next full run).
 
 ## Full-suite results and local-stack proof (22 Nov 2026)
-**Suites:** full `./mvnw -B verify` **696 tests, 0 failures** (`WeekLockApiTest` 10, `HoursLockApiTest` 10, `WeekApprovalApiTest` 12). Frontend: lint, `format:check`, build and `lint:bpmn` clean, `npm test` **148/148**. `grep -c "void BPA67_"` over the two classes = 12 (the 12 names of the Jira Definition of Done, once each); the React copy of `BPA67_sentBackWeekLeavesWorkPackInProgress` is the summary line.
+**Suites:** full `./mvnw -B verify` **696 tests, 0 failures** (`WeekLockApiTest` 10, `HoursLockApiTest` 10, `WeekApprovalApiTest` 12), and **698 tests, 0 failures** after the review fixes below (`WeekLockApiTest` 11, `HoursLockApiTest` 11). Frontend: lint, `format:check`, build and `lint:bpmn` clean, `npm test` **148/148**. `grep -c "void BPA67_"` over the two classes = 12 (the 12 names of the Jira Definition of Done, once each); the React copy of `BPA67_sentBackWeekLeavesWorkPackInProgress` is the summary line.
 
 **Local stack** (images rebuilt from this branch with `docker build`, `docker compose up -d --no-build bpa-app frontend`; calls through the portal origin as the personas; the BPMN is unchanged, the deployed weekly model equals `models/bpmn/` by the whitespace-normalised hash):
 - **The new workers took a real waiting instance.** When the new `bpa-app` started, an instance that the Project Manager had approved earlier (waiting at `ServiceTask_CompleteWorkPacks` since BPA-66) was taken at once: WP-000030 (approved 100%) became Completed and the 19 Nov period Locked, with the `audit_log` rows (`workpack.status` In Progress to Completed; `progress_period.status` CutOff to Locked and `locked_at`, all by `bpa-service`).
@@ -320,5 +320,27 @@ Both classes use the injected `TestClock` and set the month-lock day through an 
 - **Not run by hand:** the month lock and the lines of a locked month (the stack runs on the real clock; `HoursLockApiTest` proves them with the injected clock and `MonthLockJob`), the retries (the tests call `handle` twice), and the browser screens (the React tests; the new summary line was not opened in a browser).
 - **Side effects on the local stack:** the 19 Nov week is Locked and its approval is recorded; WP-000032 and, from the first run, WP-000030 were Completed at some point (WP-000030 is In Progress again, WP-000032 stays Completed); `published_message` has `WorkPackCompleted` rows for both; the seeded cost is back to 180000.00. To test the PM approval in the browser again, reset the week, the Work Pack statuses and the period status by SQL as the scratch script does, and use a Work Pack that has no `WorkPackCompleted` message yet.
 
+## After the `qa-reviewer` pass (22 Nov 2026; REVIEW.md "BPA-67 at 63e784c")
+- **Decided and fixed after the review (Ahsan, 22 Nov 2026):**
+  - **A locked-month line no longer blocks the send** (Important 1). With the first build, a Draft or Returned line dated in a month that BPA-64's lock had locked could not be changed, deleted or sent, and `PrepareHoursSubmissionWorker` stopped the whole Work Pack's send on it, so valid lines of other Workers and months were blocked too (and a Validated or Approved decision on such a submission was refused, so it could only be Returned back to the same dead end or Rejected). Decision: the send **leaves such a line out**: `DigitalTimesheetLineRepository.sendable` and `HoursSubmissionRepository.send` skip lines of a locked month, they stay Draft or Returned, and the valid lines are sent; when only such lines are left, the send step returns to Book hours with "Hours for <MMMM yyyy> are locked" (`firstLockedUnsent`). Test first: `aSendSkipsTheLinesOfALockedMonthAndSendsTheRest` was red (the send never reached Validate) at 8d32d5e, then green; `aSendWithALineOfALockedMonthReturnsToBookHours` and `HoursLockApiTest` 11/11 stay green. A locked-month line left behind is still shown on the PM's screen when its Work Pack is at 100% (information only), and it can no longer change; clearing such a line is not built (logged below).
+  - **`ReadCompletionReportWorker`** (Nit 1) now catches the Locked-week refusal and fails the job at once with no retries, as the other guarded record steps do (before: three retries and an incident). `aLockedWeekFailsTheReadStepWithNoRetries` was red (the exception left the worker) at 8d32d5e, then green.
+- **Accepted for the POC (recorded, not built):**
+  - Nit 2: the Timekeeper cannot amend the hours of a Work Pack completed while its hours wait in approval (plan Q7, Jira says only "add"); and Returned hours of such a Work Pack are not sent again, because the boundary event has ended the instance at Book hours. Both follow from the buffered design.
+  - Nit 3: scenario 8's new-line refusal is asserted with the story's text before the send; after the send only that it is still refused (BPA-53's "in approval" rule comes first). Scenario 11 is tested at the API; React does not test how the portal shows the 400 detail.
+  - Nit 4: the lock takes effect when `MonthLockJob` runs at 00:10 Asia/Riyadh (BPA-64's schedule), not at 00:00 as scenario 10's text reads; lines are not refused between 00:00 and 00:10.
+  - Nit 5: `RecordHoursDecisionWorker` has no month-lock backstop: if `MonthLockJob` runs between a Validated or Approved completion and the worker, the decision is recorded. The portal is the only completion route and the window is small.
+  - Style nits: some fully qualified `java.sql` and `java.time` types in new code; `requireOpen` repeats the "no progress period" text instead of `WeekDecisionService.NO_PERIOD`.
+- **For Ahsan and Jira (shown first, posted only on a yes):**
+  - **TTL (Jira DoR item):** the TTL P7D was agreed by Ahsan in plan mode (22 Nov 2026); the Jira comment still has to say so.
+  - **ASSUMPTIONs:** the TTL P7D and the buffered wait while hours are in approval; 409 "Work Pack <WP> is Completed" also on change, delete and amend; the month text and its order before the week check; the send leaves locked-month lines out; Validated and Approved are refused for hours of a locked month (409) while Returned and Rejected stay allowed; a 409 `ALREADY_EXISTS` on publish counts as published; the one `requireOpen` guard in all six writers of the week's rows; the summary line "<WP>: <hours> h not sent".
+  - **New story to propose (on a yes, label `claude-generated`, duplicates checked):** (a) Book hours does not show a Returned line dated in a cut-off week (Q8); (b) a locked-month Draft or Returned line cannot be cleared (a delete rule for it), and the hours of a Returned locked-month line stay with the Timekeeper's round.
+  - **Run by hand on QA after deploy (plan Q5):** the one-off SQL that locks the old CutOff periods; text is in the PR description.
+- **Recorded after the review (plan vs diff):** no file is in the diff that "Progress and departures" does not list, except `ReadCompletionReportWorker` and the two repository SQL changes above (this section); `REVIEW.md` is written in this commit.
+
 ## Human-gap log
-- None yet.
+- Demoed at sprint review: a human step (Ahsan, sprint review).
+- The Product Owner has not accepted the epic's `intent.md` and `spec.md` (the Definition of Ready box stays open, as for BPA-58 to BPA-66).
+- Jira write-backs wait for Ahsan's yes: the linkage comment, the TTL agreement (the Jira Definition of Ready item "TTL to agree with Ahsan" still reads open), and the ASSUMPTIONs listed above.
+- New stories to propose on Ahsan's yes (label `claude-generated`, duplicates checked): Book hours does not show a Returned line dated in a cut-off week (plan Q8); a locked-month Draft or Returned line cannot be cleared.
+- The one-off QA SQL for old CutOff periods (plan Q5) runs by hand after deploy; its text is in the PR description.
+- The summary line and the month-locked refusals were covered by the React tests and the API; no one opened them in a browser yet. The month lock itself is proved by the tests with the injected clock, not on the stack (real clock).

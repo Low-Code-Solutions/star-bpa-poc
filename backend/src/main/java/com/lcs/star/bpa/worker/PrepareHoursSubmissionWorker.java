@@ -49,17 +49,10 @@ public class PrepareHoursSubmissionWorker {
         List<SendLine> sendable = lines.sendable(workpackId);
         if (sendable.isEmpty()) {
             LOG.info("prepare-hours-submission job {}: nothing to send for {}", job.getKey(), workpackNumber);
-            client.newThrowErrorCommand(job.getKey()).errorCode("HOURS_INVALID")
-                    .variables(Map.of("validationMessages", List.of("No Draft or Returned hours to send for " + workpackNumber))).send().join();
+            // BPA-67 (S5; review decision, 22 Nov 2026): lines of a locked month are left out of the send, never sent; when they are all that is left, the message says why
+            String message = lines.firstLockedUnsent(workpackId).map(HourLineChecks::monthLockedMessage).orElse("No Draft or Returned hours to send for " + workpackNumber);
+            client.newThrowErrorCommand(job.getKey()).errorCode("HOURS_INVALID").variables(Map.of("validationMessages", List.of(message))).send().join();
             return;
-        }
-        // BPA-67 (S5; ASSUMPTION, plan section 4): a line dated in a locked month cannot be sent; the task returns to Book hours with the message
-        for (SendLine line : sendable) {
-            if (lines.monthLocked(line.workDate())) {
-                client.newThrowErrorCommand(job.getKey()).errorCode("HOURS_INVALID")
-                        .variables(Map.of("validationMessages", List.of(HourLineChecks.monthLockedMessage(line.workDate())))).send().join();
-                return;
-            }
         }
         List<Map<String, Object>> checks = new ArrayList<>();
         for (SendLine line : sendable) {

@@ -62,7 +62,14 @@ public class ReadCompletionReportWorker {
             fail(client, job, "Completion report " + reportId + " does not belong to the week of this instance");
             return;
         }
-        Decision decision = progress.decide(reportId, period.get().id(), username);
+        Decision decision;
+        try {
+            decision = progress.decide(reportId, period.get().id(), username);
+        } catch (IllegalArgumentException e) {
+            // BPA-67: a Locked week refuses the reported % (QA review): fail at once with no retries, as the other guarded record steps do
+            fail(client, job, e.getMessage());
+            return;
+        }
         if (decision == Decision.INVALID) {
             LOG.info("read-completion-report job {}: report {} has no usable row", job.getKey(), reportId);
             client.newThrowErrorCommand(job.getKey()).errorCode(ERROR_CODE).errorMessage(NO_USABLE_ROWS)

@@ -85,7 +85,8 @@ public class HoursSubmissionRepository {
         }
         List<Moving> moving = jdbc.query("""
                 SELECT l.id, l.status FROM bpa.digital_timesheet_line l JOIN bpa.digital_timesheet t ON t.id = l.digital_timesheet_id
-                WHERE t.workpack_id = ? AND l.status IN ('Draft', 'Returned') FOR UPDATE OF l""",
+                WHERE t.workpack_id = ? AND l.status IN ('Draft', 'Returned')
+                  AND NOT EXISTS (SELECT 1 FROM bpa.hours_month_lock m WHERE m.month = date_trunc('month', l.work_date)::date) FOR UPDATE OF l""",
                 (rs, n) -> new Moving(rs.getObject("id", UUID.class), rs.getString("status")), workpackId);
         for (Moving line : moving) {
             jdbc.update("UPDATE bpa.digital_timesheet_line SET status = 'Submitted', hours_submission_id = ?, updated_at = ?, updated_by = ? WHERE id = ?",
