@@ -126,6 +126,11 @@ public final class CompletionReportBuilder {
                 .xlsx();
     }
 
+    /** BPA-68 demo run: the one Work Pack of a freshly reset stack (WP-000001) at 40% with 15.5 actual hours, from FMS (the demo script, step Upload the completion report). */
+    public static byte[] demoRun() {
+        return report().row("WP-000001", 40, 15.5).xlsx();
+    }
+
     /** The report of the story's first scenario ("fms-completion-wk47.xlsx"): WP-000457 at 40% with 150 hours, WP-000461 at 100% with 95, both from FMS. */
     public static byte[] wk47() {
         return report().row("WP-000457", 40, 150).row("WP-000461", 100, 95).xlsx();
@@ -136,10 +141,11 @@ public final class CompletionReportBuilder {
         return "These are notes, not a workbook.\n".getBytes(StandardCharsets.UTF_8);
     }
 
-    /** Writes the demo file of the bad rows into the folder given (templates/demo): {@code java ... CompletionReportBuilder templates/demo}. */
+    /** Writes the demo files (the bad rows, BPA-68 demo run) into the folder given (templates/demo): {@code java ... CompletionReportBuilder templates/demo}. */
     public static void main(String[] args) throws IOException {
         Path dir = Path.of(args.length > 0 ? args[0] : "templates/demo");
         Files.createDirectories(dir);
         Files.write(dir.resolve("completion-demo-bad-rows.xlsx"), demoBadRows());
+        Files.write(dir.resolve("completion-demo-run.xlsx"), demoRun());
     }
 }

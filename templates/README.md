@@ -126,11 +126,12 @@ The layout of the weekly FMS completion report (BPA-59; E2-09; FLOW-CCR p3, FLOW
 
 ### demo/ (completion report)
 
-Both files name Work Packs of a fresh database (`WP-000001` and the next ones). Before showing them, replace the Work Pack numbers with In Progress Work Packs.
+`completion-demo-good.xlsx` and `completion-demo-bad-rows.xlsx` name Work Packs of a fresh database (`WP-000001` and the next ones); before showing them, replace the Work Pack numbers with In Progress Work Packs. `completion-demo-run.xlsx` is for the demo script, on a stack reset the same day.
 
 | File | What it shows |
 | --- | --- |
 | `completion-demo-good.xlsx` | two rows (`WP-000001` 40%, `WP-000002` 100%) that both read "Read" |
+| `completion-demo-run.xlsx` | BPA-68 demo run: one row, `WP-000001` at 40% with 15.5 actual hours from FMS, for the Work Pack of a freshly reset stack (`docs/showcase/epic1-epic2-demo.md`) |
 | `completion-demo-bad-rows.xlsx` | one row for each outcome, so none hides another: an unknown Work Pack, a 120% row that is still "Read" (left for approval), a second row for `WP-000001` ("Duplicate row for WP-000001"), `WP-000002` at 40.125 (two decimals), `WP-000003` at "forty" (not a number) and `WP-000004` with Source PMS (rejected while `progress.source` is FMS). It names `WP-000001` to `WP-000004` |
 
 Five `.csv` files (the same layout, comma and UTF-8) are for the portal demo and manual testing on the local dev stack. They name `WP-000011`, `WP-000030`, `WP-000031` and `WP-000032`, which are In Progress there (`WP-999999` does not exist); on another database replace the numbers with In Progress Work Packs. The upload needs an open "Upload FMS completion report" task of the weekly process.
