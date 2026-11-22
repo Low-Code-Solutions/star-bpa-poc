@@ -32,7 +32,7 @@ Portal: http://localhost:3000. Dates follow the business date 19 Nov 2026.
 | 3 | `project-engineer` | **Sign off release** | Approved | Work Pack Released |
 | 4 | `production-planner` | **Schedule Work Pack** | Start 26 Nov 2026, end 18 Dec 2026 (ASSUMPTION; the start must be at least 7 days after today) | Scheduled; the print is generated |
 | 5 | `time-method-analyst` | Open the Work Pack print | WP-000001 | The Work Pack print opens |
-| 6 | `production-team` | Upload the assignment file | `assign-demo-good.xlsx`: E1021 40 h and E1099 60 h | Both rows read "Assigned" |
+| 6 | `production-team` | Upload the assignment file | `assign-demo-good.xlsx`: E1021 40 h and E1099 60 h | Both rows read "Assigned" (wait a moment: they read "Pending" for a second or two first) |
 | 7 | | (Operate) | | Epic 1 instance ended at `EndEvent_WorkPackAssigned`; the timesheet process waits at `UserTask_BookHours` |
 | 8 | `supervisor` | **Book hours** | E1021, 16 Nov, Cutting, 8 h; E1099, 16 Nov, Cutting, 7.5 h | Both lines saved; WP-000001 becomes In Progress |
 | 8a | `supervisor` | **Live rule 1, the daily limit** | E1021, 17 Nov, Cutting, 17 h | Refused: "Worker E1021 would exceed 16 hours on 17 Nov 2026"; no line saved |
@@ -47,13 +47,13 @@ Portal: http://localhost:3000. Dates follow the business date 19 Nov 2026.
 | 16 | `project-manager` | **Approve weekly progress**: Approve week | | A-2301 shows Earned man-hours **480.00**; the week is approved |
 | 17 | | (Operate) | | The weekly process ended at `EndEvent_PeriodLocked` |
 
-**Step 10, the command** (Camunda REST on :8080, user demo, password demo; this is what the Thursday 23:59 timer does):
+**Step 10, the command**, in Git Bash or cmd (in PowerShell write `curl.exe`; its `curl` is another command) (Camunda REST on :8080, user demo, password demo; this is what the Thursday 23:59 timer does):
 
 ```
 curl -u demo:demo -X POST http://localhost:8080/v2/process-instances -H "Content-Type: application/json" -d "{\"processDefinitionId\":\"Process_PPC_WeeklyProgressPeriod\",\"startInstructions\":[{\"elementId\":\"ServiceTask_OpenProgressPeriod\"}]}"
 ```
 
-Live rule 2 shows BPA-60's check. BPA-61's own text ("<WP> completion cannot exceed 100% (approved 120%)") cannot come from the screen, because the check at approval refuses a value above 100 first; it is proved by `ProgressRuleApiTest` (see the Jira comment on BPA-68).
+Live rule 2 shows BPA-60's check. BPA-61's own text ("<WP> completion cannot exceed 100% (approved 120%)") cannot come from the screen, because the check at approval refuses a value above 100 first; it is proved by `ProgressRuleApiTest` (see questions 1 and 5 of the plan `intent/BPA-4-timesheet-to-progress/plans/BPA-68.md`; the Gherkin of scenario 3 still reads "sent back" until Khitaba amends it).
 
 ## Where it ends
 - The period for week ending 19 Nov 2026 is **Locked**.
@@ -63,7 +63,12 @@ Live rule 2 shows BPA-60's check. BPA-61's own text ("<WP> completion cannot exc
 
 ## Not shown
 Payroll and overtime, non-production timesheets, billing, live integrations, leave, HSE eligibility, Level 3 cost allocation, reopening a locked week.
-(Sources in `intent/BPA-4-timesheet-to-progress/intent.md`: "What it does not show" L40 and "Out of scope" L89-91.)
+
+Where each item comes from in `intent/BPA-4-timesheet-to-progress/intent.md` (the file has no "Not shown" heading, so the list follows Jira item BPA-68 (d), and the wording differs a little there):
+- payroll and overtime, billing (Epic 3), live integrations: "What it does not show", L40;
+- non-production timesheets, leave, Level 3 cost allocation: "Out of scope", L89;
+- billing ("progress billing and the Invoice Certificate"): "Out of scope", L90;
+- reopening a locked week, live FMS integration, hours on leave days, Worker eligibility from HSE TFC and medical fitness (HSE eligibility): "Out of scope", L91.
 
 ## What is behind it
 - **Epic 1** (BPA-3): the Work Pack numbered, released, scheduled, printed and assigned.

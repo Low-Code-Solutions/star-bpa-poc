@@ -345,12 +345,23 @@ final class DemoRun {
     // --- what the end state is -----------------------------------------------------------------------------------------------------
 
     /** The run's end state, as the Gherkin Then lines read it. */
-    void assertEndState(Run run, List<List<String>> fmsRows) {
+    void assertEndState(Run run, List<List<String>> fmsRows, String e1099Hours) {
         assertThat(fmsRows).as("FMS file rows of the demo Work Pack (others ignored)").hasSize(2);
+        // QA review: the rows themselves, not only their count: Badge No. (column 3), Date (2) and Hrs (10) of E1021 and of E1099 (7.5 h, or 7 h after the correction)
+        assertThat(fmsRows).extracting(r -> r.get(2) + " " + r.get(1) + " " + new BigDecimal(r.get(9).trim()).stripTrailingZeros().toPlainString())
+                .containsExactlyInAnyOrder("E1021 16/11/2026 8", "E1099 16/11/2026 " + e1099Hours);
         assertThat(jdbc.queryForObject("""
                 SELECT a.earned_manhours FROM bpa.activity_progress a JOIN bpa.progress_period p ON p.id = a.progress_period_id WHERE a.activity_ref = ? AND p.week_ending = ?""",
                 BigDecimal.class, ACTIVITY, java.sql.Date.valueOf(W19))).as("A-2301 Earned man-hours").isEqualByComparingTo("480.00");
-        assertThat(flow.loggedInAs("ppc-team").get("/api/v1/progress-periods/2026-11-19/earned-manhours").statusCode()).isEqualTo(200);
+        HttpResponse<String> earned = flow.loggedInAs("ppc-team").get("/api/v1/progress-periods/2026-11-19/earned-manhours");
+        assertThat(earned.statusCode()).isEqualTo(200);
+        BigDecimal shown = null;
+        for (JsonNode activity : json(earned.body()).path("activities")) {
+            if (ACTIVITY.equals(activity.path("activityRef").asText())) {
+                shown = activity.path("earnedManhours").decimalValue();
+            }
+        }
+        assertThat(shown).as("A-2301 Earned man-hours as the screen's API shows them").isEqualByComparingTo("480.00");
         assertThat(jdbc.queryForObject("SELECT status FROM bpa.progress_period WHERE week_ending = ?", String.class, java.sql.Date.valueOf(W19))).as("the period").isEqualTo("Locked");
         assertThat(jdbc.queryForObject("SELECT status FROM bpa.workpack WHERE workpack_number = ?", String.class, run.number())).as("the Work Pack").isEqualTo("In Progress");
         Reply timesheet = IntegrationApp.admin.get("/v2/process-instances/" + run.timesheetInstance());

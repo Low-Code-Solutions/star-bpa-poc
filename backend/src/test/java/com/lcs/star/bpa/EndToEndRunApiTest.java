@@ -7,6 +7,7 @@ import com.lcs.star.bpa.DemoRun.Run;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.util.List;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -96,7 +97,7 @@ class EndToEndRunApiTest {
         assertThat(demo.approveCompletion(weekly, run, "40").statusCode()).as("PPC approves 40 %").isEqualTo(204);
         demo.closeTheWeek(weekly);
 
-        demo.assertEndState(run, fmsRows);
+        demo.assertEndState(run, fmsRows, "7.5");
     }
 
     @Test
@@ -119,7 +120,7 @@ class EndToEndRunApiTest {
         assertThat(demo.approveCompletion(weekly, run, "40").statusCode()).as("PPC approves 40 %").isEqualTo(204);
         demo.closeTheWeek(weekly);
 
-        demo.assertEndState(run, fmsRows);
+        demo.assertEndState(run, fmsRows, "7");
     }
 
     @Test
@@ -145,6 +146,14 @@ class EndToEndRunApiTest {
         assertThat(above.statusCode()).as(above.body()).isEqualTo(400);
         assertThat(json(above.body()).path("detail").asText()).isEqualTo(ABOVE_100);
         assertThat(CamundaSteps.openTasks(weekly, DemoRun.APPROVE_COMPLETION)).as("the task stays open").hasSize(1);
+        // QA review: the row exists (the report read set its reported 40 %) and holds no approved %, so the refused 120 was not stored
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.workpack_progress WHERE reported_pct = 40", Integer.class)).as("the reported % is there").isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.workpack_progress WHERE approved_pct IS NOT NULL", Integer.class)).as("nothing approved").isZero();
+    }
+
+    /** QA review: leave nothing waiting for the next class (its Work Pack is WP-000001 too, and BoundaryEvent_WorkPackCompleted correlates on the number). */
+    @AfterAll
+    static void leaveNoInstanceWaiting() {
+        DemoRun.cancelWaiting();
     }
 }

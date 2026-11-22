@@ -1,7 +1,7 @@
 # Plan: BPA-68 PPC Team can see one Work Pack run from creation to locked progress in one demo
 Jira: BPA-68 (Story, epic BPA-4)
-Story last updated: 2026-11-17T11:46:03.700+0400
-Status: Approved (Ahsan, 22 Nov 2026)
+Story last updated: 2026-11-22T22:59:40.189+0400
+Status: Closed (23 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-68-end-to-end-demo, from main 6f789dc
 
@@ -297,6 +297,20 @@ One class, **`EndToEndRunApiTest`** (integration stack, real workers, Mailpit, `
   - Steps 15 and 16: the review completed with the remark; the PM screen's API showed A-2301 actualPct 40.00, earnedManhours 480.00; the week approved.
   - End: the period **Locked**; WP-000001 **In Progress**; A-2301 Earned man-hours 480.00; the only active element in Camunda was `UserTask_BookHours` (the weekly instance had ended).
   - Not done by hand: the returned-hours detour (9a) and the portal screens; the test `BPA68_returnedHoursRejoinTheRun` proves the detour.
+
+## Full-suite results (22 and 23 Nov 2026)
+- `./mvnw -B -Dtest=EndToEndRunApiTest verify`: 3 tests, 0 failures, 228.8 s (first run, before the review fixes).
+- Full `./mvnw -B verify` (at d64b326, before the review fixes): **701 tests, 1 failure**: `ConfirmWorkPackApiTest.BPA23_correctMaterialsAndPhases` (line 120: the Confirm step came back with `saved=false`, no validation message, 4.9 s). This branch changes no production code and the test is an Epic 1 test; it **passed on a rerun** (`ConfirmWorkPackApiTest` 9/9 together with `EndToEndRunApiTest` 3/3, 12 tests, 0 failures, after the review fixes). I could not find the cause; it looks like the timing flake the plan Risks name (shared Camunda), but I have not shown that. Logged here, not fixed; a Jira item can be proposed if it recurs.
+- Frontend: untouched (no change under `frontend/`), not rerun.
+- Deployed BPMN and DMN against `models/`: no model changed in BPA-68; the dry run ran on the images built from main 6f789dc (BPA-67), which carry the same models.
+
+## After the `qa-reviewer` pass (23 Nov 2026; REVIEW.md "BPA-68 at d64b326")
+- **Fixed after the review:** the end state now checks the FMS rows' content (E1021 16/11/2026 8 h; E1099 16/11/2026 7.5 h, or 7 h in test 2), reads A-2301's 480.00 from the screen's API as well as the database, proves in the 120% test that the report row exists with its reported 40 and no approved %, and cancels waiting instances in an `@AfterAll`. The script now points at this plan's Questions 1 and 5 (not at a Jira comment that does not exist yet), tells the presenter to wait a moment after the assignment upload and to use Git Bash, cmd or `curl.exe`, and cites the intent.md line of each "Not shown" item.
+- **Accepted for the POC (recorded, not built):** FMS rows are filtered by Activity (the file has no Work Pack column); the first running timesheet instance of the number is taken; no bound on a hung `poll`; the portal screens are not clicked (Human gap).
+- **Test-first:** not shown. All three tests were green at their first run because BPA-68 adds no production code (said in the plan and in commit d7d1c58). The prediction "scenario 3 red as Jira reads" in the table above was not demonstrated.
+- **For Ahsan and Jira (shown first, posted only on a yes):** (1) Q1: Gherkin scenario 3's last line cannot be met as written (BPA-60 refuses 120 first); Khitaba to amend. (2) Q5: Jira's Background has today at 16 Nov, where a 17 Nov line is refused as "Work date cannot be in the future"; the test moves the clock to 17 Nov 09:00 (ASSUMPTION). (3) Q6: intent.md has no "Not shown" list; the script follows Jira (d) and cites intent.md L40 and L89-91. (4) Q8: the ASSUMPTION demo data. (5) the Jira DoR item "script and demo data agreed with the build team" (Ahsan's approval of this plan) and the unticked intent.md / spec.md acceptance.
+- **Jira status:** Ahsan moved BPA-68 from Ready to In Progress on 22 Nov 2026 22:59 (Jira changelog); no content field changed since 17 Nov. Story last updated is therefore 22 Nov 22:59:40 (+0400).
+- **Recorded (plan vs diff):** the diff holds `EndToEndRunApiTest`, `DemoRun`, `CompletionReportBuilder` (`demoRun()` and `main`), `templates/demo/completion-demo-run.xlsx`, `templates/README.md`, `docs/showcase/epic1-epic2-demo.md`, the plan, `REVIEW.md` and the regenerated `intent/README.md`; nothing else.
 
 ## Human-gap log
 - **DoR, story-specific:** "Showcase script and demo data agreed with the build team". The demo data and method are in this plan. Ahsan's approval is the build team's agreement; Khitaba sees them in the PR.
