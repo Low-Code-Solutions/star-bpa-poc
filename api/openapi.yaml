@@ -1338,7 +1338,7 @@ paths:
         the budgeted units snapshotted on the row, the cumulative Earned man-hours (activity % / 100 x budgeted units, rounded half-up to 2 decimals;
         absent when the activity has no budgeted units), the Earned man-hours of the latest Locked week before this one, and the week's increase
         (this week's Earned MH minus that one, 0 when there is none; derived, never stored). A week not calculated yet gives an empty list.
-        Groups ppc-team and cost-controller (delta §7). 404 when the week has no progress period.
+        Groups ppc-team, cost-controller and (BPA-66, for the Approve weekly progress screen) project-manager (delta §7). 404 when the week has no progress period.
       x-assumption: true
       x-assumption-note: the shape, the week's increase base (0 when no Locked week) and the 404 text are ASSUMPTIONs of the plan
       responses:
@@ -1791,7 +1791,7 @@ components:
         elementId:
           type: string
           description: BPMN element ID of the user task
-          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction, UserTask_ApproveHoursPpc, UserTask_SendHoursToFms, UserTask_UploadCompletionReport, UserTask_ApproveCompletion, UserTask_ApproveRetraction, UserTask_ReviewActualManhours]
+          enum: [UserTask_CreateWorkPack, UserTask_ConfirmWorkPack, UserTask_SignOffRelease, UserTask_ScheduleWorkPack, UserTask_BookHours, UserTask_ValidateHours, UserTask_ApproveHoursProduction, UserTask_ApproveHoursPpc, UserTask_SendHoursToFms, UserTask_UploadCompletionReport, UserTask_ApproveCompletion, UserTask_ApproveRetraction, UserTask_ReviewActualManhours, UserTask_ApproveWeeklyProgress]
         processInstanceKey:
           $ref: '#/components/schemas/CamundaKey'
         workpackNumber:
@@ -1847,7 +1847,7 @@ components:
             line's id, data model §6.3); UserTask_SignOffRelease takes signOffDecision (Approved or Declined) and
             declineReason; UserTask_ScheduleWorkPack takes plannedStartDate and plannedEndDate; UserTask_SendHoursToFms
             (BPA-58) takes fmsHandOffs [{fmsHoursExportId, outcome (Sent to FMS or Rejected by FMS), reason}], one entry for
-            each file of the task (the reason is required, at most 250 characters, for Rejected by FMS). UserTask_ApproveCompletion (BPA-60) takes completionApprovals [{workpackNumber, approvedPct, remark}], one entry for each Work Pack of the week (the whole week is approved at once; approvedPct has at most 2 decimals and lies between 0 and 100; the remark is required, at most 250 characters, when approvedPct differs from the reported %; a 409 "Week ending <date> must be locked first" when the week before is not Locked; "Approvals are required", "Approvals must cover every Work Pack of the week", "Completion % must be between 0 and 100" and "Remark can be at most 250 characters" are ASSUMPTIONs); UserTask_ApproveCompletion also takes, per entry, retractionReason, required (at most 250 characters, ASSUMPTION text "Retraction reason can be at most 250 characters") when approvedPct is below the last locked % and no Approved retraction exists for that %, else 400 "A retraction reason is required when completion falls below last week (<prev>%)"; UserTask_ApproveRetraction (BPA-63, project-manager) takes retractionDecisions [{workpackNumber, retractionDecision (Approved or Declined), reason}], one entry for each Work Pack waiting for a retraction (Declined needs a reason of at most 250 characters, 400 "Reason is required"; 409 "You cannot approve a retraction you requested"; "Decisions must cover every Work Pack waiting for a retraction" and "Reason can be at most 250 characters" are ASSUMPTIONs); UserTask_ReviewActualManhours (BPA-64, cost-controller) takes cbsReviews [{cbsCodeRef, remark}], one entry for each CBS of the week (the remark is required for a CBS with a man-hour alert, 400 "A remark is required for <CBS> (alert raised)", at most 500 characters; "Reviews are required", "Remark can be at most 500 characters" and "CBS is not part of this review" are ASSUMPTIONs); UserTask_UploadCompletionReport (BPA-59) takes completionReportId, the id of the upload that counts ("Completion report is required" and "Completion report is not for this week" are ASSUMPTIONs). The 400 texts "Outcome is required for each file", "Outcome must be Sent to FMS or Rejected by FMS", "Reason can be at most 250 characters" and "File is not part of this task" are ASSUMPTIONs ("Reason is required" is the story's).
+            each file of the task (the reason is required, at most 250 characters, for Rejected by FMS). UserTask_ApproveCompletion (BPA-60) takes completionApprovals [{workpackNumber, approvedPct, remark}], one entry for each Work Pack of the week (the whole week is approved at once; approvedPct has at most 2 decimals and lies between 0 and 100; the remark is required, at most 250 characters, when approvedPct differs from the reported %; a 409 "Week ending <date> must be locked first" when the week before is not Locked; "Approvals are required", "Approvals must cover every Work Pack of the week", "Completion % must be between 0 and 100" and "Remark can be at most 250 characters" are ASSUMPTIONs); UserTask_ApproveCompletion also takes, per entry, retractionReason, required (at most 250 characters, ASSUMPTION text "Retraction reason can be at most 250 characters") when approvedPct is below the last locked % and no Approved retraction exists for that %, else 400 "A retraction reason is required when completion falls below last week (<prev>%)"; UserTask_ApproveRetraction (BPA-63, project-manager) takes retractionDecisions [{workpackNumber, retractionDecision (Approved or Declined), reason}], one entry for each Work Pack waiting for a retraction (Declined needs a reason of at most 250 characters, 400 "Reason is required"; 409 "You cannot approve a retraction you requested"; "Decisions must cover every Work Pack waiting for a retraction" and "Reason can be at most 250 characters" are ASSUMPTIONs); UserTask_ReviewActualManhours (BPA-64, cost-controller) takes cbsReviews [{cbsCodeRef, remark}], one entry for each CBS of the week (the remark is required for a CBS with a man-hour alert, 400 "A remark is required for <CBS> (alert raised)", at most 500 characters; "Reviews are required", "Remark can be at most 500 characters" and "CBS is not part of this review" are ASSUMPTIONs); UserTask_ApproveWeeklyProgress (BPA-66, project-manager) takes weekDecision (Approved or ChangesRequested), and for ChangesRequested weekChangeTarget (Progress or CostReview) and weekDecisionReason (required, 400 "Reason is required"; "Decision is required", "Target is required" and "Target <x> is not allowed" are ASSUMPTIONs); a target or reason sent with Approved is ignored (ASSUMPTION); 409 "You cannot approve a week whose progress you approved" when the user approved the % of any Work Pack of the week (Approved only); UserTask_UploadCompletionReport (BPA-59) takes completionReportId, the id of the upload that counts ("Completion report is required" and "Completion report is not for this week" are ASSUMPTIONs). The 400 texts "Outcome is required for each file", "Outcome must be Sent to FMS or Rejected by FMS", "Reason can be at most 250 characters" and "File is not part of this task" are ASSUMPTIONs ("Reason is required" is the story's).
             The backend adds `completedBy`, the session user's Camunda username, to every completion, so the save workers
             record who did the work (D63; BPA-6). It is on no allow-list: a request that sends it is refused with 400.
             Likewise it adds `completedTaskKey`, the key of the task being completed, the re-run key of a worker that records a
@@ -2431,6 +2431,34 @@ components:
         retractionApproved:
           type: boolean
           description: BPA-63. True when an Approved retraction of this Work Pack is for exactly the stored approvedPct, so a % kept at it needs no new reason (the screen's check; the server decides)
+        unsentLines:
+          type: array
+          description: >-
+            BPA-66 (E2-19; BPA-67 rule (c)). Only for a Work Pack whose approvedPct is exactly 100: its time sheet lines still Draft or Returned (not yet sent for
+            approval), so the Project Manager sees them before approving the week. Information only; no date bound (ASSUMPTION, plan Q5). Empty or absent otherwise.
+          items:
+            $ref: '#/components/schemas/UnsentLine'
+    UnsentLine:
+      type: object
+      description: BPA-66. One Draft or Returned time sheet line of a Work Pack approved at 100%.
+      required: [employeeRef, workDate, phase, hours, status]
+      properties:
+        employeeRef:
+          type: string
+          example: E1021
+        workDate:
+          type: string
+          format: date
+        phase:
+          type: string
+          example: Cutting
+        hours:
+          type: number
+          description: Hours with 2 decimals
+          example: 8.00
+        status:
+          type: string
+          enum: [Draft, Returned]
     CompletionReportResult:
       type: object
       description: completion_report and its completion_report_row rows (data model §13.3.3)
