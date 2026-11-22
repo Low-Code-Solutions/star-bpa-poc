@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,6 +23,7 @@ import com.lcs.star.bpa.progress.ProgressCheckService;
 import com.lcs.star.bpa.worker.CompleteWorkPacksWorker;
 import com.lcs.star.bpa.worker.LockProgressPeriodWorker;
 import com.lcs.star.bpa.worker.OpenProgressPeriodWorker;
+import com.lcs.star.bpa.worker.ReadCompletionReportWorker;
 import io.camunda.client.api.response.ActivatedJob;
 import io.camunda.client.api.worker.JobClient;
 import java.math.BigDecimal;
@@ -113,6 +115,9 @@ class WeekLockApiTest {
 
     @Autowired
     LockProgressPeriodWorker lockWorker;
+
+    @Autowired
+    ReadCompletionReportWorker readWorker;
 
     @Autowired
     CompletionApprovalService approvals;
@@ -323,6 +328,29 @@ class WeekLockApiTest {
         assertThatThrownBy(() -> completionProgress.decide(report, period, "bpa-service")).isInstanceOf(IllegalArgumentException.class).hasMessage(LOCKED);
         assertThat(jdbc.queryForList("SELECT rule_result FROM bpa.workpack_progress WHERE progress_period_id = ? AND rule_result IS NOT NULL", String.class, period)).isEmpty();
         assertThat(jdbc.queryForList("SELECT reported_pct FROM bpa.workpack_progress WHERE progress_period_id = ? AND reported_pct IS NOT NULL", BigDecimal.class, period)).isEmpty();
+    }
+
+    /** QA review: a stale instance on a Locked week fails the read step at once with no retries, as the other guarded record steps do (not three retries and an incident). */
+    @Test
+    void aLockedWeekFailsTheReadStepWithNoRetries() {
+        approvedWeek("100", "40");
+        jdbc.update("UPDATE bpa.progress_period SET status = 'Locked', locked_at = now() WHERE id = ?", period);
+        UUID report = jdbc.queryForObject("""
+                INSERT INTO bpa.completion_report (progress_period_id, file_name, sha256, uploaded_by, received_at, created_by, updated_by)
+                VALUES (?, 'fms-completion-wk47.xlsx', 'test', 'ppc-team', now(), 'test', 'test') RETURNING id""", UUID.class, period);
+        jdbc.update("""
+                INSERT INTO bpa.completion_report_row (completion_report_id, row_number, workpack_number, completion_pct_raw, actual_hours_raw, source_raw, source, outcome,
+                                                       created_by, updated_by)
+                VALUES (?, 2, 'WP-000457', '55', '150', 'FMS', 'FMS', 'Read', 'test', 'test')""", report);
+        ActivatedJob job = mock(ActivatedJob.class);
+        when(job.getKey()).thenReturn(4_000_000_068L);
+        when(job.getProcessInstanceKey()).thenReturn(9000000019L); // the period's instance key (approvedWeek)
+        when(job.getVariablesAsMap()).thenReturn(Map.of("completionReportId", report.toString(), "completedBy", "ppc-team"));
+        JobClient client = mock(JobClient.class, RETURNS_DEEP_STUBS);
+
+        readWorker.handle(client, job);
+
+        verify(client.newFailCommand(4_000_000_068L)).retries(0);
     }
 
     // --- helpers ----------------------------------------------------------------------------------------------------------------

@@ -248,6 +248,27 @@ class HoursLockApiTest {
         assertThat(lineStatus(line)).isEqualTo("Draft");
     }
 
+    /**
+     * Review decision (Ahsan, 22 Nov 2026): a line of a locked month can no longer change, so the send leaves it alone (Draft or Returned, never sent) and sends the rest; one such
+     * line never blocks the Work Pack's valid lines of other Workers and months.
+     */
+    @Test
+    void aSendSkipsTheLinesOfALockedMonthAndSendsTheRest() {
+        UUID november = fixture.line(ids.timesheet("E1021"), LocalDate.of(2026, 11, 30), "Cutting", new BigDecimal("8"), "Draft");
+        UUID december = fixture.line(ids.timesheet("E1099"), LocalDate.of(2026, 12, 1), "Cutting", new BigDecimal("8"), "Draft");
+        long instance = startAtBookHours("WP-000457");
+        String book = awaitTask(instance, BOOK_HOURS);
+        lockDay("1");
+        lockNovember("2026-12-02T07:00:00Z");
+
+        HttpResponse<String> sent = flow.loggedInAs("supervisor").post("/api/v1/tasks/" + book + "/complete", toJson(Map.of("variables", Map.of())));
+
+        assertThat(sent.statusCode()).as(sent.body()).isEqualTo(204);
+        awaitTask(instance, VALIDATE);
+        assertThat(lineStatus(december)).as("the December line was sent").isEqualTo("Submitted");
+        assertThat(lineStatus(november)).as("the November line was left as it was").isEqualTo("Draft");
+    }
+
     /** Validated and Approved are refused for hours of a locked month (409); Returned stays allowed, so the hours do not get stuck (plan Q2). */
     @Test
     void aDecisionOnHoursOfALockedMonthIsRefusedUnlessItReturnsThem() {
