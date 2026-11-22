@@ -92,6 +92,7 @@ public class ProgressCheckService {
     /** Writes each result's {@code rule_result} and returns the messages (one per Work Pack that is not Accepted), in the order of the results. */
     @Transactional
     public List<String> record(Period period, List<Result> results, String username) {
+        periods.requireOpen(period); // BPA-67: a Locked week's rule results never change (plan Q3)
         List<String> messages = new ArrayList<>();
         for (Result result : results) {
             progress.setRuleResult(period.id(), result.workpackNumber(), result.progressResult(), username);

@@ -78,17 +78,29 @@ public class CamundaProcessClient {
      * what a retried publish needs. Only a 5xx or an unreachable engine is an error.
      */
     public void publish(String messageName, String correlationKey, String messageId, Map<String, Object> variables) {
+        publish(messageName, correlationKey, messageId, variables, 0);
+    }
+
+    /**
+     * The same publication with a time-to-live in milliseconds (BPA-67: WorkPackCompleted waits, buffered, while a Work Pack's hours are in approval, P7D = 604800000, ASSUMPTION;
+     * the message id then stops a duplicate while it is buffered, ADR 0007). 0 is BPA-49's.
+     */
+    public void publish(String messageName, String correlationKey, String messageId, Map<String, Object> variables, long timeToLiveMillis) {
         try {
             rest.post().uri("/v2/messages/publication")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("name", messageName, "correlationKey", correlationKey, "messageId", messageId, "timeToLive", 0, "variables", variables))
+                    .body(Map.of("name", messageName, "correlationKey", correlationKey, "messageId", messageId, "timeToLive", timeToLiveMillis, "variables", variables))
                     .exchange((request, response) -> {
                         if (response.getStatusCode().is5xxServerError()) {
                             throw new EngineUnavailableException("Camunda message publication returned " + response.getStatusCode().value());
                         }
                         if (!response.getStatusCode().is2xxSuccessful()) {
-                            throw new IllegalStateException("Camunda message publication returned " + response.getStatusCode().value()
-                                    + ": " + new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8));
+                            String body = new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8);
+                            // BPA-67: a message with this id is still buffered (a time to live above 0): the same publish again is a duplicate, which stays dropped (ADR 0007)
+                            if (response.getStatusCode().value() == 409 && body.contains("ALREADY_EXISTS")) {
+                                return null;
+                            }
+                            throw new IllegalStateException("Camunda message publication returned " + response.getStatusCode().value() + ": " + body);
                         }
                         return null;
                     });

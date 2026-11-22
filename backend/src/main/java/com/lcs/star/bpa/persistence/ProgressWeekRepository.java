@@ -109,4 +109,29 @@ public class ProgressWeekRepository {
                 (rs, n) -> new Unsent(rs.getString("employee_ref"), rs.getDate("work_date").toLocalDate(), rs.getString("phase"), rs.getBigDecimal("hours"), rs.getString("status")),
                 workpackId);
     }
+
+    /** BPA-67: a Work Pack whose approved % for the week is exactly 100 (any status). */
+    public record AtHundred(UUID workpackId, String workpackNumber, String status) {
+    }
+
+    /** The Work Packs PPC approved at exactly 100 for the week, by number (BPA-67: they become Completed). 99.99 is not among them. */
+    public List<AtHundred> approvedAtHundred(UUID periodId) {
+        return jdbc.query("""
+                SELECT w.id, w.workpack_number, w.status FROM bpa.workpack_progress p JOIN bpa.workpack w ON w.id = p.workpack_id
+                WHERE p.progress_period_id = ? AND p.approved_pct = 100 ORDER BY w.workpack_number FOR UPDATE OF w""",
+                (rs, n) -> new AtHundred(rs.getObject("id", UUID.class), rs.getString("workpack_number"), rs.getString("status")), periodId);
+    }
+
+    /** Sets the Work Pack Completed with one audit row (D64); a Work Pack that is Completed already writes nothing. Returns true when this call completed it. */
+    public boolean markCompleted(AtHundred workpack, String username, java.time.Instant now) {
+        if ("Completed".equals(workpack.status())) {
+            return false;
+        }
+        java.sql.Timestamp at = java.sql.Timestamp.from(now.truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+        jdbc.update("UPDATE bpa.workpack SET status = 'Completed', updated_at = ?, updated_by = ? WHERE id = ?", at, username, workpack.workpackId());
+        jdbc.update("""
+                INSERT INTO bpa.audit_log (table_name, record_id, column_name, old_value, new_value, username, changed_at)
+                VALUES ('workpack', ?, 'status', ?, 'Completed', ?, ?)""", workpack.workpackId(), workpack.status(), username, at);
+        return true;
+    }
 }

@@ -75,4 +75,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-64](BPA-4-timesheet-to-progress/plans/BPA-64.md) | Cost Controller can review actual man-hours by CBS and is alerted above 15% over forecast | Closed (21 Nov 2026) |
 | [BPA-65](BPA-4-timesheet-to-progress/plans/BPA-65.md) | Project Manager can be alerted when a CBS's cost exceeds its revised budget by more than 10% | Closed (22 Nov 2026) |
 | [BPA-66](BPA-4-timesheet-to-progress/plans/BPA-66.md) | Project Manager can approve or send back a week's progress before the period locks | Closed (22 Nov 2026) |
+| [BPA-67](BPA-4-timesheet-to-progress/plans/BPA-67.md) | System can lock a week's progress and complete Work Packs approved at 100% | Closed (22 Nov 2026) |
 

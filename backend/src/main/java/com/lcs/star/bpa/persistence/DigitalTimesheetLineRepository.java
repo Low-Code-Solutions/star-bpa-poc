@@ -82,7 +82,10 @@ public class DigitalTimesheetLineRepository {
     public record SendLine(UUID workerId, String badgeNo, LocalDate workDate, String phase, String cbsCodeRef) {
     }
 
-    /** The Work Pack's Draft and Returned lines, by Badge No, date and phase (BPMN: ServiceTask_PrepareHoursSubmission collects these). */
+    /**
+     * The Work Pack's Draft and Returned lines, by Badge No, date and phase (BPMN: ServiceTask_PrepareHoursSubmission collects these). BPA-67 (review decision, 22 Nov 2026): a line of
+     * a month that BPA-64's lock has locked is left out, so it is never sent and never blocks the others.
+     */
     public List<SendLine> sendable(UUID workpackId) {
         return jdbc.query("""
                 SELECT t.worker_id, w.employee_ref, l.work_date, l.phase, t.cbs_code_ref
@@ -90,9 +93,19 @@ public class DigitalTimesheetLineRepository {
                 JOIN bpa.digital_timesheet t ON t.id = l.digital_timesheet_id
                 JOIN bpa.worker w ON w.id = t.worker_id
                 WHERE t.workpack_id = ? AND l.status IN ('Draft', 'Returned')
+                  AND NOT EXISTS (SELECT 1 FROM bpa.hours_month_lock m WHERE m.month = date_trunc('month', l.work_date)::date)
                 ORDER BY w.employee_ref, l.work_date, array_position(ARRAY['Engineering','Cutting','Welding','Finishing'], l.phase)""",
                 (rs, n) -> new SendLine(rs.getObject("worker_id", UUID.class), rs.getString("employee_ref"), rs.getDate("work_date").toLocalDate(),
                         rs.getString("phase"), rs.getString("cbs_code_ref")), workpackId);
+    }
+
+    /** BPA-67: the date of the first Draft or Returned line of the Work Pack that falls in a locked month (left out of {@link #sendable}), or empty when there is none. */
+    public Optional<LocalDate> firstLockedUnsent(UUID workpackId) {
+        return jdbc.queryForList("""
+                SELECT l.work_date FROM bpa.digital_timesheet_line l JOIN bpa.digital_timesheet t ON t.id = l.digital_timesheet_id
+                WHERE t.workpack_id = ? AND l.status IN ('Draft', 'Returned')
+                  AND EXISTS (SELECT 1 FROM bpa.hours_month_lock m WHERE m.month = date_trunc('month', l.work_date)::date)
+                ORDER BY l.work_date LIMIT 1""", Date.class, workpackId).stream().map(Date::toLocalDate).findFirst();
     }
 
     /** The Work Pack's phases in the order the grid shows them. */
@@ -114,6 +127,11 @@ public class DigitalTimesheetLineRepository {
 
     public boolean weekClosed(LocalDate weekEnding) {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM bpa.progress_period WHERE week_ending = ?)", Boolean.class, Date.valueOf(weekEnding)));
+    }
+
+    /** BPA-67: true when the month of the work date is locked (BPA-64's {@code hours_month_lock}; its month is the first day). */
+    public boolean monthLocked(LocalDate workDate) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM bpa.hours_month_lock WHERE month = ?)", Boolean.class, Date.valueOf(workDate.withDayOfMonth(1))));
     }
 
     public Optional<LocalDate> latestClosedWeekEnding() {

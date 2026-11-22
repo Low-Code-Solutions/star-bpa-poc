@@ -122,6 +122,37 @@ public class ProgressPeriodRepository {
         audit(before.id(), "week_decision_reason", before.weekDecisionReason(), reason, username, at);
     }
 
+    /**
+     * BPA-67 (plan Q3): the one guard of every write to a week's progress rows. Takes the period row {@code FOR UPDATE} for the rest of the caller's transaction, so a write and
+     * the lock ({@link #lock}) never interleave, and refuses a Locked week with "Week ending <d MMM yyyy> is locked" (an {@link IllegalArgumentException}: the job fails with no
+     * retries). Call it inside the transaction that writes the rows.
+     */
+    public void requireOpen(UUID periodId) {
+        State state = lockState(periodId).orElseThrow(() -> new IllegalArgumentException("The week of this instance has no progress period"));
+        if ("Locked".equals(state.status())) {
+            throw new IllegalArgumentException("Week ending " + state.weekEnding().format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH)) + " is locked");
+        }
+    }
+
+    public void requireOpen(Period period) {
+        requireOpen(period.id());
+    }
+
+    /**
+     * BPA-67: the week is locked: status CutOff to Locked and {@code locked_at} = now from the injected clock, one audit row per changed column (D64). A period that is Locked
+     * already writes nothing and keeps its first time (the re-run key). Returns true when this call locked it. Call it in the transaction that holds {@link #lockState}.
+     */
+    public boolean lock(State before, String username) {
+        if ("Locked".equals(before.status())) {
+            return false;
+        }
+        Timestamp at = Timestamp.from(clock.instant().truncatedTo(ChronoUnit.MICROS));
+        jdbc.update("UPDATE bpa.progress_period SET status = 'Locked', locked_at = ?, updated_at = ?, updated_by = ? WHERE id = ?", at, at, username, before.id());
+        audit(before.id(), "status", before.status(), "Locked", username, at);
+        audit(before.id(), "locked_at", null, at.toInstant().toString(), username, at);
+        return true;
+    }
+
     private void audit(UUID recordId, String column, String oldValue, String newValue, String username, Timestamp at) {
         jdbc.update("""
                 INSERT INTO bpa.audit_log (table_name, record_id, column_name, old_value, new_value, username, changed_at)

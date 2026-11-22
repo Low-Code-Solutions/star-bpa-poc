@@ -65,9 +65,9 @@ const CBS = {
 };
 
 type Call = { method: string; path: string; body: unknown };
-type Options = { completeStatus?: number; completeDetail?: string };
+type Options = { completeStatus?: number; completeDetail?: string; workpacks?: unknown };
 
-function fakeBackend({ completeStatus = 204, completeDetail = '' }: Options = {}) {
+function fakeBackend({ completeStatus = 204, completeDetail = '', workpacks = WORKPACKS }: Options = {}) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -92,7 +92,7 @@ function fakeBackend({ completeStatus = 204, completeDetail = '' }: Options = {}
         validationMessages: [],
       });
     }
-    if (path === '/api/v1/progress-periods/2026-11-19/workpacks') return json(200, WORKPACKS);
+    if (path === '/api/v1/progress-periods/2026-11-19/workpacks') return json(200, workpacks);
     if (path === '/api/v1/progress-periods/2026-11-19/earned-manhours') return json(200, EARNED);
     if (path === '/api/v1/progress-periods/2026-11-19/cbs-actuals') return json(200, CBS);
     if (path === `/api/v1/tasks/${TASK}/complete`) {
@@ -110,7 +110,7 @@ async function renderScreen(options: Options = {}) {
   const onDone = vi.fn();
   render(<ApproveWeeklyProgress api={apiClient()} taskKey={TASK} onDone={onDone} />);
   await screen.findByText('Week ending 19 Nov 2026');
-  await screen.findByText('WP-000457');
+  await screen.findAllByText(/^WP-0004(57|61)$/);
   return { ...backend, user, onDone };
 }
 
@@ -198,5 +198,28 @@ describe('ApproveWeeklyProgress', () => {
 
     expect(await screen.findByText('You cannot approve a week whose progress you approved')).toBeInTheDocument();
     expect(onDone).not.toHaveBeenCalled();
+  });
+
+  // BPA-67 (scenario 9): the Project Manager sees the unsent hours of a Work Pack at 100% before approving, in the story's words. The send-back itself is the backend's
+  // (WeekLockApiTest). The summary line is the sum of the Work Pack's unsent lines; the table with the lines stays below it.
+  it('BPA67_sentBackWeekLeavesWorkPackInProgress', async () => {
+    const workpacks = {
+      weekEnding: '2026-11-19',
+      basis: 'Physical',
+      workpacks: [
+        {
+          workpackNumber: 'WP-000461',
+          noReportRow: false,
+          lastLockedPct: 60,
+          approvedHours: 20,
+          approvedPct: 100,
+          unsentLines: [{ employeeRef: 'E1021', workDate: '2026-11-16', phase: 'Cutting', hours: 6, status: 'Draft' }],
+        },
+      ],
+    };
+    await renderScreen({ workpacks });
+
+    expect(screen.getByText('WP-000461: 6 h not sent')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Unsent hours of WP-000461 (approved at 100%)' })).toBeInTheDocument();
   });
 });

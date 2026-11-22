@@ -92,9 +92,7 @@ public class CompletionApprovalService {
     @Transactional
     public void record(Period period, List<Approval> approvals, String username) {
         // rows of a Locked week never change (data model 13.3.4, worker-checked; QA review): a stale instance cannot overwrite them
-        if (periods.statusOfWeek(period.weekEnding()).filter("Locked"::equals).isPresent()) {
-            throw new IllegalArgumentException("Week ending " + period.weekEnding().format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH)) + " is locked");
-        }
+        periods.requireOpen(period); // BPA-67: Locked week refused, the period row held for this transaction (plan Q3)
         Map<String, Row> rows = new HashMap<>();
         read.week(period).rows().forEach(row -> rows.put(row.workpackNumber(), row));
         for (Approval approval : approvals) {

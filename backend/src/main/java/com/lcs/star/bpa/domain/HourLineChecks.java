@@ -68,6 +68,18 @@ public final class HourLineChecks {
         return "Week ending " + show(weekEnding) + " is closed";
     }
 
+    private static final DateTimeFormatter MONTH_YEAR = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH);
+
+    /** BPA-67 (Jira, exact): a Completed Work Pack takes no more hours. */
+    public static String completedMessage(String workpackNumber) {
+        return "Work Pack " + workpackNumber + " is Completed";
+    }
+
+    /** BPA-67 (S5; Jira, exact): the hours of a locked month cannot be added, changed or approved, for example "Hours for November 2026 are locked". */
+    public static String monthLockedMessage(LocalDate workDate) {
+        return "Hours for " + MONTH_YEAR.format(workDate) + " are locked";
+    }
+
     /**
      * First day of the open week: the Friday that starts the week containing today, or the day after the latest cut-off week when that is later
      * (ASSUMPTION: nothing seeds progress_period, so "open" means "no cut-off row yet", plan Q4).

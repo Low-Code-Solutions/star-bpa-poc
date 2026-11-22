@@ -47,9 +47,11 @@ public class TaskService {
     private final RetractionDecisionCheck retractionDecision;
     private final CbsReviewCheck cbsReview;
     private final WeekDecisionCheck weekDecision;
+    private final HoursMonthLockCheck hoursMonthLock;
 
     public TaskService(CamundaTaskClient camunda, TaskAllowList allowList, HoursSegregationCheck segregation, FmsHandOffCheck fmsHandOff,
-            CompletionReportCheck completionReport, CompletionApprovalCheck completionApproval, RetractionDecisionCheck retractionDecision, CbsReviewCheck cbsReview, WeekDecisionCheck weekDecision) {
+            CompletionReportCheck completionReport, CompletionApprovalCheck completionApproval, RetractionDecisionCheck retractionDecision, CbsReviewCheck cbsReview, WeekDecisionCheck weekDecision,
+            HoursMonthLockCheck hoursMonthLock) {
         this.camunda = camunda;
         this.allowList = allowList;
         this.segregation = segregation;
@@ -59,6 +61,7 @@ public class TaskService {
         this.retractionDecision = retractionDecision;
         this.cbsReview = cbsReview;
         this.weekDecision = weekDecision;
+        this.hoursMonthLock = hoursMonthLock;
     }
 
     /** Open tasks whose candidate groups include one of the user's groups, oldest first. */
@@ -135,6 +138,12 @@ public class TaskService {
             // BPA-56, BPA-57: segregation of duties for the hours approvals (ASSUMPTION status and text, plan Q1): 403 for the sender, 409 for an earlier decider at PPC; the task stays open
             if (segregation.appliesTo(task.elementId())) {
                 segregation.refusal(task.elementId(), camunda.variables(task), username).ifPresent(refusal -> {
+                    throw problem(refusal.status(), refusal.message());
+                });
+            }
+            // BPA-67 (S5, plan Q2): hours of a locked month cannot be validated or approved (409); a return or a rejection stays allowed; the task stays open
+            if (hoursMonthLock.appliesTo(task.elementId())) {
+                hoursMonthLock.refusal(camunda.variables(task), submitted).ifPresent(refusal -> {
                     throw problem(refusal.status(), refusal.message());
                 });
             }

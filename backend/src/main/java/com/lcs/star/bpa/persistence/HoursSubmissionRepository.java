@@ -85,7 +85,8 @@ public class HoursSubmissionRepository {
         }
         List<Moving> moving = jdbc.query("""
                 SELECT l.id, l.status FROM bpa.digital_timesheet_line l JOIN bpa.digital_timesheet t ON t.id = l.digital_timesheet_id
-                WHERE t.workpack_id = ? AND l.status IN ('Draft', 'Returned') FOR UPDATE OF l""",
+                WHERE t.workpack_id = ? AND l.status IN ('Draft', 'Returned')
+                  AND NOT EXISTS (SELECT 1 FROM bpa.hours_month_lock m WHERE m.month = date_trunc('month', l.work_date)::date) FOR UPDATE OF l""",
                 (rs, n) -> new Moving(rs.getObject("id", UUID.class), rs.getString("status")), workpackId);
         for (Moving line : moving) {
             jdbc.update("UPDATE bpa.digital_timesheet_line SET status = 'Submitted', hours_submission_id = ?, updated_at = ?, updated_by = ? WHERE id = ?",
@@ -225,5 +226,13 @@ public class HoursSubmissionRepository {
         jdbc.update("""
                 INSERT INTO bpa.audit_log (table_name, record_id, column_name, old_value, new_value, username, changed_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)""", table, recordId, column, oldValue, newValue, username, at);
+    }
+
+    /** BPA-67 (S5): the date of the first line of the submission that falls in a month BPA-64 has locked, or empty when none does. */
+    public Optional<LocalDate> lockedMonthOf(UUID submissionId) {
+        return jdbc.queryForList("""
+                SELECT l.work_date FROM bpa.digital_timesheet_line l
+                WHERE l.hours_submission_id = ? AND EXISTS (SELECT 1 FROM bpa.hours_month_lock m WHERE m.month = date_trunc('month', l.work_date)::date)
+                ORDER BY l.work_date LIMIT 1""", java.sql.Date.class, submissionId).stream().map(java.sql.Date::toLocalDate).findFirst();
     }
 }

@@ -73,9 +73,7 @@ public class CbsReviewService {
 
     @Transactional
     public void record(Period period, List<Review> entries, String username) {
-        if (periods.statusOfWeek(period.weekEnding()).filter("Locked"::equals).isPresent()) {
-            throw new IllegalArgumentException("Week ending " + period.weekEnding().format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)) + " is locked");
-        }
+        periods.requireOpen(period); // BPA-67: Locked week refused, the period row held for this transaction (plan Q3)
         Map<String, Review> byCbs = new java.util.LinkedHashMap<>();
         entries.forEach(e -> byCbs.put(e.cbsCodeRef(), e));
         for (String cbs : alerted(period)) {
