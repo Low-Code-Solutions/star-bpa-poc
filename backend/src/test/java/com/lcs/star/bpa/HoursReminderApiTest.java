@@ -124,6 +124,19 @@ class HoursReminderApiTest {
     }
 
     @Test
+    void theDateInTheNoticeIsTheDateOfRiyadh() {
+        // BPA-74 review: sent 17 Nov 22:00Z is 18 Nov 01:00 in Asia/Riyadh (ADR 0013), so the notice says 18 Nov, not 17 Nov
+        submission(1, "2026-11-17T22:00:00Z", "Timekeeper");
+        clock.set(Instant.parse("2026-11-19T22:00:00Z"));
+
+        fire("Timekeeper", "timekeeper", 5002L);
+
+        assertThat(reminders("timekeeper")).extracting(r -> r.path("message").asText())
+                .containsExactly("Hours for WP-000457 are waiting for your decision since 18 Nov 2026");
+        completed();
+    }
+
+    @Test
     void BPA74_noReminderBefore48Hours() {
         submission(1, "2026-11-17T06:00:00Z", "Timekeeper");
         clock.set(Instant.parse("2026-11-19T05:59:00Z")); // 19 Nov 08:59

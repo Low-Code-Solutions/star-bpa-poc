@@ -68,6 +68,9 @@ public class HoursReminderService {
         String message = "Hours for " + workpackNumber + " are waiting for your decision since " + DATE.format(reached.get().at().atZone(businessZone));
         String key = processInstanceKey + ":" + step + ":" + elementInstanceKey;
         List<String> usernames = groups.usernames(recipientGroup);
+        if (usernames.isEmpty()) {
+            LOG.warn("send-hours-reminder: group {} has no users (or bpa-service lacks GROUP READ on it): nobody was reminded for {}", recipientGroup, workpackNumber);
+        }
         Map<String, String> emails = notifications.emails(usernames);
         int reminded = 0;
         for (String username : usernames) {

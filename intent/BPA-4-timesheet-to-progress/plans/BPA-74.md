@@ -1,7 +1,7 @@
 # Plan: BPA-74 Approver can be reminded when hours wait more than 48 hours for their decision
 Jira: BPA-74 (Story, epic BPA-4)
 Story last updated: 2026-11-23T17:53:51.988+0400
-Status: Approved (Ahsan, 23 Nov 2026)
+Status: Closed (23 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-74-approval-reminders, from main 3e9ff9d
 
@@ -224,6 +224,23 @@ The rule, from the BPMN documentation and Jira:
 - **Q5:** the timers are already in the model; you tick the DoR box.
 - **Q7:** the branch stays at 3e9ff9d.
 - **Q6, Q8:** as written. I ask before any Jira transition.
+
+## Progress and results (23 Nov 2026)
+- **Red first (139c1b9):** the 9 `HoursReminderApiTest` tests and the GROUP READ test failed (stub failing the job, no group permission). The two `HoursReminderProcessTest` timer tests passed at once: they guard the existing BPA-48 timers and need no new code.
+- **Green (f357031):** V7, `SendHoursReminderWorker`, `HoursReminderService`, `HoursSubmissionRepository.reachedStep`, `NotificationRepository` reminder methods, the contract (`kind`, `message`, optional drawing fields) and three GROUP READ grants. Data model and ADR 0012 notes in b3926fb.
+- **Full suite:** `./mvnw -B verify` 755 tests, 0 failures, BUILD SUCCESS (before the review fixes); after them `WorkPackDetailApiTest` 20/20 and `HoursReminderApiTest` 10/10. No frontend change.
+- **Local-stack check (23 Nov, API and Camunda REST; nobody clicked a screen, none shows reminders):** the engine clock cannot be moved on compose, so the reminder task was fired on the real instance of WP-000001 with a process instance modification. Under 48 h: no email, no notice. With the Timekeeper's decision set 49 h back: one email and one notice "... since 21 Nov 2026"; the next firing sent a second; ppc-team got none. The decision time was restored.
+- **No BPMN change.** The three `R/PT24H` timers and the `send-hours-reminder` tasks were already in the model (BPA-48).
+
+## After the `qa-reviewer` pass (23 Nov 2026; REVIEW.md "BPA-74 at b3926fb")
+- **Fixed (Important 1):** the BPA-73 Work Pack history read every `notification` row, so a reminder would show as a drawing notice with no drawing. Both history queries now filter `kind = 'DrawingRevision'`; test `anHoursReminderIsNotAHistoryNotice` was red first (total counted the reminder). Reminders are not in the history (they are in `GET /api/v1/me/notifications`).
+- **Fixed (Nits):** WARN when the group read is empty (a missing GROUP READ would otherwise lose every reminder silently); test `theDateInTheNoticeIsTheDateOfRiyadh` (17 Nov 22:00Z is 18 Nov in Riyadh).
+- **Recorded (plan vs diff):**
+  1. The case "a member with no email gets the notice only" cannot occur: `app_user.email` is NOT NULL and the notification FK needs an `app_user` row, so a group member with no `app_user` row is skipped and logged. No test for it (`aMemberWithNoEmailGetsTheNoticeOnly` was not written).
+  2. Test names: `aReminderDoesNotSpoilTheDrawingNotices` (planned `myNotificationsListsDrawingNoticesAndReminders`), `timerFiresEveryDayWhileTheHoursWait` and `noTimerOnceTheTaskIsDecided` (planned `timerFiresEvery24HoursWhileWaiting`, `noTimerAfterTheDecision`).
+  3. Existing tests edited: `PersonaSyncTest.expectedServicePermissions` (three GROUP READ lines), `FlywayBaselineTest` (the V7 description), `bpatest/ProcessTestApplication` (excludes the new worker); `WorkPackDetailApiTest` gained one test.
+  4. The two CPT timer tests were green before the code (guards of the BPA-48 timers).
+- **For Ahsan and Jira (shown first, posted only on a yes):** ASSUMPTIONs: email subject "Hours for <WP> are waiting for your decision" and body = the notice text; the date "d MMM yyyy" in Asia/Riyadh; the +24 h firing does nothing; idempotency on the timer firing's element instance key; at-least-once email (as BPA-16); GROUP READ for timekeeper, production-supervisor and ppc-team. Deploy note: V7 changes the BPA-16 table; an instance already waiting keeps running. The Jira DoR box "BPMN change agreed with Ahsan" is for Ahsan to tick (no BPMN change).
 
 ## Human-gap log
 - **DoR:** "BPMN change agreed with Ahsan" is yours to tick (Q5); intent.md and spec.md not accepted.
