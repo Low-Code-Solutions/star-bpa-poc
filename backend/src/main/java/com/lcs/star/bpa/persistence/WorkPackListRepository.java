@@ -38,6 +38,8 @@ public class WorkPackListRepository {
                 JOIN bpa.activity a ON a.activity_ref = w.activity_ref
                 JOIN bpa.wbs b ON b.wbs_ref = a.wbs_ref
                 LEFT JOIN bpa.workpack_schedule s ON s.workpack_id = w.id
+                -- the latest Locked week in which the Work Pack has an approved value: an older Locked week's value is shown, with its week, when the newest
+                -- Locked week has none for it (plan BPA-72 Q5; QA review)
                 LEFT JOIN LATERAL (
                     SELECT p.approved_pct, d.week_ending, d.id AS period_id
                     FROM bpa.workpack_progress p JOIN bpa.progress_period d ON d.id = p.progress_period_id

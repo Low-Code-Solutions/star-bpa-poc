@@ -21,7 +21,7 @@ const two = (value?: number | null) => (value == null ? EMPTY : Number(value).to
  */
 export function WorkPackList({ api }: { api: Api }) {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<WorkPackFilter>({ status: '', project: '', weekEnding: '', search: '' });
+  const [filter, setFilter] = useState<WorkPackFilter>({});
   const all = useWorkPackList(api, {});
   const rows = useWorkPackList(api, filter);
   const projects = [...new Set((all.data ?? []).map((r) => r.projectRef))].sort();
@@ -31,7 +31,7 @@ export function WorkPackList({ api }: { api: Api }) {
     <section aria-label="Work Packs list" className="work-pack-list">
       <form className="filters" onSubmit={(e) => e.preventDefault()}>
         <Field label="Status">
-          <select value={filter.status} onChange={(e) => change({ status: e.target.value })}>
+          <select value={filter.status ?? ''} onChange={(e) => change({ status: e.target.value })}>
             <option value="">All</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -41,7 +41,7 @@ export function WorkPackList({ api }: { api: Api }) {
           </select>
         </Field>
         <Field label="Project">
-          <select value={filter.project} onChange={(e) => change({ project: e.target.value })}>
+          <select value={filter.project ?? ''} onChange={(e) => change({ project: e.target.value })}>
             <option value="">All</option>
             {projects.map((p) => (
               <option key={p} value={p}>
@@ -51,10 +51,10 @@ export function WorkPackList({ api }: { api: Api }) {
           </select>
         </Field>
         <Field label="Week ending">
-          <input type="date" value={filter.weekEnding} onChange={(e) => change({ weekEnding: e.target.value })} />
+          <input type="date" value={filter.weekEnding ?? ''} onChange={(e) => change({ weekEnding: e.target.value })} />
         </Field>
         <Field label="Work Pack number">
-          <input type="search" value={filter.search} onChange={(e) => change({ search: e.target.value })} />
+          <input type="search" value={filter.search ?? ''} onChange={(e) => change({ search: e.target.value })} />
         </Field>
       </form>
       {rows.data === undefined ? <Spinner /> : null}

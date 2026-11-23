@@ -2041,7 +2041,9 @@ components:
       type: object
       description: |
         One row of the Work Packs list (BPA-72): workpack, left-joined to workpack_schedule, with the project of its activity (activity to WBS to
-        project) and the latest Locked week's approved_pct and activity Earned man-hours. Read only.
+        project) and the latest Locked week's approved_pct and activity Earned man-hours. Read only. A field that has no value (the nullable ones) is
+        left out of the JSON, as everywhere in this API; the portal treats a missing field as no value. The approved % is the one of the **latest Locked week
+        in which the Work Pack has an approved value** (an older Locked week's value is shown, with its week, when the newest Locked week has none for it).
       required: [workpackNumber, activityRef, drawingRef, departmentRef, projectRef, status]
       properties:
         workpackNumber:

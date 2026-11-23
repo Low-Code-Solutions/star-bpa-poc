@@ -208,6 +208,13 @@ class WorkPackListApiTest {
     }
 
     @Test
+    void aWeekEndingThatIsNotADateIs400() {
+        HttpResponse<String> response = flow.loggedInAs("ppc-team").get(LIST + "?weekEnding=abc");
+
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(400);
+    }
+
+    @Test
     void anUnknownStatusIs400() {
         HttpResponse<String> response = flow.loggedInAs("ppc-team").get(LIST + "?status=Finished");
 
