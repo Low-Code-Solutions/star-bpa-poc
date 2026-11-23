@@ -76,5 +76,6 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-65](BPA-4-timesheet-to-progress/plans/BPA-65.md) | Project Manager can be alerted when a CBS's cost exceeds its revised budget by more than 10% | Closed (22 Nov 2026) |
 | [BPA-66](BPA-4-timesheet-to-progress/plans/BPA-66.md) | Project Manager can approve or send back a week's progress before the period locks | Closed (22 Nov 2026) |
 | [BPA-67](BPA-4-timesheet-to-progress/plans/BPA-67.md) | System can lock a week's progress and complete Work Packs approved at 100% | Closed (22 Nov 2026) |
-| [BPA-68](BPA-4-timesheet-to-progress/plans/BPA-68.md) | PPC Team can see one Work Pack run from creation to locked progress in one demo | Approved (Ahsan, 22 Nov 2026) |
+| [BPA-68](BPA-4-timesheet-to-progress/plans/BPA-68.md) | PPC Team can see one Work Pack run from creation to locked progress in one demo | Closed (23 Nov 2026) |
+| [BPA-69](BPA-4-timesheet-to-progress/plans/BPA-69.md) | Supervisor can only book hours to a CBS that is open for productive hours | Closed (23 Nov 2026) |
 

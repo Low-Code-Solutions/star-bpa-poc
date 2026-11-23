@@ -69,7 +69,7 @@
       <bpmn:outgoing>Flow_ToPrepareSubmission</bpmn:outgoing>
     </bpmn:userTask>
     <bpmn:serviceTask id="ServiceTask_PrepareHoursSubmission" name="Prepare hours submission">
-      <bpmn:documentation>E2-04, E2-05; built in BPA-51. Collects the Work Pack's Draft and Returned lines and builds lineChecks (one element per line: workDate, phase, badgeNo, phaseBudgetHours, phaseHoursAfter and dailyHoursAfter, the totals of lines not Rejected which already include the saved line, dailyHoursLimit from app.daily-hours-limit, cbsCodeRef (null when the time sheet has no CBS, D40), cbsClosed and workerOnLeave (false until BPA-69 and BPA-75), and dailyLimitMessage and phaseBudgetMessage, the texts a Blocked reason maps to). Completes with validationMessages set to an empty list, so an earlier send's messages do not stay. Throws HOURS_INVALID with validationMessages when there is nothing to send. Writes nothing, so a retried job builds the same checks.</bpmn:documentation>
+      <bpmn:documentation>E2-04, E2-05; built in BPA-51. Collects the Work Pack's Draft and Returned lines and builds lineChecks (one element per line: workDate, phase, badgeNo, phaseBudgetHours, phaseHoursAfter and dailyHoursAfter, the totals of lines not Rejected which already include the saved line, dailyHoursLimit from app.daily-hours-limit, cbsCodeRef (null when the time sheet has no CBS, D40), cbsClosed (cbs_block, BPA-69), workerOnLeave (false until BPA-75), and dailyLimitMessage, phaseBudgetMessage and cbsClosedMessage, the texts a Blocked reason maps to). Completes with validationMessages set to an empty list, so an earlier send's messages do not stay. Throws HOURS_INVALID with validationMessages when there is nothing to send. Writes nothing, so a retried job builds the same checks.</bpmn:documentation>
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="prepare-hours-submission" retries="3" />
       </bpmn:extensionElements>
@@ -93,7 +93,7 @@
       <bpmn:outgoing>Flow_ToAreHoursWithinBudget</bpmn:outgoing>
       <bpmn:multiInstanceLoopCharacteristics>
         <bpmn:extensionElements>
-          <zeebe:loopCharacteristics inputCollection="=lineChecks" inputElement="lineCheck" outputCollection="lineCheckResults" outputElement="={budgetResult: budgetCheck.budgetResult, budgetReason: budgetCheck.budgetReason, message: if budgetCheck.budgetResult = &quot;Blocked&quot; then (if budgetCheck.budgetReason = &quot;DAILY_LIMIT_EXCEEDED&quot; then lineCheck.dailyLimitMessage else if budgetCheck.budgetReason = &quot;PHASE_BUDGET_EXCEEDED&quot; then lineCheck.phaseBudgetMessage else null) else null}" />
+          <zeebe:loopCharacteristics inputCollection="=lineChecks" inputElement="lineCheck" outputCollection="lineCheckResults" outputElement="={budgetResult: budgetCheck.budgetResult, budgetReason: budgetCheck.budgetReason, message: if budgetCheck.budgetResult = &quot;Blocked&quot; then (if budgetCheck.budgetReason = &quot;CBS_CLOSED&quot; then lineCheck.cbsClosedMessage else if budgetCheck.budgetReason = &quot;DAILY_LIMIT_EXCEEDED&quot; then lineCheck.dailyLimitMessage else if budgetCheck.budgetReason = &quot;PHASE_BUDGET_EXCEEDED&quot; then lineCheck.phaseBudgetMessage else null) else null}" />
         </bpmn:extensionElements>
       </bpmn:multiInstanceLoopCharacteristics>
     </bpmn:businessRuleTask>
