@@ -1,5 +1,5 @@
 import type { Api } from '@/services/apiClient';
-import type { LookAhead, WorkPackPrintSummary } from '@/types/api';
+import type { LookAhead, WorkPackListRow, WorkPackPrintSummary, WorkPackStatus } from '@/types/api';
 import type { StartResult } from '../workpacks.types';
 
 /** POST /api/v1/workpacks (BPA-6, D52, S20): starts a Work Pack request; no body (BPA-46 Q1). */
@@ -55,5 +55,30 @@ export async function getWorkPackPrint(api: Api, workpackNumber: string): Promis
   } catch {
     // The request itself failed (network): status 0, so the screen shows its general message.
     return { ok: false, status: 0 };
+  }
+}
+
+/** The filters of the Work Packs list (BPA-72); an empty text is "no filter". */
+export type WorkPackFilter = { status?: string; project?: string; weekEnding?: string; search?: string };
+
+/**
+ * GET /api/v1/workpacks (BPA-72): the Work Packs list, read only, filtered on the server; null when the call failed. The screen sends one status at a
+ * time (the contract takes several).
+ */
+export async function listWorkPacks(api: Api, filter: WorkPackFilter): Promise<WorkPackListRow[] | null> {
+  try {
+    const { data } = await api.GET('/api/v1/workpacks', {
+      params: {
+        query: {
+          status: filter.status ? [filter.status as WorkPackStatus] : undefined,
+          project: filter.project || undefined,
+          weekEnding: filter.weekEnding || undefined,
+          search: filter.search?.trim() || undefined,
+        },
+      },
+    });
+    return data ?? null;
+  } catch {
+    return null;
   }
 }
