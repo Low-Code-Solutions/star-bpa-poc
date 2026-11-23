@@ -27,7 +27,7 @@ public class NotificationController implements NotificationsApi {
     public ResponseEntity<List<Notification>> listMyNotifications() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return ResponseEntity.ok(notifications.noticesOf(username).stream()
-                .map(n -> new Notification(n.workpackNumber(), n.drawingRef(), n.revision(), OffsetDateTime.ofInstant(n.sentAt(), ZoneOffset.UTC)))
+                .map(n -> new Notification(Notification.KindEnum.DRAWING_REVISION, n.workpackNumber(), OffsetDateTime.ofInstant(n.sentAt(), ZoneOffset.UTC)).drawingRef(n.drawingRef()).revision(n.revision()))
                 .toList());
     }
 }

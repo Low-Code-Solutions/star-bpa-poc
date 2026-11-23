@@ -1725,10 +1725,10 @@ paths:
     get:
       tags: [notifications]
       operationId: listMyNotifications
-      summary: The logged-in user's drawing-revision notices
+      summary: The logged-in user in-system notices (drawing revisions and hours reminders)
       description: |
         In-system notices for the session user only; no parameter selects another user (BPA-16 "A user sees only their own
-        notices"; D44). Source: BPA-16.
+        notices"; D44). Source: BPA-16. Since BPA-74 the list also holds the hours reminders sent to the user (kind HoursReminder, with a message); a drawing notice has kind DrawingRevision.
       responses:
         '200':
           description: The user's notices
@@ -3091,9 +3091,15 @@ components:
           example: B
     Notification:
       type: object
-      description: notification (data model §5.9), channel InSystem, joined to workpack
-      required: [workpackNumber, drawingRef, revision, sentAt]
+      description: |
+        notification (data model §5.9), channel InSystem, joined to workpack: a drawing-revision notice (BPA-16; has drawingRef and revision) or an hours reminder
+        (BPA-74; has a message and no drawing). A field with no value is left out of the JSON.
+      required: [workpackNumber, kind, sentAt]
       properties:
+        kind:
+          type: string
+          enum: [DrawingRevision, HoursReminder]
+          description: DrawingRevision (BPA-16) or HoursReminder (BPA-74)
         workpackNumber:
           $ref: '#/components/schemas/WorkpackNumber'
         drawingRef:
@@ -3102,6 +3108,9 @@ components:
         revision:
           type: string
           example: C
+        message:
+          type: string
+          description: The text of an hours reminder (BPA-74), for example Hours for WP-000457 are waiting for your decision since 17 Nov 2026; absent on a drawing notice
         sentAt:
           type: string
           format: date-time
