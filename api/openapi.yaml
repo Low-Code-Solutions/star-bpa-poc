@@ -197,6 +197,73 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '503':
           $ref: '#/components/responses/EngineUnavailable'
+    get:
+      tags: [workpacks]
+      operationId: listWorkPacks
+      summary: List the Work Packs, with filters (read only)
+      description: |
+        The Work Packs list of the portal (BPA-72; E2-22): every Work Pack, newest number first, read only. Any logged-in user may read it (all
+        eleven groups; Jira decision 12 Nov 2026, Khitaba for the PO). Until BPA-79 builds the per-user project scope the list is **not** limited to
+        the user's projects: the `project` filter is the user's own choice. The filters combine with AND and all are optional: `status` (one or more of
+        Draft, Released, In Progress, Completed), `project` (the project of the Work Pack's activity, through its WBS), `weekEnding` (Work Packs that
+        have a progress row for that week, ASSUMPTION) and `search` (the text is part of the Work Pack number, any case, ASSUMPTION). A number that
+        matches nothing is not an error: the answer is 200 with an empty list, and the portal shows "Work Pack not found". Each row carries the latest
+        **Locked** week's approved completion % and that week (null before any week is locked), and the Earned man-hours of the Work Pack's
+        **activity** for that latest Locked week (Earned man-hours exist only per activity, BPA-62; null before any week is locked). No paging in the POC.
+        Built by BPA-72; no FRD names a Work Pack list, so the operation and its parameters are ASSUMPTION (statuses from FRD-7 §7.8.2.4).
+      x-assumption: true
+      x-assumption-note: the list, its filters, the partial search, the sort and the Earned MH meaning are not stated by an FRD (BPA-72, Jira source reference)
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: One or more Work Pack statuses (repeat the parameter); a Work Pack with any of them is listed
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [Draft, Released, In Progress, Completed]
+        - name: project
+          in: query
+          required: false
+          description: Project reference of the Work Pack's activity (activity to WBS to project), for example PRJ-139
+          schema:
+            type: string
+            example: PRJ-139
+        - name: weekEnding
+          in: query
+          required: false
+          description: A week-ending date (a Thursday); lists the Work Packs that have a progress row for that week (ASSUMPTION)
+          schema:
+            type: string
+            format: date
+            example: '2026-11-19'
+        - name: search
+          in: query
+          required: false
+          description: Text that is part of the Work Pack number, any case (ASSUMPTION; "461" finds WP-000461)
+          schema:
+            type: string
+            example: WP-000461
+      responses:
+        '200':
+          description: The Work Packs that match, highest number first (empty when none does)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkPackListRow'
+        '400':
+          description: A status that is not one of the four, or a week ending that is not a date
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /api/v1/tasks:
     get:
       tags: [tasks]
@@ -1970,6 +2037,61 @@ components:
           type: string
           format: date-time
           description: When the print was generated (workpack_print.generated_at)
+    WorkPackListRow:
+      type: object
+      description: |
+        One row of the Work Packs list (BPA-72): workpack, left-joined to workpack_schedule, with the project of its activity (activity to WBS to
+        project) and the latest Locked week's approved_pct and activity Earned man-hours. Read only.
+      required: [workpackNumber, activityRef, drawingRef, departmentRef, projectRef, status]
+      properties:
+        workpackNumber:
+          $ref: '#/components/schemas/WorkpackNumber'
+        activityRef:
+          type: string
+          example: A-2301
+        drawingRef:
+          type: string
+          example: DWG-118
+        departmentRef:
+          type: string
+          example: Fabrication
+        projectRef:
+          type: string
+          description: Project of the Work Pack's activity (WBS to project)
+          example: PRJ-139
+        status:
+          type: string
+          enum: [Draft, Released, In Progress, Completed]
+        assignmentState:
+          type: string
+          nullable: true
+          enum: [AwaitingFile, Assigning, Assigned, Replacing]
+          description: Null until the Workpack print is stored
+        plannedStartDate:
+          type: string
+          format: date
+          nullable: true
+          description: Null until the Work Pack is scheduled
+        plannedEndDate:
+          type: string
+          format: date
+          nullable: true
+          description: Null until the Work Pack is scheduled
+        approvedPct:
+          type: number
+          nullable: true
+          description: The approved completion % of the latest Locked week (workpack_progress.approved_pct); null before a week is locked
+          example: 40.00
+        approvedWeekEnding:
+          type: string
+          format: date
+          nullable: true
+          description: The latest Locked week that approvedPct and earnedManhours belong to
+        earnedManhours:
+          type: number
+          nullable: true
+          description: The Earned man-hours of the Work Pack's activity (not of the Work Pack) in that Locked week (activity_progress.earned_manhours, BPA-62); null before a week is locked
+          example: 480.00
     HourJournalHeader:
       type: object
       description: hour_journal_header (data model §5.5), joined to workpack

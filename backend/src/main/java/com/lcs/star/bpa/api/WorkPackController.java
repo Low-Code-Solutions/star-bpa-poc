@@ -4,6 +4,9 @@ import com.lcs.star.bpa.adapter.CamundaProcessClient;
 import com.lcs.star.bpa.adapter.CamundaTaskClient.EngineUnavailableException;
 import com.lcs.star.bpa.api.generated.WorkpacksApi;
 import com.lcs.star.bpa.api.generated.model.StartWorkPackResponse;
+import com.lcs.star.bpa.api.generated.model.WorkPackListRow;
+import java.time.LocalDate;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -28,6 +31,13 @@ public class WorkPackController implements WorkpacksApi {
 
     public WorkPackController(CamundaProcessClient camunda) {
         this.camunda = camunda;
+    }
+
+
+    /** BPA-72 compile stub: not built yet (red tests first). */
+    @Override
+    public ResponseEntity<List<WorkPackListRow>> listWorkPacks(List<String> status, String project, LocalDate weekEnding, String search) {
+        throw new ErrorResponseException(HttpStatus.NOT_IMPLEMENTED, ProblemDetail.forStatusAndDetail(HttpStatus.NOT_IMPLEMENTED, "Work Pack list not built yet"), null);
     }
 
     @Override
