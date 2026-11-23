@@ -1,10 +1,10 @@
 import type { Api } from '@/services/apiClient';
 import type { WorkPackDetail } from '@/types/api';
-import { showDate } from '@/utils/dates';
+import { showDate, showInstantDate } from '@/utils/dates';
 import { useWorkPackHistory } from '../../hooks/useWorkPackHistory';
 
-const EMPTY = '–';
-const two = (value?: number | null) => (value == null ? EMPTY : Number(value).toFixed(2));
+export const EMPTY = '–';
+export const two = (value?: number | null) => (value == null ? EMPTY : Number(value).toFixed(2));
 
 /** The Overview tab (BPA-73): phases and man-hours, materials, the schedule and the print (shown as a date, no PDF button: the page stays read only). */
 export function OverviewTab({ detail }: { detail: WorkPackDetail }) {
@@ -51,7 +51,7 @@ export function OverviewTab({ detail }: { detail: WorkPackDetail }) {
           : 'Not scheduled yet'}
       </p>
       <h4>Workpack print</h4>
-      <p>{overview.print ? `Printed ${showDate(overview.print.generatedAt.slice(0, 10))}` : 'Not printed yet'}</p>
+      <p>{overview.print ? `Printed ${showInstantDate(overview.print.generatedAt)}` : 'Not printed yet'}</p>
     </>
   );
 }
@@ -195,7 +195,7 @@ export function HistoryTab({ api, workpackNumber }: { api: Api; workpackNumber: 
         <tbody>
           {items.map((h, i) => (
             <tr key={`${h.at}-${i}`}>
-              <td>{showDate(h.at.slice(0, 10))}</td>
+              <td>{showInstantDate(h.at)}</td>
               {h.kind === 'Notice' ? (
                 <>
                   <td>{h.notice?.recipientUsername}</td>

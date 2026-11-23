@@ -166,13 +166,13 @@ public class WorkPackDetailRepository {
     public List<HistoryItem> history(UUID workpackId, int page, int size) {
         String sql = RECORD_IDS.replace(":w", "?") + """
                 SELECT * FROM (
-                    SELECT 'Change' AS kind, changed_at AS at, username, table_name, column_name, old_value, new_value,
+                    SELECT 'Change' AS kind, changed_at AS at, username, table_name, column_name, old_value, new_value, id::text AS row_id,
                            NULL::text AS drawing_ref, NULL::text AS revision, NULL::text AS recipient_username, NULL::text AS channel
                     FROM bpa.audit_log WHERE record_id IN (SELECT id FROM ids)
                     UNION ALL
-                    SELECT 'Notice', sent_at, NULL, NULL, NULL, NULL, NULL, drawing_ref, revision, recipient_username, channel
+                    SELECT 'Notice', sent_at, NULL, NULL, NULL, NULL, NULL, id::text, drawing_ref, revision, recipient_username, channel
                     FROM bpa.notification WHERE workpack_id = ?
-                ) h ORDER BY at DESC, table_name, column_name, recipient_username LIMIT ? OFFSET ?""";
+                ) h ORDER BY at DESC, table_name, column_name, recipient_username, row_id LIMIT ? OFFSET ?""";
         return jdbc.query(sql, (rs, n) -> new HistoryItem(rs.getString("kind"), rs.getObject("at", OffsetDateTime.class).withOffsetSameInstant(ZoneOffset.UTC),
                 rs.getString("username"), rs.getString("table_name"), rs.getString("column_name"), rs.getString("old_value"), rs.getString("new_value"),
                 rs.getString("drawing_ref"), rs.getString("revision"), rs.getString("recipient_username"), rs.getString("channel")),

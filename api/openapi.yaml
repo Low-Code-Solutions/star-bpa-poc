@@ -585,10 +585,10 @@ paths:
         The History tab of the Work Pack detail (BPA-73). Read only, every logged-in user. Items are `audit_log` rows of the Work Pack and of its child
         records (phases, materials, schedule, print, Worker assignments, Hour Journal header and lines, time sheets and their lines, hours submissions,
         progress rows and retractions) and the drawing-revision notices sent for it, newest first. `audit_log` has no Work Pack column, so the record ids of
-        the Work Pack's own records are collected first (ASSUMPTION; audit trail per FRD-7 §7.3.3). It pages: `page` from 0, `size` 1 to 200 (default 50),
+        the Work Pack own records are collected first (ASSUMPTION; audit trail per FRD-7 §7.3.3), so the rows of a child record that has since been deleted (a phase, a material, a time sheet line, a Worker assignment) are not in it (the limit of that approach). Times are UTC instants; the portal shows their Asia/Riyadh date. It pages: `page` from 0, `size` 1 to 200 (default 50),
         and `total` is the number of items in all.
       x-assumption: true
-      x-assumption-note: the history scope (the Work Pack and its child records, with the notices) and the paging are not stated by an FRD (BPA-73)
+      x-assumption-note: the history scope (the Work Pack and its live child records, with the notices), its limit for deleted child records, and the paging are not stated by an FRD (BPA-73)
       parameters:
         - name: page
           in: query

@@ -1,7 +1,7 @@
 # Plan: BPA-73 PPC Team can open a Work Pack and see its status, workers, hours and progress in one place
 Jira: BPA-73 (Story, epic BPA-4)
 Story last updated: 2026-11-23T13:51:11.506+0400
-Status: Approved (Ahsan, 23 Nov 2026)
+Status: Closed (23 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-73-workpack-detail, from main 8fc497d
 
@@ -241,7 +241,38 @@ Code layout:
   - unscoped until BPA-79.
 - **Q7:** I ask before any Jira transition.
 
+## Progress and departures (23 Nov 2026)
+- **Contract first (65b4808):** `GET /api/v1/workpacks/{n}` (`getWorkPack`), `.../history` and `.../open-tasks` with their schemas in `api/openapi.yaml`; `npm run gen:api`; compile stubs in the controller (501) so the tests could run red.
+- **Red first (65b4808):** `WorkPackDetailApiTest` **13 of 14 red** (501 from the stubs; `aMalformedNumberIs400` too, because the generated `@Pattern` reaches the generic handler as a 500) with `notLoggedInIs401` green; `WorkPackDetailPage.test.tsx` **all 10 red** (the placeholder page, no tabs or side panel).
+- **Built (d0b984b):** `WorkPackController` (three methods and a 400 handler for the number and the page and size), `workpack/WorkPackDetailService`, `workpack/WorkPackListMapper` (the list controller now uses it too), `persistence/WorkPackDetailRepository`, `task/WorkPackOpenTaskService`, `CamundaTaskClient.searchOpenAnyGroup`; the page `WorkPackDetailPage` (replaces `WorkPackDetailPlaceholder`, deleted), `features/workpacks` `WorkPackDetail` (tabs), `LifecycleBar`, `OpenTasksPanel`, three hooks, the service functions, the CSS, and `TaskList` opening a task from navigation state.
+- **After the review:** the open-task read searches the Epic 1 and weekly instances by key and reads every page; the history sorts by row id last, shows Riyadh dates and states its deleted-records limit; `TaskList` clears the navigation state it used; tests added (see below).
+- **Departures from the plan:**
+  - `WorkPackHistoryRepository` was not made: the history reads are in `WorkPackDetailRepository`.
+  - `SecurityConfig` needed no change: `anyRequest().authenticated()` already covers the three reads.
+  - New `workpack/WorkPackDetailService` and `WorkPackListMapper`; `WorkPacksPage.test.tsx` scenario 5 now has a fake backend that answers the detail (the placeholder is gone).
+  - The named probe test `searchWithoutAGroupIsAllowedForTheServiceUser` was not written separately: scenario 7 and the Epic 1 and weekly task tests prove the search without a candidate group against the real engine, with the service user's existing `READ_USER_TASK` permission. **No new permission was needed.**
+  - `src/services/schema.d.ts` is generated and gitignored (not in the diff); `intent/README.md` is regenerated in the closing commit.
+- **Green:** `WorkPackDetailApiTest` 19/19 (the 14 of the red run, and five added after the review), `WorkPackListApiTest` 14/14, `TaskApiTest` 8/8, `WorkPackApiTest` 13/13; frontend `WorkPackDetailPage` 12/12 (the 10 and two added after the review), `TaskList.navigation` 2/2, `WorkPacksPage` 6/6 and `Sidebar` 1/1; lint, `format:check` and `build` clean. Full `./mvnw -B verify` at d0b984b (before the review fixes): **739 tests, 0 failures**; after them the three classes the fixes touch were rerun (above). Full `npm test` after the fixes: 168 of 169; the one failure is the known `CreateWorkPack` `BPA6_dateToCompleteBoundary` 5 s timeout under load (passes alone).
+- **No model, migration or data model change.**
+- **Local-stack check (23 Nov, over the API; the portal screens were not clicked by me):** on WP-000001 the detail returned the summary (A-2301, PRJ-139, In Progress, 26 Nov to 18 Dec, 40.00, 480.00), phases Cutting 300 and Welding 200, Workers E1021 (40 h) and E1099 (60 h), three hour lines (two Approved on 16 Nov, one Submitted waiting at ProductionSupervisor, total 25.50 h) and the Locked week 19 Nov; the history returned the changes (including the Timekeeper's Validated decision); the open tasks listed **Approve hours (Production)** for `production-supervisor`, with `canOpen` false for `ppc-team` and `supervisor` and true for `production-supervisor`; an unknown number answered 404 "Work Pack not found". The portal served `/workpacks/WP-000001`.
+
+## After the `qa-reviewer` pass (23 Nov 2026; REVIEW.md "BPA-73 at d0b984b")
+- **Fixed after the review (Important 1 to 5):** the open-task search by instance key with every page read; the stable history order; the history limit stated in the contract and the child-table branches tested; the missing tests (TaskList navigation, "Show more", another Work Pack's task, an Epic 1 task, the 400s, the empty assertion removed); Riyadh dates for the history and the print.
+- **Fixed (Nits):** `aria-controls` on the selected tab only; the navigation state cleared after use; the duplicated helpers; element-specific task assertions and a cleanup of the engine before each test.
+- **Accepted for the POC:** no roving tabindex or arrow keys on the tabs; a task that completes between the search and its variables read fails the panel (as the task list does); the history query does not use the `audit_log` index; the 400 handler's wording; two weak keyword regexes in React tests.
+- **For Ahsan and Jira (shown first, posted only on a yes):**
+  1. **Q1:** the open-tasks read as the service user, listing the tasks of the Work Pack's Epic 1 instance, its timesheet process and (ASSUMPTION) the weekly process of a not-Locked week in which the Work Pack has a progress row; no task data; `canOpen` from the user's groups; no new permission.
+  2. **Q2:** three reads (detail, history, open tasks).
+  3. **Q3 (ASSUMPTIONs):** "No hours booked yet", "No progress recorded yet", "Not scheduled yet", "No open tasks", "Not printed yet", "No Workers assigned yet"; the print as a date only (no PDF button).
+  4. **Q4:** the history is the audit log of the Work Pack and its **live** child records plus the drawing notices, paged; the rows of deleted child records are not in it.
+  5. **Q5:** unscoped until BPA-79 (every user reads every Work Pack).
+  6. **For the PO to confirm:** the history shows raw old and new values and usernames of all child tables to all eleven groups.
+  7. **Jira status:** Ahsan moved BPA-73 to In Progress on 23 Nov 13:51; no content field changed since 17 Nov.
+- **Recorded (plan vs diff):** the diff holds the contract, `WorkPackController`, `WorkPackDetailService`, `WorkPackListMapper`, `WorkPackDetailRepository`, `WorkPackOpenTaskService`, `CamundaTaskClient`, `WorkPackDetailApiTest`, the page, the `features/workpacks` detail, lifecycle bar, side panel, hooks, service and barrel, `TaskList` and its navigation test, `utils/dates.ts`, the CSS, `WorkPackDetailPage.test.tsx`, `WorkPacksPage.test.tsx`, the plan, `REVIEW.md` and `intent/README.md`; nothing else.
+
 ## Human-gap log
 - **DoR:** intent.md and spec.md not accepted; the DoR contract item is met by this branch.
+- **DoD, local run:** done over the API; nobody has clicked the detail page in a browser yet (the five tabs, the lifecycle bar, the open-tasks panel and opening a task from it). Ahsan or Khitaba can do one click-through.
+- **For the PO:** the History tab shows raw audit values and usernames of all child tables to every group.
 - **DoD:** "Demoed at sprint review". People.
 - **DoD:** "passing in CI". Actions may not start (billing).

@@ -32,3 +32,20 @@ export function daysFrom(start: string, end: string): string[] {
   }
   return days;
 }
+
+/**
+ * A moment (an ISO instant such as 2026-11-04T22:30:00Z) as its Asia/Riyadh business date, 05 Nov 2026 (D28, 09 S9): the backend answers in UTC, and the
+ * business date is the Riyadh one whatever the browser's zone.
+ */
+export function showInstantDate(instant?: string): string {
+  if (!instant) {
+    return '';
+  }
+  const iso = new Intl.DateTimeFormat('en-CA', {
+    timeZone: appConfig.businessZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(instant));
+  return showDate(iso);
+}

@@ -84,18 +84,22 @@ class WorkPackDetailApiTest {
     private BookHoursFixture.Ids ids;
     private AssignmentFlow flow;
     private UUID wp457;
-
-    /** All test classes share one Camunda: no task of another class may mix with this class's instances. */
+    /** All test classes share one Camunda: no task of another class, nor of an earlier test of this one, may mix with a test's instances. */
     @BeforeAll
     static void noTaskLeftWaiting() {
         IntegrationApp.background();
-        for (String element : new String[] {BOOK_HOURS, VALIDATE, APPROVE_PRODUCTION, "UserTask_ApproveHoursPpc", "UserTask_ApproveCompletion"}) {
+        cancelWaiting();
+    }
+
+    private static void cancelWaiting() {
+        for (String element : new String[] {BOOK_HOURS, VALIDATE, APPROVE_PRODUCTION, "UserTask_ApproveHoursPpc", "UserTask_ApproveCompletion", "UserTask_ScheduleWorkPack"}) {
             CamundaSteps.cancelInstancesWaitingAt(element);
         }
     }
 
     @BeforeEach
     void background() {
+        cancelWaiting();
         clock.set(TODAY);
         jdbc.update("DELETE FROM bpa.workpack_schedule"); // BookHoursFixture.reset() does not clear it, and the foreign key would stop the delete of the Work Packs
         jdbc.update("DELETE FROM bpa.workpack_print");
@@ -303,7 +307,84 @@ class WorkPackDetailApiTest {
 
         assertThat(task.path("canOpen").asBoolean()).as("timekeeper is not ppc-team").isFalse();
         assertThat(taskOf(json(flow.loggedInAs("ppc-team").get(DETAIL + "WP-000457/open-tasks").body()), "UserTask_ApproveCompletion").path("canOpen").asBoolean()).isTrue();
-        assertThat(json(flow.loggedInAs("ppc-team").get(DETAIL + "WP-000490/open-tasks").body())).as("WP-000490 has no progress row in that week").isEmpty();
+        assertThat(elementsOf(json(flow.loggedInAs("ppc-team").get(DETAIL + "WP-000490/open-tasks").body()))).as("WP-000490 has no progress row in that week").doesNotContain("UserTask_ApproveCompletion");
+    }
+
+    @Test
+    void historyPagesAreStableWhenRowsShareATimestamp() {
+        // QA review: audit rows written together share changed_at, table and column and differ only by record; LIMIT/OFFSET must not repeat or skip one
+        List<UUID> records = jdbc.queryForList("SELECT id FROM bpa.workpack_phase WHERE workpack_id = ?", UUID.class, wp457);
+        assertThat(records).hasSize(2);
+        audit("workpack_phase", records.get(0), "manhours", "1", "a", "2026-11-04T08:00:00Z");
+        audit("workpack_phase", records.get(1), "manhours", "2", "b", "2026-11-04T08:00:00Z");
+        audit("workpack_phase", records.get(0), "manhours", "3", "c", "2026-11-04T08:00:00Z");
+        List<String> seen = new ArrayList<>();
+
+        for (int page = 0; page < 3; page++) {
+            JsonNode items = json(flow.loggedInAs("ppc-team").get(DETAIL + "WP-000457/history?page=" + page + "&size=1").body()).path("items");
+            assertThat(items).hasSize(1);
+            seen.add(items.get(0).path("newValue").asText());
+        }
+
+        assertThat(seen).as("every row once, over the three pages").containsExactlyInAnyOrder("a", "b", "c");
+    }
+
+    @Test
+    void historyIncludesTheRecordsOfTheWorkPacksChildTables() {
+        UUID line = jdbc.queryForObject("SELECT id FROM bpa.digital_timesheet_line WHERE status = 'Rejected'", UUID.class);
+        UUID assignment = jdbc.queryForObject("SELECT id FROM bpa.worker_assignment WHERE workpack_id = ? LIMIT 1", UUID.class, wp457);
+        UUID progress = jdbc.queryForObject("SELECT id FROM bpa.workpack_progress WHERE workpack_id = ?", UUID.class, wp457);
+        audit("digital_timesheet_line", line, "status", "Submitted", "Rejected", "2026-11-05T08:00:00Z");
+        audit("worker_assignment", assignment, "flag", null, "HoursLoadedNotRemoved", "2026-11-04T08:00:00Z");
+        audit("workpack_progress", progress, "approved_pct", null, "35.00", "2026-11-03T08:00:00Z");
+
+        JsonNode history = json(flow.loggedInAs("ppc-team").get(DETAIL + "WP-000457/history").body());
+
+        List<String> tables = new ArrayList<>();
+        history.path("items").forEach(i -> tables.add(i.path("tableName").asText()));
+        assertThat(history.path("total").asInt()).isEqualTo(3);
+        assertThat(tables).containsExactly("digital_timesheet_line", "worker_assignment", "workpack_progress");
+    }
+
+    @Test
+    void anInvalidPageOrSizeIs400() {
+        for (String query : new String[] {"?size=0", "?size=201", "?page=-1"}) {
+            HttpResponse<String> response = flow.loggedInAs("ppc-team").get(DETAIL + "WP-000457/history" + query);
+            assertThat(response.statusCode()).as(query + ": " + response.body()).isEqualTo(400);
+            assertThat(json(response.body()).path("detail").asText()).isEqualTo("page must be 0 or more and size 1 to 200");
+        }
+    }
+
+    @Test
+    void anotherWorkPacksTimesheetTaskIsNotListed() {
+        // a time sheet process of WP-000490 is waiting at Book hours; WP-000457 has no task of its own, so only WP-000490 lists it
+        UUID draft = jdbc.queryForObject("SELECT id FROM bpa.workpack WHERE workpack_number = 'WP-000490'", UUID.class);
+        Map<String, Object> variables = new LinkedHashMap<>();
+        variables.put("workpackId", draft.toString());
+        variables.put("workpackNumber", "WP-000490");
+        Reply started = IntegrationApp.admin.post("/v2/process-instances", Map.of(
+                "processDefinitionId", PROCESS, "variables", variables, "startInstructions", List.of(Map.of("elementId", BOOK_HOURS))));
+        assertThat(started.status()).as(started.body().toString()).isEqualTo(200);
+        CamundaSteps.awaitOpenTask(Long.parseLong(started.body().path("processInstanceKey").asText()), BOOK_HOURS);
+
+        assertThat(elementsOf(json(flow.loggedInAs("supervisor").get(DETAIL + "WP-000457/open-tasks").body()))).as("WP-000490 task is not WP-000457 task").doesNotContain(BOOK_HOURS);
+        assertThat(taskOf(json(flow.loggedInAs("supervisor").get(DETAIL + "WP-000490/open-tasks").body()), BOOK_HOURS).path("canOpen").asBoolean()).isTrue();
+    }
+
+    @Test
+    void anEpic1TaskIsListedForItsWorkPack() {
+        // Q1 (a): the Work Pack's own assignment instance, here waiting at Schedule Work Pack
+        Reply started = IntegrationApp.admin.post("/v2/process-instances", Map.of(
+                "processDefinitionId", "Process_PPC_WorkPackAssignment", "startInstructions", List.of(Map.of("elementId", "UserTask_ScheduleWorkPack"))));
+        assertThat(started.status()).as(started.body().toString()).isEqualTo(200);
+        long instance = Long.parseLong(started.body().path("processInstanceKey").asText());
+        jdbc.update("UPDATE bpa.workpack SET process_instance_key = ? WHERE id = ?", instance, wp457);
+        CamundaSteps.awaitOpenTask(instance, "UserTask_ScheduleWorkPack");
+
+        JsonNode task = taskOf(json(flow.loggedInAs("production-planner").get(DETAIL + "WP-000457/open-tasks").body()), "UserTask_ScheduleWorkPack");
+
+        assertThat(task.path("canOpen").asBoolean()).isTrue();
+        assertThat(taskOf(json(flow.loggedInAs("ppc-team").get(DETAIL + "WP-000457/open-tasks").body()), "UserTask_ScheduleWorkPack").path("canOpen").asBoolean()).isFalse();
     }
 
     @Test
@@ -374,6 +455,12 @@ class WorkPackDetailApiTest {
                 .isEqualTo(204);
         CamundaSteps.awaitOpenTask(instance, APPROVE_PRODUCTION);
         return instance;
+    }
+
+    private static List<String> elementsOf(JsonNode tasks) {
+        List<String> elements = new ArrayList<>();
+        tasks.forEach(t -> elements.add(t.path("elementId").asText()));
+        return elements;
     }
 
     private static JsonNode taskOf(JsonNode tasks, String elementId) {

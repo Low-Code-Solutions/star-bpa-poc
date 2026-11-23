@@ -5,8 +5,11 @@ import com.lcs.star.bpa.adapter.CamundaTaskClient.UserTask;
 import com.lcs.star.bpa.api.generated.model.OpenTask;
 import com.lcs.star.bpa.persistence.WorkPackDetailRepository;
 import com.lcs.star.bpa.persistence.WorkPackDetailRepository.Header;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -23,9 +26,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class WorkPackOpenTaskService {
 
-    static final String EPIC1 = "Process_PPC_WorkPackAssignment";
     static final String TIMESHEET = "Process_PPC_TimesheetToProgress";
-    static final String WEEKLY = "Process_PPC_WeeklyProgressPeriod";
 
     private final CamundaTaskClient camunda;
     private final TaskAllowList allowList;
@@ -39,22 +40,19 @@ public class WorkPackOpenTaskService {
 
     /** @throws CamundaTaskClient.EngineUnavailableException when the process engine cannot be reached (the caller answers 503) */
     public List<OpenTask> list(String workpackNumber, Header header, Collection<String> userGroups) {
-        Set<String> weekly = Set.copyOf(detail.openWeeklyInstanceKeys(header.id()));
-        String epic1 = Long.toString(header.processInstanceKey());
-        return allowList.processIds().stream().flatMap(process -> camunda.searchOpenAnyGroup(process).stream())
+        // The Epic 1 and weekly instances of the Work Pack are known by key, so they are searched by it (QA review: not found among a whole process's tasks).
+        // The timesheet process has no stored instance key until the first send, so its open tasks are read from the process and kept by their variable.
+        Set<String> instances = new LinkedHashSet<>();
+        instances.add(Long.toString(header.processInstanceKey()));
+        instances.addAll(detail.openWeeklyInstanceKeys(header.id()));
+        List<UserTask> found = new ArrayList<>();
+        instances.forEach(instance -> found.addAll(camunda.searchOpenOfInstance(instance)));
+        camunda.searchOpenAnyGroup(TIMESHEET).stream().filter(t -> Objects.equals(workpackNumber, camunda.variables(t).get("workpackNumber"))).forEach(found::add);
+        return found.stream()
                 .filter(t -> allowList.forElement(t.elementId()).isPresent())
-                .filter(t -> belongs(t, workpackNumber, epic1, weekly))
+                .collect(java.util.stream.Collectors.toMap(UserTask::key, t -> t, (a, b) -> a, LinkedHashMap::new)).values().stream()
                 .sorted(Comparator.comparing(UserTask::creationDate, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(t -> new OpenTask(t.key(), t.name(), t.elementId(), t.candidateGroups(), t.creationDate(), t.candidateGroups().stream().anyMatch(userGroups::contains)))
                 .toList();
-    }
-
-    private boolean belongs(UserTask task, String workpackNumber, String epic1Instance, Set<String> weeklyInstances) {
-        return switch (task.processDefinitionId()) {
-            case EPIC1 -> epic1Instance.equals(task.processInstanceKey());
-            case WEEKLY -> weeklyInstances.contains(task.processInstanceKey());
-            case TIMESHEET -> Objects.equals(workpackNumber, camunda.variables(task).get("workpackNumber"));
-            default -> false;
-        };
     }
 }

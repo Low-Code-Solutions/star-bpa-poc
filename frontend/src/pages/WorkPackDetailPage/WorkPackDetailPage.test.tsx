@@ -98,7 +98,12 @@ const OPEN_TASK = {
   creationDate: '2026-11-19T07:00:00Z',
 };
 
-function fakeBackend(groups: string[], { tasksStatus = 200 }: { tasksStatus?: number } = {}) {
+type HistoryReply = { items: unknown[]; total: number };
+
+function fakeBackend(
+  groups: string[],
+  { tasksStatus = 200, history }: { tasksStatus?: number; history?: (page: number) => HistoryReply } = {},
+) {
   const json = (status: number, body: unknown, type = 'application/json') =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': type } });
   const fetchMock = vi.fn(async (input: Request) => {
@@ -122,6 +127,9 @@ function fakeBackend(groups: string[], { tasksStatus = 200 }: { tasksStatus?: nu
           );
     }
     if (path === '/api/v1/workpacks/WP-000457/history') {
+      if (history) {
+        return json(200, history(Number(new URL(input.url).searchParams.get('page') ?? '0')));
+      }
       return json(200, {
         items: [
           {
@@ -242,7 +250,7 @@ describe('WorkPackDetailPage', () => {
   });
 
   it('BPA73_openTaskOnlyForOwnGroup', async () => {
-    const { user } = await openDetail('WP-000457', ['timekeeper']);
+    await openDetail('WP-000457', ['timekeeper']);
     const panel = await screen.findByRole('complementary', { name: 'Open tasks' });
 
     // timekeeper: the task is listed but there is nothing to open it with
@@ -255,7 +263,6 @@ describe('WorkPackDetailPage', () => {
     await openDetail('WP-000457', ['production-supervisor']);
     const own = await screen.findByRole('complementary', { name: 'Open tasks' });
     expect(await within(own).findByRole('button', { name: /Open Approve hours \(Production\)/ })).toBeEnabled();
-    expect(user).toBeDefined();
   });
 
   // --- not scenarios (plan BPA-73) ---------------------------------------------------------------------------------------------------
@@ -269,6 +276,61 @@ describe('WorkPackDetailPage', () => {
     const panel = screen.getByRole('tabpanel', { name: 'History' });
     expect(await within(panel).findByText(/status/)).toBeInTheDocument();
     expect(within(panel).getByText(/In Progress/)).toBeInTheDocument();
+  });
+
+  it('theHistoryShowsBusinessDatesInRiyadh', async () => {
+    // 22:30 UTC on 4 Nov is already 5 Nov in Asia/Riyadh (09 S9: business dates are Riyadh dates, whatever the zone the answer carries)
+    const late = (): HistoryReply => ({
+      items: [
+        {
+          kind: 'Change',
+          at: '2026-11-04T22:30:00Z',
+          username: 'ppc-team',
+          tableName: 'workpack',
+          columnName: 'status',
+          oldValue: 'Released',
+          newValue: 'In Progress',
+        },
+      ],
+      total: 1,
+    });
+    const { user } = await openDetail('WP-000457', ['ppc-team'], { history: late });
+    await screen.findByRole('tablist');
+
+    await user.click(screen.getByRole('tab', { name: 'History' }));
+
+    const panel = screen.getByRole('tabpanel', { name: 'History' });
+    expect(await within(panel).findByText('05 Nov 2026')).toBeInTheDocument();
+  });
+
+  it('showMoreReadsTheNextPageOfTheHistory', async () => {
+    const item = (n: number) => ({
+      kind: 'Change',
+      at: `2026-11-04T08:00:${String(n % 60).padStart(2, '0')}Z`,
+      username: 'ppc-team',
+      tableName: 'workpack',
+      columnName: `column-${n}`,
+      oldValue: 'a',
+      newValue: 'b',
+    });
+    const pages = (page: number): HistoryReply => ({
+      items: Array.from({ length: 50 }, (_, i) => item(page * 50 + i)),
+      total: 100,
+    });
+    const { user, fetchMock } = await openDetail('WP-000457', ['ppc-team'], { history: pages });
+    await screen.findByRole('tablist');
+
+    await user.click(screen.getByRole('tab', { name: 'History' }));
+    const panel = screen.getByRole('tabpanel', { name: 'History' });
+    await within(panel).findByText('column-0');
+    expect(within(panel).getAllByRole('row')).toHaveLength(51); // the header and the first 50
+
+    await user.click(within(panel).getByRole('button', { name: 'Show more' }));
+
+    expect(await within(panel).findByText('column-99')).toBeInTheDocument();
+    expect(within(panel).getAllByRole('row')).toHaveLength(101);
+    expect(within(panel).queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument(); // 100 of 100
+    expect(fetchMock.mock.calls.some(([req]) => new URL((req as Request).url).searchParams.get('page') === '1')).toBe(true);
   });
 
   it('theSidePanelFailsAloneWhenTheEngineIsDown', async () => {

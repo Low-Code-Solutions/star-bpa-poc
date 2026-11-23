@@ -7,12 +7,10 @@ import { showDate } from '@/utils/dates';
 import { useWorkPack } from '../../hooks/useWorkPack';
 import { LifecycleBar } from '../LifecycleBar';
 import { OpenTasksPanel } from '../OpenTasksPanel';
-import { HistoryTab, HoursTab, OverviewTab, ProgressTab, WorkersTab } from './tabs';
+import { EMPTY, HistoryTab, HoursTab, OverviewTab, ProgressTab, WorkersTab, two } from './tabs';
 
 const TABS = ['Overview', 'Workers', 'Hours', 'Progress', 'History'] as const;
 type Tab = (typeof TABS)[number];
-const EMPTY = '–';
-const two = (value?: number | null) => (value == null ? EMPTY : Number(value).toFixed(2));
 
 /**
  * BPA-73: the Work Pack as one case view, read only. A summary panel and the lifecycle bar, five tabs (Overview, Workers, Hours, Progress, History) and a side
@@ -68,7 +66,7 @@ export function WorkPackDetail({ api, workpackNumber }: { api: Api; workpackNumb
                   role="tab"
                   id={`tab-${t}`}
                   aria-selected={tab === t}
-                  aria-controls={`panel-${t}`}
+                  aria-controls={tab === t ? `panel-${t}` : undefined}
                   onClick={() => setTab(t)}
                 >
                   {t}
