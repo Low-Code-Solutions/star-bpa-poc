@@ -1,7 +1,7 @@
 # Plan: BPA-75 Supervisor can only book hours for a Worker who is not on approved leave that day
 Jira: BPA-75 (Story, epic BPA-4)
 Story last updated: 2026-11-23T23:46:53.151+0400
-Status: Approved (Ahsan, 24 Nov 2026)
+Status: Closed (24 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-75-leave-blocks-hours, from main ec3051a
 
@@ -140,6 +140,24 @@ One class, **`WorkerLeaveApiTest`**, on the integration stack (per-class Postgre
 - **Q3:** change and amend on a leave day are refused with the same 400 text (ASSUMPTION, in the comment).
 - **Q5:** one WORKER_ON_LEAVE branch in `BusinessRuleTask_CheckHoursWithinBudget`'s `outputElement`; no new element.
 - **Q4, Q6:** as written; I ask before any Jira transition or comment.
+
+## Progress and results (24 Nov 2026)
+- **Red first (adbb0b2):** 6 of 11 `WorkerLeaveApiTest` tests failed (the line was saved, 201 or 200, and the upload row said "Saved", where a 400 and the leave text were expected; the send went on to Validate hours). Two of the four `BPA75_` scenarios were red (`bookingOnLeaveDayIsBlocked`, `uploadRowOnLeaveDayIsRejected`); `bookingOnWorkingDayIsAccepted` and `leaveNotYetApprovedDoesNotBlock` passed before code, as the plan said (guards).
+- **Green (de56ae4):** `WorkerLeaveRepository.onLeave` (the one lookup, at save and at send), `HourLineChecks.workerOnLeaveMessage`, the WORKER_ON_LEAVE case in `HourLineService.checkBudget`, `workerOnLeave` and `workerOnLeaveMessage` in `PrepareHoursSubmissionWorker`, one FEEL branch in the send step's `outputElement`, contract texts, data model note. `WorkerLeaveApiTest` 11/11; neighbours `CbsBlockApiTest` 10, `HoursBudgetApiTest` 11, `BookHoursApiTest` 28, `TimesheetFileApiTest` 21, `HoursValidationApiTest` 14.
+- **Full suite:** `./mvnw -B verify` 768 tests, 0 failures, BUILD SUCCESS. `npm run lint:bpmn` clean. No frontend change; DMN and migrations unchanged.
+- **Deployed model:** the deployed `Process_PPC_TimesheetToProgress` equals `models/` (whitespace-normalised hash) and contains the WORKER_ON_LEAVE branch.
+- **Local-stack check (24 Nov, over the API as supervisor; nobody clicked a portal screen):** E1203 (seeded leave 23 to 26 Nov) is not assigned to any seeded Work Pack, so a synthetic assignment, journal line and time sheet on WP-000001 were added by SQL and removed afterwards. The waiting hours submission of WP-000001 (at the Production Supervisor from earlier testing) was moved to Closed/Returned for the check, because "hours in approval" (409) is checked before the leave rule, and restored (stage ProductionSupervisor, outcome NULL). Results: 24 Nov refused 400 "Worker E1203 is on leave on 24 Nov 2026"; 23 Nov (leave_from) refused; 22 Nov (the day before) saved as Draft; 26 Nov was not reached by the leave rule (a future date, 400 "Work date cannot be in the future").
+
+## After the `qa-reviewer` pass (24 Nov 2026; REVIEW.md "BPA-75 at de56ae4")
+- **0 High, 0 Important, 5 Nits.** Nothing needed a code change.
+- **Recorded (Nits):**
+  1. A timesheet instance already waiting at Book hours keeps the old model version, whose `outputElement` has no WORKER_ON_LEAVE branch: with the new backend such a send can be Blocked with a null message. Redeploy the model with the backend (as BPA-69's deploy note).
+  2. The Timekeeper's amend is refused on a leave day, even when the leave was approved after the line was sent (the plan's Q3 ASSUMPTION, as the CBS rule): in the Jira comment.
+  3. "is read, only, by" in the data model note follows the BPA-69 wording; left.
+  4. The `POST /timesheet-files` operation text does not mention the leave outcome (it is in the outcomes list and the lines endpoints, as the plan said): left.
+  5. The extra tests have no `BPA75_` prefix (the plan counts four `BPA75_` tests, one per scenario).
+- **Plan vs diff:** no departure; the diff holds exactly the planned files (repository, service, checks, worker, BPMN, contract, data model, `WorkerLeaveApiTest`). No existing test was edited.
+- **For Ahsan and Jira (shown first, posted only on a yes):** (1) the SOR Notes name `worker_leave (employee_ref, leave_date, status)`; the table as built (BPA-48) is `(worker_id, leave_from, leave_to)`, approved leave only, no status (Q-DM23): Khitaba to update the SOR Notes; (2) scenario 4 ("leave not yet approved") can only be shown as a Worker with no leave row; (3) ASSUMPTIONs: change and the Timekeeper's amend are refused on a leave day; a closed CBS comes before leave (DMN order); leave dates are inclusive and block the whole day (12 Nov decision); (4) deploy note above.
 
 ## Human-gap log
 - **DoR:** intent.md and spec.md not accepted; the SOR Notes need Khitaba's update (Q1).
