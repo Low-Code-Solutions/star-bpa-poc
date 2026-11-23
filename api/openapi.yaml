@@ -540,6 +540,121 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/WorkPackNotFound'
+  /api/v1/workpacks/{workpackNumber}:
+    parameters:
+      - $ref: '#/components/parameters/WorkpackNumberPath'
+    get:
+      tags: [workpacks]
+      operationId: getWorkPack
+      summary: The Work Pack detail (read only), with summary, overview, workers, hours and progress
+      description: |
+        The case view of one Work Pack (BPA-73; E2-23), read only, for every logged-in user (all eleven groups; Jira decision 12 Nov 2026). Until BPA-79
+        builds the per-user project scope it is not limited to the user's projects (as BPA-72). It carries what the summary panel, the lifecycle bar and
+        the Overview, Workers, Hours and Progress tabs show, all from the POC database. The History tab and the open tasks have their own reads, so a
+        long history or an engine that is down does not hold the page back.
+        `summary` is the row of the Work Packs list (BPA-72). `overview` has the phases and their man-hours, the materials, the schedule and the print
+        (the print is shown as a date only; its PDF stays behind its own groups). `workers` has one entry per assigned Worker, with the flag
+        "Hours loaded; not removed" (worker_assignment.flag, BPA-13). `hours.lines` has every line with its status and, while its submission waits, the
+        approval step; `hours.totalHours` is the sum of the lines that are not Rejected (BPA-73 scenario 3). `progress` has one entry per week in which the
+        Work Pack has a progress row, newest first, with the Earned man-hours of the Work Pack's **activity** for that week (they exist only per
+        activity, BPA-62) and the retractions. A Work Pack with no hours or no progress gets empty lists.
+        Built by BPA-73; no FRD names a Work Pack detail (Jira source reference), so the operation and its content are ASSUMPTION.
+      x-assumption: true
+      x-assumption-note: the detail view, its content and the open access are not stated by an FRD (BPA-73, Jira source reference)
+      responses:
+        '200':
+          description: The Work Pack with its tabs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkPackDetail'
+        '400':
+          $ref: '#/components/responses/InvalidWorkpackNumber'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/WorkPackNotFound'
+  /api/v1/workpacks/{workpackNumber}/history:
+    parameters:
+      - $ref: '#/components/parameters/WorkpackNumberPath'
+    get:
+      tags: [workpacks]
+      operationId: getWorkPackHistory
+      summary: The history of a Work Pack (audit log of the Work Pack and its records, and drawing notices), newest first
+      description: |
+        The History tab of the Work Pack detail (BPA-73). Read only, every logged-in user. Items are `audit_log` rows of the Work Pack and of its child
+        records (phases, materials, schedule, print, Worker assignments, Hour Journal header and lines, time sheets and their lines, hours submissions,
+        progress rows and retractions) and the drawing-revision notices sent for it, newest first. `audit_log` has no Work Pack column, so the record ids of
+        the Work Pack's own records are collected first (ASSUMPTION; audit trail per FRD-7 §7.3.3). It pages: `page` from 0, `size` 1 to 200 (default 50),
+        and `total` is the number of items in all.
+      x-assumption: true
+      x-assumption-note: the history scope (the Work Pack and its child records, with the notices) and the paging are not stated by an FRD (BPA-73)
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: Page number from 0
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          required: false
+          description: Items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: One page of the history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkPackHistoryPage'
+        '400':
+          $ref: '#/components/responses/InvalidWorkpackNumber'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/WorkPackNotFound'
+  /api/v1/workpacks/{workpackNumber}/open-tasks:
+    parameters:
+      - $ref: '#/components/parameters/WorkpackNumberPath'
+    get:
+      tags: [workpacks]
+      operationId: listWorkPackOpenTasks
+      summary: The open user tasks on a Work Pack, from every group (read only; no task data)
+      description: |
+        The "Open tasks" side panel of the Work Pack detail (BPA-73 scenario 7). Every open user task on this Work Pack, **whatever its group**, with its name, its
+        element, the groups it is for and when it was created, and `canOpen`: true when one of the user's groups is one of the task's. No task variables or data
+        are returned. A task opens only through `GET /api/v1/tasks/{taskKey}`, which still answers 403 to a user outside its groups; `canOpen` only tells the
+        screen whether to offer it. The tasks are those of the Work Pack's Epic 1 instance, of its timesheet process instance and (ASSUMPTION) of the weekly
+        process of a week that is not Locked and in which the Work Pack has a progress row. The read is made by the service user, which already has
+        `READ_USER_TASK` on these processes (BPA-73 proves it). It is a separate read because it calls the process engine: 503 when the engine is not
+        reachable, and the page still shows.
+        Built by BPA-73; ASSUMPTION (no FRD names it).
+      x-assumption: true
+      x-assumption-note: the cross-group task list, its scope (including the weekly process) and canOpen are not stated by an FRD (BPA-73)
+      responses:
+        '200':
+          description: The open tasks (empty when there is none)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OpenTask'
+        '400':
+          $ref: '#/components/responses/InvalidWorkpackNumber'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/WorkPackNotFound'
+        '503':
+          $ref: '#/components/responses/EngineUnavailable'
   /api/v1/hour-journal-headers:
     get:
       tags: [hour-journal-headers]
@@ -2094,6 +2209,265 @@ components:
           nullable: true
           description: The Earned man-hours of the Work Pack's activity (not of the Work Pack) in that Locked week (activity_progress.earned_manhours, BPA-62); null before a week is locked
           example: 480.00
+    WorkPackDetail:
+      type: object
+      description: The Work Pack detail (BPA-73), read only. A field with no value is left out of the JSON, as everywhere in this API.
+      required: [summary, overview, workers, hours, progress]
+      properties:
+        summary:
+          $ref: '#/components/schemas/WorkPackListRow'
+        overview:
+          $ref: '#/components/schemas/WorkPackOverview'
+        workers:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkPackWorker'
+        hours:
+          $ref: '#/components/schemas/WorkPackHours'
+        progress:
+          type: array
+          description: One entry per week in which the Work Pack has a progress row, newest week first
+          items:
+            $ref: '#/components/schemas/WorkPackWeek'
+    WorkPackOverview:
+      type: object
+      required: [completionDate, phases, materials]
+      properties:
+        completionDate:
+          type: string
+          format: date
+        phases:
+          type: array
+          items:
+            type: object
+            required: [phase, manhours]
+            properties:
+              phase:
+                type: string
+                enum: [Engineering, Cutting, Welding, Finishing]
+              manhours:
+                type: number
+                example: 150.00
+        materials:
+          type: array
+          items:
+            type: object
+            required: [materialRef, phase]
+            properties:
+              materialRef:
+                type: string
+                example: MAT-PIPE-06
+              phase:
+                type: string
+        schedule:
+          type: object
+          description: Absent until the Work Pack is scheduled
+          required: [plannedStartDate, plannedEndDate, scheduledBy]
+          properties:
+            plannedStartDate:
+              type: string
+              format: date
+            plannedEndDate:
+              type: string
+              format: date
+            scheduledBy:
+              type: string
+        print:
+          type: object
+          description: Absent until the Workpack print is generated; the PDF itself is read through its own endpoint and groups
+          required: [generatedAt]
+          properties:
+            generatedAt:
+              type: string
+              format: date-time
+    WorkPackWorker:
+      type: object
+      description: One assigned Worker (worker_assignment) with the Worker's Hour Journal line and time sheet
+      required: [badgeNo, workerName, estimatedHours, hoursLoadedNotRemoved]
+      properties:
+        badgeNo:
+          type: string
+          example: E1099
+        workerName:
+          type: string
+        role:
+          type: string
+        designation:
+          type: string
+        estimatedHours:
+          type: number
+          description: The hours assigned to the Worker on this Work Pack (worker_assignment.estimated_hours)
+        hoursLoadedNotRemoved:
+          type: boolean
+          description: True when the Worker was kept with hours booked while a replacement file left them out (worker_assignment.flag HoursLoadedNotRemoved, BPA-13); the screen says "Hours loaded; not removed"
+        journalStatus:
+          type: string
+          enum: [Open, Closed]
+          description: Status of the Worker's Hour Journal line
+        timesheetStatus:
+          type: string
+          enum: [Draft, Cancelled]
+          description: Status of the Worker's time sheet (digital_timesheet.submission_status)
+        cbsCodeRef:
+          type: string
+          description: The CBS the time sheet carries; absent when it has none
+    WorkPackHours:
+      type: object
+      required: [lines, totalHours]
+      properties:
+        lines:
+          type: array
+          description: Every line of the Work Pack's time sheets, oldest work date first
+          items:
+            $ref: '#/components/schemas/WorkPackHourLine'
+        totalHours:
+          type: number
+          description: The sum of the lines that are not Rejected (BPA-73); 0 when there is none
+          example: 27.50
+    WorkPackHourLine:
+      type: object
+      required: [badgeNo, workDate, phase, hours, status]
+      properties:
+        badgeNo:
+          type: string
+        workDate:
+          type: string
+          format: date
+        phase:
+          type: string
+        hours:
+          type: number
+        status:
+          type: string
+          enum: [Draft, Submitted, Approved, Returned, Rejected]
+        step:
+          type: string
+          enum: [Timekeeper, ProductionSupervisor, Ppc]
+          description: While the line is Submitted, the approval step its submission waits at (hours_submission.stage); absent otherwise
+        entrySource:
+          type: string
+          enum: [Form, Upload]
+    WorkPackWeek:
+      type: object
+      description: The Work Pack in one progress week
+      required: [weekEnding, periodStatus, retractions]
+      properties:
+        weekEnding:
+          type: string
+          format: date
+        periodStatus:
+          type: string
+          enum: [CutOff, Locked]
+        reportedPct:
+          type: number
+        approvedPct:
+          type: number
+        ruleResult:
+          type: string
+          enum: [Accepted, Blocked, NeedsRetraction]
+        earnedManhours:
+          type: number
+          description: The Earned man-hours of the Work Pack's activity (not of the Work Pack) for that week, as in the Work Packs list; absent when the week has none yet
+        retractions:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkPackRetraction'
+    WorkPackRetraction:
+      type: object
+      description: A progress retraction request of that week (progress_retraction, BPA-63)
+      required: [approvedPct, reason, requestedBy]
+      properties:
+        approvedPct:
+          type: number
+          description: The approved % the retraction concerns (progress_retraction.approved_pct)
+        reason:
+          type: string
+        requestedBy:
+          type: string
+        decision:
+          type: string
+          enum: [Approved, Declined]
+          description: Absent while the retraction is open
+        decisionReason:
+          type: string
+        decidedBy:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+    WorkPackHistoryPage:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkPackHistoryItem'
+        total:
+          type: integer
+          description: The number of history items in all, over every page
+    WorkPackHistoryItem:
+      type: object
+      description: One change of the audit log, or one drawing-revision notice
+      required: [kind, at]
+      properties:
+        kind:
+          type: string
+          enum: [Change, Notice]
+        at:
+          type: string
+          format: date-time
+        username:
+          type: string
+          description: Who changed it (Change)
+        tableName:
+          type: string
+          description: The table of the audit_log row (Change), for example workpack or digital_timesheet_line
+        columnName:
+          type: string
+          description: The column that changed (Change)
+        oldValue:
+          type: string
+        newValue:
+          type: string
+        notice:
+          type: object
+          description: The drawing-revision notice (Notice)
+          required: [drawingRef, revision, recipientUsername, channel]
+          properties:
+            drawingRef:
+              type: string
+            revision:
+              type: string
+            recipientUsername:
+              type: string
+            channel:
+              type: string
+              enum: [Email, InSystem]
+    OpenTask:
+      type: object
+      description: An open user task on a Work Pack, from any group (BPA-73). No task data.
+      required: [key, name, elementId, candidateGroups, creationDate, canOpen]
+      properties:
+        key:
+          $ref: '#/components/schemas/CamundaKey'
+        name:
+          type: string
+          example: Approve hours (Production)
+        elementId:
+          type: string
+          example: UserTask_ApproveHoursProduction
+        candidateGroups:
+          type: array
+          items:
+            type: string
+          example: [production-supervisor]
+        creationDate:
+          type: string
+          format: date-time
+        canOpen:
+          type: boolean
+          description: True when one of the logged-in user's groups is one of the task's; the task itself still answers 403 to anyone else
     HourJournalHeader:
       type: object
       description: hour_journal_header (data model §5.5), joined to workpack

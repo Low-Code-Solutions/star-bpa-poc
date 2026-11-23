@@ -5,6 +5,9 @@ import com.lcs.star.bpa.adapter.CamundaTaskClient.EngineUnavailableException;
 import com.lcs.star.bpa.api.generated.WorkpacksApi;
 import com.lcs.star.bpa.persistence.WorkPackListRepository;
 import com.lcs.star.bpa.api.generated.model.StartWorkPackResponse;
+import com.lcs.star.bpa.api.generated.model.OpenTask;
+import com.lcs.star.bpa.api.generated.model.WorkPackDetail;
+import com.lcs.star.bpa.api.generated.model.WorkPackHistoryPage;
 import com.lcs.star.bpa.api.generated.model.WorkPackListRow;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -63,6 +66,26 @@ public class WorkPackController implements WorkpacksApi {
                     .approvedWeekEnding(r.approvedWeekEnding()).earnedManhours(r.earnedManhours()));
         }
         return ResponseEntity.ok(rows);
+    }
+
+    /** BPA-73 compile stubs: the three reads are not built yet (red tests first). */
+    @Override
+    public ResponseEntity<WorkPackDetail> getWorkPack(String workpackNumber) {
+        throw notBuilt();
+    }
+
+    @Override
+    public ResponseEntity<WorkPackHistoryPage> getWorkPackHistory(String workpackNumber, Integer page, Integer size) {
+        throw notBuilt();
+    }
+
+    @Override
+    public ResponseEntity<List<OpenTask>> listWorkPackOpenTasks(String workpackNumber) {
+        throw notBuilt();
+    }
+
+    private static ErrorResponseException notBuilt() {
+        return new ErrorResponseException(HttpStatus.NOT_IMPLEMENTED, ProblemDetail.forStatusAndDetail(HttpStatus.NOT_IMPLEMENTED, "Work Pack detail not built yet"), null);
     }
 
     @Override
