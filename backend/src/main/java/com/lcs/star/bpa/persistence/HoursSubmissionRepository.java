@@ -235,4 +235,29 @@ public class HoursSubmissionRepository {
                 WHERE l.hours_submission_id = ? AND EXISTS (SELECT 1 FROM bpa.hours_month_lock m WHERE m.month = date_trunc('month', l.work_date)::date)
                 ORDER BY l.work_date LIMIT 1""", java.sql.Date.class, submissionId).stream().map(java.sql.Date::toLocalDate).findFirst();
     }
+
+    /** The open submission of a process instance at an approval step, and the moment its hours reached that step (BPA-74). */
+    public record Reached(UUID submissionId, UUID workpackId, Instant at) {
+    }
+
+    /**
+     * The newest submission of the process instance that is waiting at {@code step} (its stage), with when its hours reached the step (BPA-74): its
+     * {@code submitted_at} for the Timekeeper, else the {@code decided_at} of the previous step's decision (Validated for the Production Supervisor, Approved
+     * for PPC). Empty when no submission of the instance is at that step: the hours moved on, or the round was closed by a return or a rejection. A re-sent
+     * submission is a new round with its own {@code submitted_at}, so the count starts again (plan BPA-74 Q2).
+     */
+    public Optional<Reached> reachedStep(long processInstanceKey, String step) {
+        String previousStep = "ProductionSupervisor".equals(step) ? "Timekeeper" : "Ppc".equals(step) ? "ProductionSupervisor" : null;
+        String previousDecision = "ProductionSupervisor".equals(step) ? "Validated" : "Approved";
+        return jdbc.query("""
+                SELECT s.id, s.workpack_id,
+                       CASE WHEN s.stage = 'Timekeeper' THEN s.submitted_at
+                            ELSE (SELECT max(d.decided_at) FROM bpa.hours_decision d WHERE d.hours_submission_id = s.id AND d.step = ? AND d.decision = ?) END AS reached_at
+                FROM bpa.hours_submission s
+                WHERE s.process_instance_key = ? AND s.stage = ?
+                ORDER BY s.round_no DESC LIMIT 1""",
+                (rs, n) -> rs.getTimestamp("reached_at") == null ? null
+                        : new Reached(rs.getObject("id", UUID.class), rs.getObject("workpack_id", UUID.class), rs.getTimestamp("reached_at").toInstant()),
+                previousStep, previousDecision, processInstanceKey, step).stream().filter(java.util.Objects::nonNull).findFirst();
+    }
 }
