@@ -33,8 +33,24 @@ const DETAIL_457 = {
     schedule: { plannedStartDate: '2026-11-03', plannedEndDate: '2026-11-06', scheduledBy: 'production-planner' },
   },
   workers: [
-    { badgeNo: 'E1021', workerName: 'Worker E1021', role: 'Welder', designation: 'Grade 3', estimatedHours: 100, hoursLoadedNotRemoved: false, journalStatus: 'Open' },
-    { badgeNo: 'E1099', workerName: 'Worker E1099', role: 'Fitter', designation: 'Grade 2', estimatedHours: 100, hoursLoadedNotRemoved: true, journalStatus: 'Open' },
+    {
+      badgeNo: 'E1021',
+      workerName: 'Worker E1021',
+      role: 'Welder',
+      designation: 'Grade 3',
+      estimatedHours: 100,
+      hoursLoadedNotRemoved: false,
+      journalStatus: 'Open',
+    },
+    {
+      badgeNo: 'E1099',
+      workerName: 'Worker E1099',
+      role: 'Fitter',
+      designation: 'Grade 2',
+      estimatedHours: 100,
+      hoursLoadedNotRemoved: true,
+      journalStatus: 'Open',
+    },
   ],
   hours: {
     lines: [
@@ -59,7 +75,15 @@ const DETAIL_457 = {
 };
 
 const DETAIL_490 = {
-  summary: { ...SUMMARY, workpackNumber: 'WP-000490', status: 'Draft', assignmentState: undefined, plannedStartDate: undefined, plannedEndDate: undefined, approvedPct: undefined },
+  summary: {
+    ...SUMMARY,
+    workpackNumber: 'WP-000490',
+    status: 'Draft',
+    assignmentState: undefined,
+    plannedStartDate: undefined,
+    plannedEndDate: undefined,
+    approvedPct: undefined,
+  },
   overview: { completionDate: '2026-12-31', phases: [{ phase: 'Cutting', manhours: 80 }], materials: [] },
   workers: [],
   hours: { lines: [], totalHours: 0 },
@@ -91,12 +115,24 @@ function fakeBackend(groups: string[], { tasksStatus = 200 }: { tasksStatus?: nu
     if (path === '/api/v1/workpacks/WP-000457/open-tasks') {
       return tasksStatus === 200
         ? json(200, [{ ...OPEN_TASK, canOpen: groups.includes('production-supervisor') }])
-        : json(tasksStatus, { status: tasksStatus, detail: 'The process engine is not available right now; try again later' }, 'application/problem+json');
+        : json(
+            tasksStatus,
+            { status: tasksStatus, detail: 'The process engine is not available right now; try again later' },
+            'application/problem+json',
+          );
     }
     if (path === '/api/v1/workpacks/WP-000457/history') {
       return json(200, {
         items: [
-          { kind: 'Change', at: '2026-11-04T08:00:00Z', username: 'ppc-team', tableName: 'workpack', columnName: 'status', oldValue: 'Released', newValue: 'In Progress' },
+          {
+            kind: 'Change',
+            at: '2026-11-04T08:00:00Z',
+            username: 'ppc-team',
+            tableName: 'workpack',
+            columnName: 'status',
+            oldValue: 'Released',
+            newValue: 'In Progress',
+          },
         ],
         total: 1,
       });
@@ -133,14 +169,20 @@ describe('WorkPackDetailPage', () => {
 
     const bar = await screen.findByRole('list', { name: 'Lifecycle' });
     const steps = within(bar).getAllByRole('listitem');
-    expect(steps.map((s) => s.textContent)).toEqual([expect.stringContaining('Draft'), expect.stringContaining('Released'), expect.stringContaining('In Progress'), expect.stringContaining('Completed')]);
+    expect(steps.map((s) => s.textContent)).toEqual([
+      expect.stringContaining('Draft'),
+      expect.stringContaining('Released'),
+      expect.stringContaining('In Progress'),
+      expect.stringContaining('Completed'),
+    ]);
     expect(steps[2]).toHaveAttribute('aria-current', 'step');
     expect(steps[0]).toHaveClass('lifecycle__step--done');
     expect(steps[1]).toHaveClass('lifecycle__step--done');
     expect(steps[3]).not.toHaveClass('lifecycle__step--done');
     const overview = screen.getByRole('tabpanel', { name: 'Overview' });
-    expect(within(overview).getByText('Cutting')).toBeInTheDocument();
-    expect(within(overview).getByText('Welding')).toBeInTheDocument();
+    const phases = within(within(overview).getByRole('table', { name: 'Phases and man-hours' }));
+    expect(phases.getByText('Cutting')).toBeInTheDocument();
+    expect(phases.getByText('Welding')).toBeInTheDocument();
     expect(within(overview).getByText(/03 Nov 2026/)).toBeInTheDocument();
     expect(within(overview).getByText(/06 Nov 2026/)).toBeInTheDocument();
   });
@@ -153,7 +195,9 @@ describe('WorkPackDetailPage', () => {
 
     const row = within(screen.getByRole('tabpanel', { name: 'Workers' })).getByRole('row', { name: /E1099/ });
     expect(row).toHaveTextContent('Hours loaded; not removed');
-    expect(within(screen.getByRole('tabpanel', { name: 'Workers' })).getByRole('row', { name: /E1021/ })).not.toHaveTextContent('Hours loaded; not removed');
+    expect(within(screen.getByRole('tabpanel', { name: 'Workers' })).getByRole('row', { name: /E1021/ })).not.toHaveTextContent(
+      'Hours loaded; not removed',
+    );
   });
 
   it('BPA73_hoursTabExcludesRejectedFromTotal', async () => {

@@ -3,7 +3,11 @@ package com.lcs.star.bpa.api;
 import com.lcs.star.bpa.adapter.CamundaProcessClient;
 import com.lcs.star.bpa.adapter.CamundaTaskClient.EngineUnavailableException;
 import com.lcs.star.bpa.api.generated.WorkpacksApi;
+import com.lcs.star.bpa.persistence.WorkPackDetailRepository;
 import com.lcs.star.bpa.persistence.WorkPackListRepository;
+import com.lcs.star.bpa.task.WorkPackOpenTaskService;
+import com.lcs.star.bpa.workpack.WorkPackDetailService;
+import com.lcs.star.bpa.workpack.WorkPackListMapper;
 import com.lcs.star.bpa.api.generated.model.StartWorkPackResponse;
 import com.lcs.star.bpa.api.generated.model.OpenTask;
 import com.lcs.star.bpa.api.generated.model.WorkPackDetail;
@@ -14,10 +18,15 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.ErrorResponseException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -34,13 +43,18 @@ public class WorkPackController implements WorkpacksApi {
     private static final Logger LOG = LoggerFactory.getLogger(WorkPackController.class);
 
     static final List<String> STATUSES = List.of("Draft", "Released", "In Progress", "Completed");
+    private static final java.util.regex.Pattern NUMBER = java.util.regex.Pattern.compile("^WP-[0-9]{6}$");
 
     private final CamundaProcessClient camunda;
     private final WorkPackListRepository list;
+    private final WorkPackDetailService details;
+    private final WorkPackOpenTaskService openTasks;
 
-    public WorkPackController(CamundaProcessClient camunda, WorkPackListRepository list) {
+    public WorkPackController(CamundaProcessClient camunda, WorkPackListRepository list, WorkPackDetailService details, WorkPackOpenTaskService openTasks) {
         this.camunda = camunda;
         this.list = list;
+        this.details = details;
+        this.openTasks = openTasks;
     }
 
 
@@ -60,32 +74,69 @@ public class WorkPackController implements WorkpacksApi {
         }
         List<WorkPackListRow> rows = new ArrayList<>();
         for (WorkPackListRepository.Row r : list.list(new WorkPackListRepository.Filter(status, project, weekEnding, search))) {
-            rows.add(new WorkPackListRow(r.workpackNumber(), r.activityRef(), r.drawingRef(), r.departmentRef(), r.projectRef(), WorkPackListRow.StatusEnum.fromValue(r.status()))
-                    .assignmentState(r.assignmentState() == null ? null : WorkPackListRow.AssignmentStateEnum.fromValue(r.assignmentState()))
-                    .plannedStartDate(r.plannedStartDate()).plannedEndDate(r.plannedEndDate()).approvedPct(r.approvedPct())
-                    .approvedWeekEnding(r.approvedWeekEnding()).earnedManhours(r.earnedManhours()));
+            rows.add(WorkPackListMapper.toRow(r));
         }
         return ResponseEntity.ok(rows);
     }
 
-    /** BPA-73 compile stubs: the three reads are not built yet (red tests first). */
+    /**
+     * {@code GET /api/v1/workpacks/{workpackNumber}} (BPA-73): the read-only Work Pack detail (summary, Overview, Workers, Hours, Progress) for every logged-in
+     * user; 400 for a number outside WP-######, 404 "Work Pack not found".
+     */
     @Override
     public ResponseEntity<WorkPackDetail> getWorkPack(String workpackNumber) {
-        throw notBuilt();
+        return ResponseEntity.ok(details.detail(workpackNumber, known(workpackNumber)));
     }
 
+    /** The History tab (BPA-73): the audit log of the Work Pack and its records, and the drawing notices, newest first, one page. */
     @Override
     public ResponseEntity<WorkPackHistoryPage> getWorkPackHistory(String workpackNumber, Integer page, Integer size) {
-        throw notBuilt();
+        int pageNo = page == null ? 0 : page;
+        int pageSize = size == null ? 50 : size;
+        if (pageNo < 0 || pageSize < 1 || pageSize > 200) {
+            throw new ErrorResponseException(HttpStatus.BAD_REQUEST, ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "page must be 0 or more and size 1 to 200"), null);
+        }
+        return ResponseEntity.ok(details.history(known(workpackNumber), pageNo, pageSize));
     }
 
+    /**
+     * The open tasks of the Work Pack from every group, without task data (BPA-73, the side panel). The user's groups come from the session; the read is made by the
+     * service user. 503 when the process engine is not reachable (the page itself does not depend on it).
+     */
     @Override
     public ResponseEntity<List<OpenTask>> listWorkPackOpenTasks(String workpackNumber) {
-        throw notBuilt();
+        WorkPackDetailRepository.Header header = known(workpackNumber);
+        List<String> groups = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream().map(a -> a.getAuthority()).toList();
+        try {
+            return ResponseEntity.ok(openTasks.list(workpackNumber, header, groups));
+        } catch (EngineUnavailableException e) {
+            LOG.warn("Open tasks of {} not read: {}", workpackNumber, e.getMessage());
+            throw new ErrorResponseException(HttpStatus.SERVICE_UNAVAILABLE, ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                    "The process engine is not available right now; try again later"), null);
+        }
     }
 
-    private static ErrorResponseException notBuilt() {
-        return new ErrorResponseException(HttpStatus.NOT_IMPLEMENTED, ProblemDetail.forStatusAndDetail(HttpStatus.NOT_IMPLEMENTED, "Work Pack detail not built yet"), null);
+    /**
+     * A parameter that breaks a generated constraint (the number's @Pattern, the history's page and size limits): 400, as the other Work Pack reads answer the
+     * number. Without this the validation failure would reach the generic handler as a 500.
+     */
+    @ExceptionHandler({ConstraintViolationException.class, HandlerMethodValidationException.class})
+    ResponseEntity<ProblemDetail> invalidParameter(Exception e) {
+        boolean paging = (e instanceof HandlerMethodValidationException h && h.getParameterValidationResults().stream()
+                .anyMatch(r -> List.of("page", "size").contains(r.getMethodParameter().getParameterName())))
+                || (e instanceof ConstraintViolationException c && c.getConstraintViolations().stream()
+                        .anyMatch(v -> v.getPropertyPath().toString().endsWith("page") || v.getPropertyPath().toString().endsWith("size")));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, paging ? "page must be 0 or more and size 1 to 200" : "Workpack number must match WP-######"));
+    }
+
+    /** The Work Pack of this number: 400 outside WP-###### (the contract's InvalidWorkpackNumber), 404 "Work Pack not found". */
+    private WorkPackDetailRepository.Header known(String workpackNumber) {
+        if (workpackNumber == null || !NUMBER.matcher(workpackNumber).matches()) {
+            throw new ErrorResponseException(HttpStatus.BAD_REQUEST, ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Workpack number must match WP-######"), null);
+        }
+        return details.header(workpackNumber).orElseThrow(() -> new ErrorResponseException(HttpStatus.NOT_FOUND,
+                ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Work Pack not found"), null));
     }
 
     @Override

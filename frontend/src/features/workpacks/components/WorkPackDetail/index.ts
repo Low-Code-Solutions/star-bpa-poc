@@ -1,0 +1,1 @@
+export { WorkPackDetail } from './WorkPackDetail';

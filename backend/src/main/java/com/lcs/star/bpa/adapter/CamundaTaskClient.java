@@ -55,6 +55,23 @@ public class CamundaTaskClient {
     }
 
     /**
+     * Open (CREATED) tasks of one process whatever their candidate groups (BPA-73: the Work Pack detail lists the open tasks of every group, without task data;
+     * the search needs {@code READ_USER_TASK} on the process, which the service user has).
+     */
+    public List<UserTask> searchOpenAnyGroup(String processDefinitionId) {
+        JsonNode body = call(() -> rest.post().uri("/v2/user-tasks/search")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(
+                        "filter", Map.of("processDefinitionId", processDefinitionId, "state", "CREATED"),
+                        "page", Map.of("limit", PAGE_LIMIT)))
+                .exchange((request, response) -> warnIfCut(ok(response.getStatusCode(), "user task search", read(response.getBody())),
+                        "user task search")));
+        List<UserTask> tasks = new ArrayList<>();
+        body.path("items").forEach(item -> tasks.add(UserTask.of(item)));
+        return tasks;
+    }
+
+    /**
      * The task, or empty when Camunda knows no task with this key (404), or rejects the key itself (400, for example 19 digits
      * above the int64 range, which the contract's pattern lets through).
      */

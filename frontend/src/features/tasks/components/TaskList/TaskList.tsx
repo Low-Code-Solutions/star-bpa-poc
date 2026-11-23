@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router';
 import { Button } from '@/components/common/Button';
 import { appConfig } from '@/config/app.config';
 import { useStartWorkPack } from '@/features/workpacks/hooks/useStartWorkPack';
@@ -25,6 +26,17 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
   const start = useStartWorkPack(api);
   const [open, setOpen] = useState<TaskSummary | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // BPA-73: the Work Pack detail's "Open tasks" panel sends the user here with the task to open (navigation state); a task not in the user's list stays unopened.
+  const wanted = (useLocation().state as { taskKey?: string } | null)?.taskKey;
+  const handled = useRef<string | null>(null);
+  useEffect(() => {
+    const task = wanted && handled.current !== wanted ? tasks.find((t) => t.key === wanted) : undefined;
+    if (task) {
+      handled.current = wanted ?? null;
+      setOpen(task);
+    }
+  }, [wanted, tasks]);
 
   const refresh = async () => (await refetch()).data ?? [];
 
