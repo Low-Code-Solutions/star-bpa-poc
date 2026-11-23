@@ -76,6 +76,15 @@ function fakeBackend(groups: string[]) {
         ),
       );
     }
+    if (url.pathname === '/api/v1/workpacks/WP-000457') {
+      return json(200, {
+        summary: ROWS[2],
+        overview: { completionDate: '2026-11-30', phases: [], materials: [] },
+        workers: [],
+        hours: { lines: [], totalHours: 0 },
+        progress: [],
+      });
+    }
     return json(200, []);
   });
   return { fetchMock, listCalls };

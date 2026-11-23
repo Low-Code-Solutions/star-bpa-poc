@@ -1,1 +1,0 @@
-export { WorkPackDetailPlaceholder } from './WorkPackDetailPlaceholder';

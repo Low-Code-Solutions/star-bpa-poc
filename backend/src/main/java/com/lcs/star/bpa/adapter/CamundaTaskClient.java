@@ -28,6 +28,7 @@ public class CamundaTaskClient {
     private static final Logger LOG = LoggerFactory.getLogger(CamundaTaskClient.class);
 
     private static final int PAGE_LIMIT = 100; // POC sizes; ASSUMPTION, no source sizes the task list
+    private static final int MAX_TASKS = 2000; // a safety stop for the BPA-73 searches that read every page; ASSUMPTION
 
     private final RestClient rest;
     private final ObjectMapper json;
@@ -51,6 +52,40 @@ public class CamundaTaskClient {
                         "user task search")));
         List<UserTask> tasks = new ArrayList<>();
         body.path("items").forEach(item -> tasks.add(UserTask.of(item)));
+        return tasks;
+    }
+
+    /**
+     * Open (CREATED) tasks of one process whatever their candidate groups (BPA-73: the Work Pack detail lists the open tasks of every group, without task data;
+     * the search needs {@code READ_USER_TASK} on the process, which the service user has).
+     */
+    public List<UserTask> searchOpenAnyGroup(String processDefinitionId) {
+        return searchAllPages(Map.of("processDefinitionId", processDefinitionId, "state", "CREATED"));
+    }
+
+    /**
+     * Open (CREATED) tasks of one process instance, whatever their candidate groups (BPA-73: the Epic 1 and weekly instances of a Work Pack are known by
+     * their key, so they are searched by it, not found among a whole process's tasks).
+     */
+    public List<UserTask> searchOpenOfInstance(String processInstanceKey) {
+        return searchAllPages(Map.of("processInstanceKey", processInstanceKey, "state", "CREATED"));
+    }
+
+    /** Every page of a user task search (QA review: a search that stops at the first page would silently drop tasks of a busy process). */
+    private List<UserTask> searchAllPages(Map<String, Object> filter) {
+        List<UserTask> tasks = new ArrayList<>();
+        for (int from = 0; from < MAX_TASKS; from += PAGE_LIMIT) {
+            int start = from;
+            JsonNode body = call(() -> rest.post().uri("/v2/user-tasks/search")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("filter", filter, "page", Map.of("from", start, "limit", PAGE_LIMIT)))
+                    .exchange((request, response) -> ok(response.getStatusCode(), "user task search", read(response.getBody()))));
+            body.path("items").forEach(item -> tasks.add(UserTask.of(item)));
+            if (tasks.size() >= body.path("page").path("totalItems").asLong(0) || body.path("items").isEmpty()) {
+                return tasks;
+            }
+        }
+        LOG.warn("Camunda user task search stopped at {} tasks (MAX_TASKS)", MAX_TASKS);
         return tasks;
     }
 

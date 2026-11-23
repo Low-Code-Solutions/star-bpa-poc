@@ -79,4 +79,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-68](BPA-4-timesheet-to-progress/plans/BPA-68.md) | PPC Team can see one Work Pack run from creation to locked progress in one demo | Closed (23 Nov 2026) |
 | [BPA-69](BPA-4-timesheet-to-progress/plans/BPA-69.md) | Supervisor can only book hours to a CBS that is open for productive hours | Closed (23 Nov 2026) |
 | [BPA-72](BPA-4-timesheet-to-progress/plans/BPA-72.md) | PPC Team can browse all Work Packs and filter them by status | Closed (23 Nov 2026) |
+| [BPA-73](BPA-4-timesheet-to-progress/plans/BPA-73.md) | PPC Team can open a Work Pack and see its status, workers, hours and progress in one place | Closed (23 Nov 2026) |
 

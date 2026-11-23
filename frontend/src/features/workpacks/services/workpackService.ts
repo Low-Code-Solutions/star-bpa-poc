@@ -1,5 +1,13 @@
 import type { Api } from '@/services/apiClient';
-import type { LookAhead, WorkPackListRow, WorkPackPrintSummary, WorkPackStatus } from '@/types/api';
+import type {
+  LookAhead,
+  OpenTask,
+  WorkPackDetail,
+  WorkPackHistoryPage,
+  WorkPackListRow,
+  WorkPackPrintSummary,
+  WorkPackStatus,
+} from '@/types/api';
 import type { StartResult } from '../workpacks.types';
 
 /** POST /api/v1/workpacks (BPA-6, D52, S20): starts a Work Pack request; no body (BPA-46 Q1). */
@@ -77,6 +85,46 @@ export async function listWorkPacks(api: Api, filter: WorkPackFilter): Promise<W
         },
       },
     });
+    return data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The detail of a Work Pack (BPA-73), or why there is none: a 404 means "Work Pack not found"; null is a failed call. */
+export type WorkPackResult = { detail: WorkPackDetail } | { notFound: true } | null;
+
+/** GET /api/v1/workpacks/{workpackNumber} (BPA-73): the read-only Work Pack detail. */
+export async function getWorkPack(api: Api, workpackNumber: string): Promise<WorkPackResult> {
+  try {
+    const { data, response } = await api.GET('/api/v1/workpacks/{workpackNumber}', { params: { path: { workpackNumber } } });
+    if (response.status === 404) {
+      return { notFound: true };
+    }
+    return data ? { detail: data } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** GET /api/v1/workpacks/{workpackNumber}/history (BPA-73): one page of the history, newest first; null when the call failed. */
+export async function getWorkPackHistory(api: Api, workpackNumber: string, page: number): Promise<WorkPackHistoryPage | null> {
+  try {
+    const { data } = await api.GET('/api/v1/workpacks/{workpackNumber}/history', {
+      params: { path: { workpackNumber }, query: { page, size: HISTORY_PAGE_SIZE } },
+    });
+    return data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export const HISTORY_PAGE_SIZE = 50;
+
+/** GET /api/v1/workpacks/{workpackNumber}/open-tasks (BPA-73): the open tasks of every group, no task data; null when the call failed (503 included). */
+export async function listWorkPackOpenTasks(api: Api, workpackNumber: string): Promise<OpenTask[] | null> {
+  try {
+    const { data } = await api.GET('/api/v1/workpacks/{workpackNumber}/open-tasks', { params: { path: { workpackNumber } } });
     return data ?? null;
   } catch {
     return null;
