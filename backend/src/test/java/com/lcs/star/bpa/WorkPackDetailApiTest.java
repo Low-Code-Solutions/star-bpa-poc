@@ -291,6 +291,21 @@ class WorkPackDetailApiTest {
     }
 
     @Test
+    void anHoursReminderIsNotAHistoryNotice() {
+        // BPA-74 review: a reminder row (kind HoursReminder, no drawing) must not appear in the drawing-notice history of BPA-73
+        audit("workpack", wp457, "status", "Released", "In Progress", "2026-11-03T08:00:00Z");
+        jdbc.update("""
+                INSERT INTO bpa.notification (workpack_id, kind, message, reminder_key, recipient_username, channel, sent_at, created_by, updated_by)
+                VALUES (?, 'HoursReminder', 'Hours for WP-000457 are waiting for your decision since 17 Nov 2026', '1:Timekeeper:2', 'workpack-owner', 'InSystem',
+                        TIMESTAMPTZ '2026-11-19 08:00:00+00', 'test', 'test')""", wp457);
+
+        JsonNode history = json(flow.loggedInAs("ppc-team").get(DETAIL + "WP-000457/history").body());
+
+        assertThat(history.path("total").asInt()).as("only the change; a reminder is not a drawing notice").isEqualTo(1);
+        history.path("items").forEach(i -> assertThat(i.path("kind").asText()).isEqualTo("Change"));
+    }
+
+    @Test
     void anOpenWeeklyTaskIsListedForAWorkPackInThatWeek() {
         // Q1 (ASSUMPTION): the weekly process of a week that is not Locked, in which the Work Pack has a progress row
         UUID week = period("2026-11-26", "CutOff", 9000000026L);

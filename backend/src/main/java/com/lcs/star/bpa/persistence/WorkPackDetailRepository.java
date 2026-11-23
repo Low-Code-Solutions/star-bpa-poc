@@ -171,7 +171,7 @@ public class WorkPackDetailRepository {
                     FROM bpa.audit_log WHERE record_id IN (SELECT id FROM ids)
                     UNION ALL
                     SELECT 'Notice', sent_at, NULL, NULL, NULL, NULL, NULL, id::text, drawing_ref, revision, recipient_username, channel
-                    FROM bpa.notification WHERE workpack_id = ?
+                    FROM bpa.notification WHERE workpack_id = ? AND kind = 'DrawingRevision'
                 ) h ORDER BY at DESC, table_name, column_name, recipient_username, row_id LIMIT ? OFFSET ?""";
         return jdbc.query(sql, (rs, n) -> new HistoryItem(rs.getString("kind"), rs.getObject("at", OffsetDateTime.class).withOffsetSameInstant(ZoneOffset.UTC),
                 rs.getString("username"), rs.getString("table_name"), rs.getString("column_name"), rs.getString("old_value"), rs.getString("new_value"),
@@ -182,7 +182,7 @@ public class WorkPackDetailRepository {
     public int historyTotal(UUID workpackId) {
         String sql = RECORD_IDS.replace(":w", "?") + """
                 SELECT (SELECT count(*) FROM bpa.audit_log WHERE record_id IN (SELECT id FROM ids))
-                     + (SELECT count(*) FROM bpa.notification WHERE workpack_id = ?)""";
+                     + (SELECT count(*) FROM bpa.notification WHERE workpack_id = ? AND kind = 'DrawingRevision')""";
         Long total = jdbc.queryForObject(sql, Long.class, args(workpackId));
         return total == null ? 0 : Math.toIntExact(total);
     }

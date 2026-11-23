@@ -28,7 +28,7 @@ public class NotificationRepository {
     }
 
     /** One in-system notice as the user sees it. */
-    public record Notice(String workpackNumber, String drawingRef, String revision, Instant sentAt) {
+    public record Notice(String kind, String workpackNumber, String drawingRef, String revision, String message, Instant sentAt) {
     }
 
     private final JdbcTemplate jdbc;
@@ -60,7 +60,7 @@ public class NotificationRepository {
     public boolean emailRecorded(String recipientUsername, String drawingRef, String revision) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (SELECT 1 FROM bpa.notification
-                               WHERE recipient_username = ? AND drawing_ref = ? AND revision = ? AND channel = 'Email')""", Boolean.class,
+                               WHERE recipient_username = ? AND drawing_ref = ? AND revision = ? AND channel = 'Email' AND kind = 'DrawingRevision')""", Boolean.class,
                 recipientUsername, drawingRef, revision));
     }
 
@@ -93,12 +93,46 @@ public class NotificationRepository {
     /** The user's in-system notices, newest first. Only the session user's own: no argument other than the name of the logged-in user (09 S6). */
     public List<Notice> noticesOf(String username) {
         return jdbc.query("""
-                SELECT w.workpack_number, n.drawing_ref, n.revision, n.sent_at
+                SELECT n.kind, w.workpack_number, n.drawing_ref, n.revision, n.message, n.sent_at
                 FROM bpa.notification n JOIN bpa.workpack w ON w.id = n.workpack_id
                 WHERE n.recipient_username = ? AND n.channel = 'InSystem'
                 ORDER BY n.sent_at DESC, w.workpack_number, n.revision, n.id""",
-                (rs, n) -> new Notice(rs.getString("workpack_number"), rs.getString("drawing_ref"), rs.getString("revision"),
-                        rs.getTimestamp("sent_at").toInstant()), username);
+                (rs, n) -> new Notice(rs.getString("kind"), rs.getString("workpack_number"), rs.getString("drawing_ref"), rs.getString("revision"),
+                        rs.getString("message"), rs.getTimestamp("sent_at").toInstant()), username);
+    }
+
+    /** True when an email for this recipient and this timer firing was already recorded (BPA-74: "any existing row means the email went", as for drawing notices). */
+    public boolean reminderEmailRecorded(String recipientUsername, String reminderKey) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM bpa.notification
+                               WHERE recipient_username = ? AND reminder_key = ? AND channel = 'Email' AND kind = 'HoursReminder')""", Boolean.class,
+                recipientUsername, reminderKey));
+    }
+
+    /**
+     * An hours reminder (BPA-74; FRD-5-12 section 5.12.10) for one recipient on one channel, audited per business column (D64) by {@code bpa-service}. The key
+     * (process instance key, step and timer firing) makes it idempotent: a row that exists is left alone and false comes back (09 S7).
+     */
+    @Transactional
+    public boolean recordReminder(String channel, UUID workpackId, String recipientUsername, String message, String reminderKey, Instant now) {
+        List<UUID> inserted = jdbc.queryForList("""
+                INSERT INTO bpa.notification (workpack_id, kind, message, reminder_key, recipient_username, channel, sent_at, created_at, created_by, updated_at, updated_by)
+                VALUES (?, 'HoursReminder', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (reminder_key, recipient_username, channel) WHERE kind = 'HoursReminder' DO NOTHING
+                RETURNING id""", UUID.class, workpackId, message, reminderKey, recipientUsername, channel, Timestamp.from(now), Timestamp.from(now),
+                SERVICE_USER, Timestamp.from(now), SERVICE_USER);
+        if (inserted.isEmpty()) {
+            return false;
+        }
+        UUID id = inserted.get(0);
+        audit(id, "workpack_id", workpackId.toString(), now);
+        audit(id, "kind", "HoursReminder", now);
+        audit(id, "message", message, now);
+        audit(id, "reminder_key", reminderKey, now);
+        audit(id, "recipient_username", recipientUsername, now);
+        audit(id, "channel", channel, now);
+        audit(id, "sent_at", now.toString(), now);
+        return true;
     }
 
     private void audit(UUID recordId, String column, String newValue, Instant at) {

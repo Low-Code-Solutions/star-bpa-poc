@@ -62,6 +62,10 @@ public class PersonaSync implements SmartInitializingSingleton {
         permissions.put("GROUP:cost-controller", Set.of("READ"));
         // BPA-65 (ASSUMPTION): read the members of the group that receives the cost variance alert (project-manager), and evaluate Decision_CostVariance for the daily close check.
         permissions.put("GROUP:project-manager", Set.of("READ"));
+        // BPA-74 (ASSUMPTION): read the members of the three groups that receive an hours reminder (without it the search answers an empty list)
+        permissions.put("GROUP:timekeeper", Set.of("READ"));
+        permissions.put("GROUP:production-supervisor", Set.of("READ"));
+        permissions.put("GROUP:ppc-team", Set.of("READ"));
         permissions.put("DECISION_DEFINITION:Decision_CostVariance", Set.of("CREATE_DECISION_INSTANCE"));
         SERVICE_PERMISSIONS = Map.copyOf(permissions);
     }

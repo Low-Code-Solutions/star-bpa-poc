@@ -38,7 +38,8 @@ and whether the print needs Arabic text was asked (S3).
 - The notice content (one email per recipient per revision, the in-system `notification` rows) is a
   business decision in 06 D44, not repeated here; idempotency of the send uses the notification unique key
   `UNIQUE(workpack_id, drawing_ref, revision, recipient_username, channel)` (`docs/data-model.md` §5.9;
-  ADR 0007).
+  ADR 0007). Since BPA-74 the same table also holds the hours reminders (`kind = HoursReminder`, with a message and an idempotency key of their own,
+  V7): see `docs/data-model.md` §5.9.
 - Mailpit is added to the compose stack when the notification work is built; it is not in
   `docker-compose.yml` as of 29 Oct.
 
