@@ -164,6 +164,17 @@ One class, **`CbsBlockApiTest`**. It runs on the integration stack (per-class Po
 - **Q3:** one CBS_CLOSED branch in `BusinessRuleTask_CheckHoursWithinBudget`'s `outputElement`, plus `cbsClosedMessage` in the worker's line check. No new element.
 - **Q4, Q5:** as written; I ask before any Jira transition.
 
+## Progress and departures (23 Nov 2026)
+- **Red first (07b52d8):** `CbsBlockApiTest` has 9 tests (the 5 of the Definition of Done and 4 extras). Before any production code **6 failed for the expected reasons** and 3 passed as the plan said:
+  - red: `BPA69_hoursOnClosedCbsAreRefused` (201 instead of the 400), `BPA69_uploadRowOnClosedCbsIsRejected` (the row read "Saved"), `BPA69_cbsClosedAfterSavingStopsTheSend` (the send went on: no return to Book hours within the wait), `aChangeOnAClosedCbsIsRefused`, `anAmendOnAClosedCbsIsRefused`, `theCbsCheckComesBeforeTheDailyLimit`;
+  - green before code (guards): `BPA69_noCbsIsNeverBlocked`, `BPA69_openCbsAcceptsHours`, `anotherBlockTypeDoesNotBlock`.
+- **Built (3bcec40):** `CbsBlockRepository.closedForProductiveHours` (the one lookup), `Sheet.cbsCodeRef` (read in both Sheet selects), `HourLineChecks.cbsClosedMessage`, the CBS_CLOSED case in `HourLineService.checkBudget`, the lookup and `cbsClosedMessage` in `PrepareHoursSubmissionWorker`, and the CBS_CLOSED branch in the send step's `outputElement` (Q3). The comments that said "false until BPA-69" are updated. OpenAPI texts (add, change, amend, upload outcomes) and the data model note ("As built by BPA-69") are written. No schema change, no frontend change.
+- **No departure from the plan's file list.** `BookHoursFixture` was not changed: `CbsBlockApiTest` builds WP-000490 itself.
+- **Green:** `CbsBlockApiTest` 9/9 and the decision's neighbours `HoursBudgetApiTest` 11, `BookHoursApiTest` 28, `TimesheetFileApiTest` 21, `HoursValidationApiTest` 14 (83 tests, 0 failures). `npm run lint:bpmn` is clean.
+- **Local-stack check (23 Nov, over the API as `supervisor`; the portal screens were not clicked):** on WP-000001 (A-2301, CBS-139-PIP-01 on the time sheets) an open CBS accepted a Draft line (201); after closing CBS-139-PIP-01 for FmsTimesheet a new line got 400 "CBS CBS-139-PIP-01 is closed for productive hours"; with that Draft line saved while open, **Send** returned the instance to Book hours with `validationMessages` ["CBS CBS-139-PIP-01 is closed for productive hours"] and the line stayed Draft. Then the CBS was opened again, the test line deleted, and the stack left as it was. The upload row was not tried by curl (the test covers it).
+- **Deploy note found in the check:** an instance that was already waiting at Book hours before the new model version is deployed keeps the old `outputElement` (Camunda runs an instance on the version it started on). At send it is still returned to Book hours (the decision is the same), but with no CBS text. I cancelled the old instance on the local stack and started a new one on version 2 to see the message. Camunda instances in flight at deploy on QA: new instances get the text; old ones return without it.
+- **Deployed vs repo BPMN:** the latest deployed `Process_PPC_TimesheetToProgress` (whitespace-normalised) equals `models/bpmn/Process_PPC_TimesheetToProgress.bpmn`; `Decision_HoursWithinBudget` is unchanged.
+
 ## Human-gap log
 - **DoR:** intent.md and spec.md not accepted by the PO.
 - **DoD:** "Demoed at sprint review". People.
