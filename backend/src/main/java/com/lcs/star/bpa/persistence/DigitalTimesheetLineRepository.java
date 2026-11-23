@@ -27,7 +27,8 @@ public class DigitalTimesheetLineRepository {
     }
 
     /** A time sheet with the Worker and Work Pack it belongs to. */
-    public record Sheet(UUID id, UUID workerId, String employeeRef, UUID workpackId, String workpackNumber, String submissionStatus, String workpackStatus) {
+    public record Sheet(UUID id, UUID workerId, String employeeRef, UUID workpackId, String workpackNumber, String submissionStatus, String workpackStatus,
+            String cbsCodeRef) {
     }
 
     /** An hour line with its time sheet. */
@@ -36,14 +37,15 @@ public class DigitalTimesheetLineRepository {
     }
 
     private static final String SHEET_SELECT = """
-            SELECT t.id, t.worker_id, w.employee_ref, t.workpack_id, p.workpack_number, t.submission_status, p.status AS workpack_status
+            SELECT t.id, t.worker_id, w.employee_ref, t.workpack_id, p.workpack_number, t.submission_status, p.status AS workpack_status, t.cbs_code_ref
             FROM bpa.digital_timesheet t
             JOIN bpa.worker w ON w.id = t.worker_id
             JOIN bpa.workpack p ON p.id = t.workpack_id""";
 
     private static Sheet sheet(java.sql.ResultSet rs) throws java.sql.SQLException {
         return new Sheet(rs.getObject("id", UUID.class), rs.getObject("worker_id", UUID.class), rs.getString("employee_ref"),
-                rs.getObject("workpack_id", UUID.class), rs.getString("workpack_number"), rs.getString("submission_status"), rs.getString("workpack_status"));
+                rs.getObject("workpack_id", UUID.class), rs.getString("workpack_number"), rs.getString("submission_status"), rs.getString("workpack_status"),
+                rs.getString("cbs_code_ref"));
     }
 
     public Optional<Sheet> sheet(UUID timesheetId) {
@@ -53,7 +55,7 @@ public class DigitalTimesheetLineRepository {
     public Optional<Line> line(UUID lineId) {
         return jdbc.query("""
                 SELECT l.id AS line_id, l.work_date, l.phase, l.hours, l.status, l.entry_source, l.remarks, l.reported_completion_pct, l.created_by,
-                       t.id, t.worker_id, w.employee_ref, t.workpack_id, p.workpack_number, t.submission_status, p.status AS workpack_status
+                       t.id, t.worker_id, w.employee_ref, t.workpack_id, p.workpack_number, t.submission_status, p.status AS workpack_status, t.cbs_code_ref
                 FROM bpa.digital_timesheet_line l
                 JOIN bpa.digital_timesheet t ON t.id = l.digital_timesheet_id
                 JOIN bpa.worker w ON w.id = t.worker_id
@@ -69,7 +71,7 @@ public class DigitalTimesheetLineRepository {
     public List<Line> lines(UUID timesheetId) {
         return jdbc.query("""
                 SELECT l.id AS line_id, l.work_date, l.phase, l.hours, l.status, l.entry_source, l.remarks, l.reported_completion_pct, l.created_by,
-                       t.id, t.worker_id, w.employee_ref, t.workpack_id, p.workpack_number, t.submission_status, p.status AS workpack_status
+                       t.id, t.worker_id, w.employee_ref, t.workpack_id, p.workpack_number, t.submission_status, p.status AS workpack_status, t.cbs_code_ref
                 FROM bpa.digital_timesheet_line l
                 JOIN bpa.digital_timesheet t ON t.id = l.digital_timesheet_id
                 JOIN bpa.worker w ON w.id = t.worker_id

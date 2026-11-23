@@ -1,6 +1,7 @@
 package com.lcs.star.bpa.worker;
 
 import com.lcs.star.bpa.domain.HourLineChecks;
+import com.lcs.star.bpa.persistence.CbsBlockRepository;
 import com.lcs.star.bpa.persistence.DigitalTimesheetLineRepository;
 import com.lcs.star.bpa.persistence.DigitalTimesheetLineRepository.SendLine;
 import io.camunda.client.annotation.JobWorker;
@@ -22,8 +23,8 @@ import org.springframework.stereotype.Component;
  * Supervisor completes UserTask_BookHours ("Send to Timekeeper"): collects the Work Pack's Draft and Returned lines and builds {@code lineChecks}, one
  * element per line, for BusinessRuleTask_CheckHoursWithinBudget, which re-checks the budget with Decision_HoursWithinBudget (the same decision as at
  * save). Each element carries workDate, phase, badgeNo, phaseBudgetHours, phaseHoursAfter and dailyHoursAfter (the totals of lines not Rejected, which
- * already include the saved line), dailyHoursLimit (app.daily-hours-limit), cbsCodeRef, cbsClosed and workerOnLeave (false until BPA-69 and BPA-75), and
- * the two message texts a Blocked reason maps to (the model copies the right one into lineCheckResults). With no Draft or Returned line it throws the
+ * already include the saved line), dailyHoursLimit (app.daily-hours-limit), cbsCodeRef, cbsClosed (cbs_block, BPA-69), workerOnLeave (false until BPA-75), and
+ * the three message texts a Blocked reason maps to (daily limit, phase budget, CBS closed) (the model copies the right one into lineCheckResults). With no Draft or Returned line it throws the
  * BPMN error HOURS_INVALID with validationMessages ("No Draft or Returned hours to send for WP-…": the text is the BPMN documentation's example, an
  * ASSUMPTION), which returns the instance to Book hours. It writes nothing, so a retried job builds the same checks; it clears validationMessages so
  * an earlier send's messages do not stay. Retries and backoff are Camunda's defaults (S7).
@@ -34,10 +35,12 @@ public class PrepareHoursSubmissionWorker {
     private static final Logger LOG = LoggerFactory.getLogger(PrepareHoursSubmissionWorker.class);
 
     private final DigitalTimesheetLineRepository lines;
+    private final CbsBlockRepository cbsBlocks;
     private final BigDecimal dailyHoursLimit;
 
-    public PrepareHoursSubmissionWorker(DigitalTimesheetLineRepository lines, @Value("${app.daily-hours-limit}") BigDecimal dailyHoursLimit) {
+    public PrepareHoursSubmissionWorker(DigitalTimesheetLineRepository lines, CbsBlockRepository cbsBlocks, @Value("${app.daily-hours-limit}") BigDecimal dailyHoursLimit) {
         this.lines = lines;
+        this.cbsBlocks = cbsBlocks;
         this.dailyHoursLimit = dailyHoursLimit;
     }
 
@@ -65,8 +68,10 @@ public class PrepareHoursSubmissionWorker {
             check.put("phaseHoursAfter", lines.phaseHours(workpackId, line.phase(), null));
             check.put("dailyHoursAfter", lines.workerHoursOn(line.workerId(), line.workDate(), null));
             check.put("dailyHoursLimit", dailyHoursLimit);
-            check.put("cbsCodeRef", line.cbsCodeRef()); // null when the time sheet has no CBS (D40); BPA-69 reads cbs_block with it
-            check.put("cbsClosed", false);
+            check.put("cbsCodeRef", line.cbsCodeRef()); // null when the time sheet has no CBS (D40), which is never blocked
+            boolean cbsClosed = cbsBlocks.closedForProductiveHours(line.cbsCodeRef()); // BPA-69: the one shared lookup
+            check.put("cbsClosed", cbsClosed);
+            check.put("cbsClosedMessage", cbsClosed ? HourLineChecks.cbsClosedMessage(line.cbsCodeRef()) : null);
             check.put("workerOnLeave", false);
             check.put("dailyLimitMessage", HourLineChecks.dailyLimitMessage(line.badgeNo(), line.workDate(), dailyHoursLimit));
             check.put("phaseBudgetMessage", HourLineChecks.phaseBudgetMessage(line.phase(), budget));

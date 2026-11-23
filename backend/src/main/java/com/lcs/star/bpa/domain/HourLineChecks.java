@@ -97,6 +97,11 @@ public final class HourLineChecks {
         return "Worker " + badge + " would exceed " + plain(dailyLimit) + " hours on " + show(date);
     }
 
+    /** CBS_CLOSED: the text at save (form and upload row) and at send (BPA-69; Jira, marked ASSUMPTION there). */
+    public static String cbsClosedMessage(String cbsCodeRef) {
+        return "CBS " + cbsCodeRef + " is closed for productive hours";
+    }
+
     /** PHASE_BUDGET_EXCEEDED: the text at save and at send; the budget is workpack_phase.manhours. */
     public static String phaseBudgetMessage(String phase, BigDecimal budget) {
         return "Phase " + phase + " budget of " + plain(budget) + " h would be exceeded";
