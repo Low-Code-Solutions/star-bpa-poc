@@ -1287,7 +1287,7 @@ paths:
         Saves a Draft line with entry source Form (BPA-50). Every rule is checked here, one message per response, in this
         order (ASSUMPTION): time sheet found, Work Pack not Completed (BPA-67: 409 "Work Pack <WP> is Completed"), not Cancelled, remarks, hours above 0, at most 2 decimals, completion %, not a
         future date, month not locked (BPA-67, S5: 400 "Hours for <Month YYYY> are locked"), week not cut off, phase on the Work Pack, Worker assigned, no line for the Worker, date and phase, then
-        Decision_HoursWithinBudget (first its rule 1, BPA-69: 400 "CBS <code> is closed for productive hours" when the time sheet carries a CBS that cbs_block closes for FmsTimesheet; no CBS or no row is open, ASSUMPTION; then the daily limit and the phase budget). The first saved line on a Released Work Pack sets it In Progress (D1). Groups
+        Decision_HoursWithinBudget (first its rule 1, BPA-69: 400 "CBS <code> is closed for productive hours" when the time sheet carries a CBS that cbs_block closes for FmsTimesheet; no CBS or no row is open, ASSUMPTION; then its rule 2, BPA-75: 400 "Worker <badge> is on leave on <d MMM yyyy>" when worker_leave holds approved leave of the Worker on the work date, both ends inclusive, the whole day; then the daily limit and the phase budget). The first saved line on a Released Work Pack sets it In Progress (D1). Groups
         supervisor and production-team (C-E2-5).
       requestBody:
         required: true
@@ -1345,7 +1345,7 @@ paths:
         Date and phase cannot change (ASSUMPTION; delete the line and add another). The status is not changed (a Returned
         line stays Returned; the resubmit is BPA-52). PUT replaces hours, remarks and reported completion: a body with
         `hours` only clears the other two (ASSUMPTION). A Draft line in a cut-off week answers 400 "Week ending 12 Nov
-        2026 is closed" (a Returned line may still be corrected, BPA-67 a). BPA-69 (ASSUMPTION): the same 400 "CBS <code> is closed for productive hours" when the line time sheet CBS is closed for FmsTimesheet. BPA-67: once the month of the line is locked (S5) no line of it changes, a Returned one included: 400 "Hours for <Month YYYY> are locked"; a line of a Completed Work Pack answers 409 "Work Pack <WP> is Completed" (ASSUMPTION). One audit row per changed column (D64). Groups
+        2026 is closed" (a Returned line may still be corrected, BPA-67 a). BPA-69 (ASSUMPTION): the same 400 "CBS <code> is closed for productive hours" when the line time sheet CBS is closed for FmsTimesheet. BPA-75 (ASSUMPTION): the same 400 "Worker <badge> is on leave on <d MMM yyyy>" when the Worker has approved leave on the work date. BPA-67: once the month of the line is locked (S5) no line of it changes, a Returned one included: 400 "Hours for <Month YYYY> are locked"; a line of a Completed Work Pack answers 409 "Work Pack <WP> is Completed" (ASSUMPTION). One audit row per changed column (D64). Groups
         supervisor and production-team.
       x-assumption: true
       x-assumption-note: which fields can change, and that the status stays, are not stated by BPA-50
@@ -1421,7 +1421,7 @@ paths:
       description: |
         FRD-5-12 §5.12.5.5 (BPA-53). Only while the line is Submitted and its submission waits at the Timekeeper (UserTask_ValidateHours
         is open), else 409 "Line is not editable (status ...)". `reason` is required (at most 250 characters). Only `hours` changes; date,
-        phase and Worker cannot. The budget is checked again with the line old hours left out (BPA-51); BPA-69 (ASSUMPTION): a CBS closed for FmsTimesheet refuses it too, 400 "CBS <code> is closed for productive hours". One audit row for `hours` and one
+        phase and Worker cannot. The budget is checked again with the line old hours left out (BPA-51); BPA-69 (ASSUMPTION): a CBS closed for FmsTimesheet refuses it too, 400 "CBS <code> is closed for productive hours"; BPA-75 (ASSUMPTION): approved leave of the Worker on the work date refuses it too, 400 "Worker <badge> is on leave on <d MMM yyyy>". One audit row for `hours` and one
         for `amend_reason` (D64; ASSUMPTION: the reason has no column of its own). Group timekeeper.
       x-assumption: true
       x-assumption-note: the path, the body and where the reason is stored are not stated by BPA-53
@@ -3063,7 +3063,7 @@ components:
             "Hours for <WP> are in approval; book them after the decision" (ASSUMPTION: detection), "Work date is not a valid date",
             "Hours must be a number", "Hours must be greater than 0", "Hours can have at most 2 decimal places", "Work date cannot be
             in the future", "Hours for <Month YYYY> are locked" (BPA-67), "Work Pack <WP> is Completed" (BPA-67), "Week ending <date> is closed", "Phase <phase> is not on this Work Pack", "Hours already booked for
-            <badge> on <date> for phase <phase>", "CBS <code> is closed for productive hours" (BPA-69), "Worker <badge> would exceed <limit> hours on <date>", "Phase <phase> budget of
+            <badge> on <date> for phase <phase>", "CBS <code> is closed for productive hours" (BPA-69), "Worker <badge> is on leave on <date>" (BPA-75), "Worker <badge> would exceed <limit> hours on <date>", "Phase <phase> budget of
             <budget> h would be exceeded", "Remarks can be at most 250 characters".
     DrawingRevisionEvent:
       type: object

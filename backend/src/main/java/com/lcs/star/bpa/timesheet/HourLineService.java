@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.lcs.star.bpa.adapter.CamundaDecisionClient;
 import com.lcs.star.bpa.domain.HourLineChecks;
 import com.lcs.star.bpa.persistence.CbsBlockRepository;
+import com.lcs.star.bpa.persistence.WorkerLeaveRepository;
 import com.lcs.star.bpa.persistence.DigitalTimesheetLineRepository;
 import com.lcs.star.bpa.persistence.HoursSubmissionRepository;
 import com.lcs.star.bpa.persistence.DigitalTimesheetLineRepository.Line;
@@ -28,7 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Add, change and delete hour lines on a Digital Time sheet (BPA-50; E2-03). Every rule is checked here, one message per refusal and in this order
  * (ASSUMPTION): time sheet or line found, Cancelled, editable status, remarks, hours, decimals, reported completion, future date, cut-off week, phase
  * on the Work Pack, Worker assigned, duplicate, then Decision_HoursWithinBudget at every save (its rule scenarios belong to BPA-51, BPA-69 and
- * BPA-75; cbsClosed is read from cbs_block since BPA-69, workerOnLeave is sent as false until BPA-75 reads worker_leave). Only the write runs in a
+ * BPA-75; cbsClosed is read from cbs_block since BPA-69, workerOnLeave from worker_leave since BPA-75). Only the write runs in a
  * transaction: the line insert, update or delete, its audit rows and the Released to In Progress move (D1). Every check, the sums the decision gets
  * and the decision itself (a call to Camunda) run before it, so two saves at the same moment can both pass the daily and phase limits; only the
  * one-line rule has a database backstop (the partial unique index, mapped to the same 400). A POC accepts that (QA review). Dates and the clock are
@@ -60,6 +61,7 @@ public class HourLineService {
 
     private final DigitalTimesheetLineRepository lines;
     private final CbsBlockRepository cbsBlocks;
+    private final WorkerLeaveRepository workerLeave;
     private final HoursSubmissionRepository submissions;
     private final CamundaDecisionClient decisions;
     private final TransactionTemplate transaction;
@@ -67,10 +69,11 @@ public class HourLineService {
     private final ZoneId businessZone;
     private final BigDecimal dailyHoursLimit;
 
-    public HourLineService(DigitalTimesheetLineRepository lines, CbsBlockRepository cbsBlocks, HoursSubmissionRepository submissions, CamundaDecisionClient decisions, TransactionTemplate transaction, Clock clock,
+    public HourLineService(DigitalTimesheetLineRepository lines, CbsBlockRepository cbsBlocks, WorkerLeaveRepository workerLeave, HoursSubmissionRepository submissions, CamundaDecisionClient decisions, TransactionTemplate transaction, Clock clock,
             ZoneId businessZone, @Value("${app.daily-hours-limit}") BigDecimal dailyHoursLimit) {
         this.lines = lines;
         this.cbsBlocks = cbsBlocks;
+        this.workerLeave = workerLeave;
         this.submissions = submissions;
         this.decisions = decisions;
         this.transaction = transaction;
@@ -227,12 +230,12 @@ public class HourLineService {
 
     /**
      * Decision_HoursWithinBudget with this line counted: the Worker's hours that day over all Work Packs and the Work Pack's hours in the phase,
-     * both without the line being changed. cbsClosed is read from cbs_block (BPA-69); workerOnLeave is false for now (BPA-75).
+     * both without the line being changed. cbsClosed is read from cbs_block (BPA-69); workerOnLeave from worker_leave (BPA-75).
      */
     private void checkBudget(Sheet sheet, LocalDate date, String phase, BigDecimal hours, BigDecimal budget, UUID exceptLine) {
         Map<String, Object> variables = new LinkedHashMap<>();
         variables.put("cbsClosed", cbsBlocks.closedForProductiveHours(sheet.cbsCodeRef())); // BPA-69: the one shared lookup (CbsBlockRepository)
-        variables.put("workerOnLeave", false);
+        variables.put("workerOnLeave", workerLeave.onLeave(sheet.workerId(), date)); // BPA-75: the one shared lookup (WorkerLeaveRepository)
         variables.put("dailyHoursAfter", lines.workerHoursOn(sheet.workerId(), date, exceptLine).add(hours));
         variables.put("dailyHoursLimit", dailyHoursLimit); // app.daily-hours-limit, BPA-51 decision (a)
         variables.put("phaseHoursAfter", lines.phaseHours(sheet.workpackId(), phase, exceptLine).add(hours));
@@ -247,7 +250,7 @@ public class HourLineService {
             case "DAILY_LIMIT_EXCEEDED" -> HourLineChecks.dailyLimitMessage(sheet.employeeRef(), date, dailyHoursLimit);
             case "PHASE_BUDGET_EXCEEDED" -> HourLineChecks.phaseBudgetMessage(phase, budget);
             case "CBS_CLOSED" -> HourLineChecks.cbsClosedMessage(sheet.cbsCodeRef()); // BPA-69, shared with the send-time worker
-            // WORKER_ON_LEAVE cannot happen yet; BPA-75 gives its text
+            case "WORKER_ON_LEAVE" -> HourLineChecks.workerOnLeaveMessage(sheet.employeeRef(), date); // BPA-75, shared with the send-time worker
             default -> "Hours are blocked (" + reason + ")";
         });
     }

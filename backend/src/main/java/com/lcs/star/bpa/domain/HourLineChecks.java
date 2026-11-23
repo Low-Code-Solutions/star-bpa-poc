@@ -102,6 +102,11 @@ public final class HourLineChecks {
         return "CBS " + cbsCodeRef + " is closed for productive hours";
     }
 
+    /** WORKER_ON_LEAVE: the text at save (form and upload row) and at send (BPA-75; Jira). The date is the work date, a business-zone date (ADR 0013). */
+    public static String workerOnLeaveMessage(String badge, LocalDate date) {
+        return "Worker " + badge + " is on leave on " + show(date);
+    }
+
     /** PHASE_BUDGET_EXCEEDED: the text at save and at send; the budget is workpack_phase.manhours. */
     public static String phaseBudgetMessage(String phase, BigDecimal budget) {
         return "Phase " + phase + " budget of " + plain(budget) + " h would be exceeded";
