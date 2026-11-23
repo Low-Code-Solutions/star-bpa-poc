@@ -201,6 +201,34 @@ class CbsBlockApiTest {
         assertThat(jdbc.queryForObject("SELECT hours FROM bpa.digital_timesheet_line WHERE id = ?", BigDecimal.class, line)).isEqualByComparingTo("8");
     }
 
+    /**
+     * QA review (plan BPA-69, decision Ahsan 23 Nov 2026, ASSUMPTION): a closed-CBS line stops the whole send, as any Blocked line does (BPA-51); the other
+     * Workers' valid lines wait. The way out is deleting the closed-CBS line (a re-opened CBS is BPA-70, parked); the send then goes on.
+     */
+    @Test
+    void aClosedCbsLineStopsTheWholeSendUntilItIsDeleted() {
+        HttpResponse<String> blocked = add(ids.timesheet("E1021"), "2026-11-17", "Cutting", "8");
+        UUID blockedLine = UUID.fromString(json(blocked.body()).path("id").asText());
+        jdbc.update("UPDATE bpa.digital_timesheet SET cbs_code_ref = NULL WHERE id = ?", ids.timesheet("E1099")); // E1099 carries no CBS: its line stays valid
+        HttpResponse<String> valid = add(ids.timesheet("E1099"), "2026-11-17", "Cutting", "7");
+        UUID validLine = UUID.fromString(json(valid.body()).path("id").asText());
+        closePip01();
+        long instance = startAtBookHours();
+        String task = CamundaSteps.awaitOpenTask(instance, BOOK_HOURS).path("userTaskKey").asText();
+
+        assertThat(flow.loggedInAs("supervisor").post("/api/v1/tasks/" + task + "/complete", toJson(Map.of("variables", Map.of()))).statusCode()).isEqualTo(204);
+
+        String back = poll(() -> openTasks(instance, BOOK_HOURS).stream().filter(t -> !task.equals(t.path("userTaskKey").asText())).findFirst(),
+                found -> found.isPresent(), "UserTask_BookHours of " + instance + " again after the send").orElseThrow().path("userTaskKey").asText();
+        assertThat(messagesOf(back)).containsExactly(PIP01_CLOSED);
+        assertThat(statusOf(validLine)).as("the valid line is not sent either").isEqualTo("Draft");
+
+        assertThat(flow.loggedInAs("supervisor").delete("/api/v1/digital-timesheet-lines/" + blockedLine).statusCode()).as("delete the closed-CBS line").isEqualTo(204);
+        assertThat(flow.loggedInAs("supervisor").post("/api/v1/tasks/" + back + "/complete", toJson(Map.of("variables", Map.of()))).statusCode()).isEqualTo(204);
+        CamundaSteps.awaitOpenTask(instance, VALIDATE);
+        assertThat(statusOf(validLine)).as("now the valid line is sent").isEqualTo("Submitted");
+    }
+
     @Test
     void theCbsCheckComesBeforeTheDailyLimit() {
         HttpResponse<String> response = add(wp490Sheet, "2026-11-17", "Cutting", "17");
@@ -275,6 +303,10 @@ class CbsBlockApiTest {
         List<String> outcomes = new ArrayList<>();
         json(response.body()).path("rows").forEach(r -> outcomes.add(r.path("outcome").asText()));
         return outcomes;
+    }
+
+    private String statusOf(UUID line) {
+        return jdbc.queryForObject("SELECT status FROM bpa.digital_timesheet_line WHERE id = ?", String.class, line);
     }
 
     private int lineCount(UUID timesheet) {

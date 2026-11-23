@@ -1,7 +1,7 @@
 # Plan: BPA-69 Supervisor can only book hours to a CBS that is open for productive hours
 Jira: BPA-69 (Story, epic BPA-4)
-Story last updated: 2026-11-20T21:50:28.791+0400
-Status: Approved (Ahsan, 23 Nov 2026)
+Story last updated: 2026-11-23T10:24:38.195+0400
+Status: Closed (23 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-69-closed-cbs-blocks-hours, from main e453cc6
 
@@ -88,7 +88,7 @@ The text is "CBS <code> is closed for productive hours". It is an LCS suggestion
 |---|---|
 | Backend, new | `persistence/CbsBlockRepository.java` |
 | Backend, changed | `timesheet/HourLineService.java` (lookup, CBS_CLOSED case), `domain/HourLineChecks.java` (`cbsClosedMessage`), `persistence/DigitalTimesheetLineRepository.java` (`Sheet.cbsCodeRef`), `worker/PrepareHoursSubmissionWorker.java` (lookup, `cbsClosedMessage`) |
-| Model | `models/bpmn/Process_PPC_TimesheetToProgress.bpmn`: the `outputElement` branch and the documentation text of `ServiceTask_PrepareHoursSubmission` and `BusinessRuleTask_CheckHoursWithinBudget` (no new element; lint) |
+| Model | `models/bpmn/Process_PPC_TimesheetToProgress.bpmn`: the `outputElement` branch and the documentation text of `ServiceTask_PrepareHoursSubmission` (no new element; lint) |
 | Contract | `api/openapi.yaml` (texts only) |
 | Tests | new `CbsBlockApiTest`; `BookHoursFixture` gains a helper for WP-000490 (if it fits there; else in the test class) |
 | Docs | data model note; plan; REVIEW.md; `intent/README.md` regenerated |
@@ -175,8 +175,23 @@ One class, **`CbsBlockApiTest`**. It runs on the integration stack (per-class Po
 - **Deploy note found in the check:** an instance that was already waiting at Book hours before the new model version is deployed keeps the old `outputElement` (Camunda runs an instance on the version it started on). At send it is still returned to Book hours (the decision is the same), but with no CBS text. I cancelled the old instance on the local stack and started a new one on version 2 to see the message. Camunda instances in flight at deploy on QA: new instances get the text; old ones return without it.
 - **Deployed vs repo BPMN:** the latest deployed `Process_PPC_TimesheetToProgress` (whitespace-normalised) equals `models/bpmn/Process_PPC_TimesheetToProgress.bpmn`; `Decision_HoursWithinBudget` is unchanged.
 
+## Full-suite results (23 Nov 2026)
+- `./mvnw -B verify` at 80a259c: **710 tests, 0 failures**.
+- After the review: `CbsBlockApiTest` 10/10 (the tenth is `aClosedCbsLineStopsTheWholeSendUntilItIsDeleted`, added after the full run started).
+- Frontend: untouched (no change under `frontend/`), not rerun. `npm run lint:bpmn` clean.
+- Deployed `Process_PPC_TimesheetToProgress` (version 2, local stack) equals `models/bpmn/Process_PPC_TimesheetToProgress.bpmn` (whitespace-normalised hash).
+
+## After the `qa-reviewer` pass (23 Nov 2026; REVIEW.md "BPA-69 at 80a259c")
+- **Decided (Ahsan, 23 Nov 2026):** keep **"a closed-CBS line stops the whole send"** (Important 1): it is what any Blocked line does since BPA-51, and Jira says the send stops "for that line" without saying the others go on. BPA-67 chose to skip locked-month lines; here the choice is to stay with BPA-51. **ASSUMPTION.** The way out is deleting the line (`delete` accepts a Draft or Returned line; a re-opened CBS is BPA-70, parked); other Workers' valid lines wait until then. A test shows both halves: `aClosedCbsLineStopsTheWholeSendUntilItIsDeleted`. The data model note says so.
+- **Fixed after the review:** the plan's file list no longer names a documentation change to `BusinessRuleTask_CheckHoursWithinBudget`; the data model note states the whole-send behaviour.
+- **Accepted for the POC:** one `cbs_block` query per line at send; the class comment of `HourLineService`.
+- **Deploy note:** instances already waiting at Book hours when the new model version is deployed return without the CBS text (the old `outputElement`); new instances show it. For the PR and the Jira comment.
+- **For Ahsan and Jira (shown first, posted only on a yes):** (1) Q1: change and amend on a closed CBS are refused with the same 400 (ASSUMPTION). (2) Q3: the send step's `outputElement` gained a CBS_CLOSED branch (no new element). (3) the whole-send decision above. (4) the deploy note. (5) the ASSUMPTIONs: the message text, only `FmsTimesheet` counts, no row means open, the check after BPA-50's and BPA-52's own checks. (6) Jira status: Ahsan moved BPA-69 to In Progress on 23 Nov 10:24 (changelog); no content field changed since 20 Nov.
+- **Recorded (plan vs diff):** the diff holds `CbsBlockRepository`, `DigitalTimesheetLineRepository`, `HourLineChecks`, `HourLineService`, `PrepareHoursSubmissionWorker`, `Process_PPC_TimesheetToProgress.bpmn`, `api/openapi.yaml`, `docs/data-model.md`, `CbsBlockApiTest`, the plan, `REVIEW.md` and `intent/README.md`; nothing else.
+
 ## Human-gap log
 - **DoR:** intent.md and spec.md not accepted by the PO.
+- **DoD, local run:** done over the API as `supervisor` (and the Camunda REST for the new model version); nobody has clicked the portal screens for a closed-CBS Work Pack, and the upload row was not tried by hand (the test covers it). Khitaba or Faraz can do one click-through.
 - **DoD:** "Demoed at sprint review". People.
 - **DoD:** "passing in CI". GitHub Actions may not start (billing); local runs are the evidence until it does.
 - **Jira:** the Q1 and Q3 decisions and the ASSUMPTIONs go in a comment, shown to you first.
