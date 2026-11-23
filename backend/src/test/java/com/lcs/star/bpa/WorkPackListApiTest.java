@@ -102,7 +102,7 @@ class WorkPackListApiTest {
         assertThat(in457.path("projectRef").asText()).isEqualTo("PRJ-139");
         assertThat(row(rows, "WP-000461").path("status").asText()).isEqualTo("Completed");
         assertThat(row(rows, "WP-000480").path("status").asText()).isEqualTo("Released");
-        assertThat(in457.path("approvedPct").isNull()).as("no week is locked yet").isTrue();
+        assertThat(absent(in457.path("approvedPct"))).as("no week is locked yet").isTrue();
     }
 
     @Test
@@ -189,7 +189,7 @@ class WorkPackListApiTest {
         assertThat(in457.path("approvedPct").decimalValue()).isEqualByComparingTo("30.00");
         assertThat(in457.path("approvedWeekEnding").asText()).isEqualTo("2026-11-12");
         assertThat(in457.path("earnedManhours").decimalValue()).isEqualByComparingTo("150.00");
-        assertThat(row(rows(flow.loggedInAs("ppc-team").get(LIST)), "WP-000480").path("approvedPct").isNull()).as("no row for WP-000480").isTrue();
+        assertThat(absent(row(rows(flow.loggedInAs("ppc-team").get(LIST)), "WP-000480").path("approvedPct"))).as("no row for WP-000480").isTrue();
     }
 
     @Test
@@ -198,8 +198,8 @@ class WorkPackListApiTest {
 
         JsonNode row = row(rows(flow.loggedInAs("ppc-team").get(LIST)), "WP-000480");
 
-        assertThat(row.path("plannedStartDate").isNull()).isTrue();
-        assertThat(row.path("plannedEndDate").isNull()).isTrue();
+        assertThat(absent(row.path("plannedStartDate"))).isTrue();
+        assertThat(absent(row.path("plannedEndDate"))).isTrue();
     }
 
     @Test
@@ -241,6 +241,11 @@ class WorkPackListApiTest {
         jdbc.update("""
                 INSERT INTO bpa.activity_progress (activity_ref, progress_period_id, actual_pct, budgeted_units, earned_manhours, created_by, updated_by)
                 VALUES (?, ?, ?::numeric, 500, ?::numeric, 'test', 'test')""", activityRef, period, actualPct, earned);
+    }
+
+    /** A null field is left out of the answer (default-property-inclusion: non_null), so "no value" is a missing node, or a JSON null. */
+    private static boolean absent(JsonNode node) {
+        return node.isMissingNode() || node.isNull();
     }
 
     private static List<JsonNode> rows(HttpResponse<String> response) {

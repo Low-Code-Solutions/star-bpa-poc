@@ -140,7 +140,11 @@ describe('WorkPacksPage', () => {
     await user.type(screen.getByLabelText('Work Pack number'), 'WP-000461');
 
     await waitFor(() => expect(numbersShown()).toEqual(['WP-000461']));
-    expect(within(screen.getByRole('table', { name: 'Work Packs' }).querySelectorAll('tbody tr')[0] as HTMLElement).getByText('Completed')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('table', { name: 'Work Packs' }).querySelectorAll('tbody tr')[0] as HTMLElement).getByText(
+        'Completed',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('BPA72_unknownNumber', async () => {

@@ -9,6 +9,7 @@ export type Task = Schemas['Task'];
 export type LookAhead = Schemas['LookAhead'];
 export type WorkPackPrintSummary = Schemas['WorkPackPrintSummary'];
 export type WorkPackListRow = Schemas['WorkPackListRow'];
+export type WorkPackStatus = Schemas['WorkPackListRow']['status'];
 export type AssignmentFileResult = Schemas['AssignmentFileResult'];
 export type AssignmentFileRow = Schemas['AssignmentFileRow'];
 export type Activity = Schemas['Activity'];

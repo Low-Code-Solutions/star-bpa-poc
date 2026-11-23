@@ -67,6 +67,8 @@ public class SecurityConfig {
                         // Error dispatches keep their own status instead of turning into a 401 for anonymous callers.
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/workpacks").hasAuthority(TIME_METHOD_ANALYST)
+                        // BPA-72: the Work Packs list is read by every logged-in group (Jira decision 12 Nov 2026); read only, no project scope until BPA-79.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/workpacks").authenticated()
                         // BPA-7 (D22): the Header is read by the PPC Team and the Analyst (groups ASSUMPTION in the story).
                         .requestMatchers(HttpMethod.GET, "/api/v1/hour-journal-headers").hasAnyAuthority(PPC_TEAM, TIME_METHOD_ANALYST)
                         // BPA-10: the Workpack print and the list the portal shows are read by the Analyst, the Planner and the
