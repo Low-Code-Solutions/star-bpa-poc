@@ -247,6 +247,24 @@ class ProjectMasterDataApiTest {
         }
     }
 
+    /** QA review: without a session both new paths are 401, not a 403 and not data (the matchers are authenticated(), not permitAll()). */
+    @Test
+    void withoutASessionBothPathsAre401() {
+        TestBrowser nobody = new TestBrowser(port);
+
+        assertThat(nobody.get("/api/v1/me/projects").statusCode()).isEqualTo(401);
+        assertThat(nobody.get("/api/v1/projects/PRJ-139/master-data").statusCode()).isEqualTo(401);
+    }
+
+    /** QA review: a project reference in the wrong case is not PRJ-139 (references are exact), so it is refused like an unknown project. */
+    @Test
+    void aProjectInTheWrongCaseIsRefusedLikeAnUnknownOne() {
+        assign("project-engineer", "PRJ-139");
+        TestBrowser engineer = flow.loggedInAs("project-engineer");
+
+        assertRefused(engineer.get("/api/v1/projects/prj-139/master-data"), "Project prj-139 is not assigned to you");
+    }
+
     // --- helpers ----------------------------------------------------------------------------------------------------------
 
     private void assign(String username, String projectRef) {

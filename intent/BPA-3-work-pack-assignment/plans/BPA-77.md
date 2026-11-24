@@ -1,7 +1,7 @@
 # Plan: BPA-77 Portal user can see master data only for their assigned projects
 Jira: BPA-77 (Story, epic BPA-3)
 Story last updated: 2026-11-24T16:55:28.013+0400
-Status: Approved (Ahsan, 24 Nov 2026)
+Status: Closed (24 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-77-master-data-by-project, from main 1ed07bb
 
@@ -98,7 +98,7 @@ Seed today: PRJ-139 (WBS 11031, 11032; activities A-2201 to A-2205, A-2209, A-22
 |---|---|
 | Migration and seed | new `V8__drawing_project.sql`; `R__seed_reference_data.sql` (drawing `project_ref`) |
 | Contract | `api/openapi.yaml` (2 operations; `ProjectMasterData`, tab wrappers, `CbsActivity`, `ProjectDrawing`, `ReservedMaterial`, `CuttingSheet`) |
-| Backend, new | `domain/ProjectScope.java`, `domain/ProjectNotAssignedException.java`, `api/ProjectMasterDataController.java`, `persistence/ProjectMasterDataRepository.java` |
+| Backend, new | `scope/ProjectScope.java`, `scope/ProjectNotAssignedException.java`, `scope/package-info.java` (moved from `domain/`, Departure 1), `api/ProjectMasterDataController.java`, `persistence/ProjectMasterDataRepository.java` |
 | Backend, changed | `persistence/UserProjectRepository.java` (`exists`), `config/SecurityConfig.java` (explicit authenticated matcher) |
 | Backend tests | new `ProjectMasterDataApiTest.java`; `FlywayBaselineTest.java` (existing-test edit) |
 | Frontend, new | `features/projects/**`, `pages/ProjectsPage/**` |
@@ -174,11 +174,37 @@ Seed today: PRJ-139 (WBS 11031, 11032; activities A-2201 to A-2205, A-2209, A-22
 
 ## Progress and departures (24 Nov 2026)
 - **Contract and V8 first:** the two operations, the `project-master-data` tag and the schemas (`ProjectMasterData`, five tab wrappers, `CbsActivity`, `ProjectDrawing`, `ReservedMaterial`, `CuttingSheet`) are in `api/openapi.yaml` (`npm run gen:api` parses it); `V8__drawing_project.sql` adds the nullable `drawing.project_ref` with its FK and SOR comment; the drawing seed upsert sets it (ASSUMPTION); `FlywayBaselineTest` lists "drawing project".
-- **Red first:** `ProjectMasterDataApiTest` 8 of 10 fail (404 "No static resource" where 200 or 403 is expected; `aDrawingWithNoProjectIsInNoProject` was vacuous at first, a 404 body has no drawings, so it now asserts 200 and non-empty drawings and fails too); `ProjectScopeTest` 6 of 6 fail on the stub; React `ProjectsPage.test.tsx` 6 of 6 and the three Sidebar link tests fail. Green before code, by design: `theReferenceListsAreUnchanged` (a guard for the BPA-78 split) and `FlywayBaselineTest` (V8 exists in the same commit).
+- **Red first:** `ProjectMasterDataApiTest` 9 of 10 fail (404 "No static resource" where 200 or 403 is expected; `aDrawingWithNoProjectIsInNoProject` was vacuous at first, a 404 body has no drawings, so it now asserts 200 and non-empty drawings and fails too); `ProjectScopeTest` 6 of 6 fail on the stub; React `ProjectsPage.test.tsx` 6 of 6 and the three Sidebar link tests fail. Green before code, by design: `theReferenceListsAreUnchanged` (a guard for the BPA-78 split) and `FlywayBaselineTest` (V8 exists in the same commit).
 - **Departure 1 (package):** the shared check is in a new package `com.lcs.star.bpa.scope` (`ProjectScope`, `ProjectNotAssignedException`), not in `domain/` as the plan said: `domain/` has no dependency on `persistence/` today and `ProjectScope` reads `user_project`. The compile stubs of the red commit are `ProjectScope` (methods throw) and `UserProjectRepository.exists`.
+- **Green (ff1b783):** `ProjectScope` (`projectsOf`, `allows`, `require`), `ProjectNotAssignedException`, `UserProjectRepository.exists`, `ProjectMasterDataRepository` (five queries: activities and Cost structure through the WBS, drawings through `drawing.project_ref` with the latest revision by `registered_at`, reservations and cutting sheets through their drawing), `ProjectMasterDataController` (the 403 handler), the explicit `authenticated()` matcher for `/api/v1/me/projects` and `/api/v1/projects/*/master-data` before the ppc-team matcher, the React feature `features/projects`, `pages/ProjectsPage`, the route and the Sidebar link for every group, the data model §3.7 and SOR matrix notes.
+- **Full suite:** `./mvnw -B verify` on ff1b783: **797 tests, 0 failures**, BUILD SUCCESS. After the review, `ProjectMasterDataApiTest` was rerun alone, 12/12 (two guard tests added); the whole backend was not rerun, so CI is the first full run of the final commit. Frontend full run: **189 of 190**; the one failure is `CreateWorkPack > BPA6_dateToCompleteBoundary`, a BPA-6 test this story does not touch, which times out at 5 s in the full run and passes alone (the `CreateWorkPack` file alone: 9 of 9). A first full run started while the backend tests were running had four such timeouts. `npm run lint`, `format:check` and `build` are clean.
+- **Local-stack check (24 Nov, over the API the screen calls, as cost-controller and supervisor; the screen itself was not clicked by me):** V8 applied at start and the seed set `drawing.project_ref` (DWG-118, 119, 121, 130 to PRJ-139; DWG-140, 141 to PRJ-140; DWG-150, 151 none). The local database also held a `cost-controller` PRJ-139 row that `personas.yaml` does not give (added by earlier testing), so as ppc-team (the BPA-76 API) PRJ-139 was taken from cost-controller for the check and **given back afterwards** (the rows equal the starting rows). As cost-controller with PRJ-140 only: `GET /api/v1/me/projects` gave `[PRJ-140]` (the picker), `GET /api/v1/projects/PRJ-139/master-data` answered **403** "Project PRJ-139 is not assigned to you", PRJ-140 answered 200 with A-2206 to A-2208, DWG-140 (As-Built) and DWG-141, TR-5535, CS-3312 and an empty Cost structure, each tab with its system of record; `GET /api/v1/projects` answered 403 (ppc-team only); supervisor got `[]` and a 403 for PRJ-139; no session gave 401.
+- **No BPMN, DMN or model change** (`git diff --stat models/` empty).
+- **Departure 2 (extras):** the plan's "`aStaleProjectShowsTheRefusal`" is the scenario test `BPA77_unassignedProjectIsRefused` itself (a list read while PRJ-142 was assigned, then refused). Extras added beyond the plan: React `theFirstProjectIsOpenedWithItsActivities`, `aProjectWithNoRowsInATabSaysSo` and the three Sidebar link tests; backend `withoutASessionBothPathsAre401` and `aProjectInTheWrongCaseIsRefusedLikeAnUnknownOne` (guards, both passed at once).
+- **Observation for the PR:** the local database had a cost-controller PRJ-139 row that `personas.yaml` and `PersonaSyncTest` do not give; it was left as found.
+
+## After the `qa-reviewer` pass (24 Nov 2026; REVIEW.md "BPA-77 at ff1b783")
+- **0 High, 1 Important, 5 Nits (and 3 more counted).**
+- **Important, left for Ahsan:** the new package `com.lcs.star.bpa.scope` is not in backend/CLAUDE.md's package list (09 S23, LOCKED). Kept: that list is already not followed (`timesheet`, `progress`, `workpack`, `assignment`, `drawing`, `fileintake`, `fms` and `print` exist), and a LOCKED decision is not mine to amend. The alternative is `persistence/` or `api/`, which BPA-78 and BPA-79 would then depend on. Ahsan accepts the package in the PR, or names another place.
+- **Nits, fixed (guards, passed at once):** the missing negative tests: 401 without a session on both new paths, and a wrong-case reference refused like an unknown project. `GET /api/v1/projects` for a non-ppc-team user is already pinned by BPA-76's `otherPersonasCannotReadOrRemoveEither`.
+- **Nits, fixed in this plan:** "Files that change" now names `scope/`; "8 of 10 fail" is 9 of 10.
+- **Nit, no code change:** a picked project that leaves a refetched list would leave the `<select>` with no matching option. It cannot happen today: `refetchOnWindowFocus` is off, nothing else refetches the list, and the picked project resets with the page.
+- **Nits, accepted for the POC:** the tests repeat the five SOR texts as literals (independent of the controller constants; compared with docs/03 by eye); an over-long reference is echoed in the 403 text (JSON-escaped, React renders it as text); the tab pattern has no arrow keys, as BPA-73.
+- **For Ahsan and Jira (shown first, posted only on a yes):**
+  1. **Not in Jira:** no API or screen specification, so the two paths, the screen and the texts are ours.
+  2. **V8 and the seeded drawing mapping (ASSUMPTION, Khitaba to confirm):** `drawing.project_ref` (nullable) is new; DWG-118, 119, 121, 130 are PRJ-139, DWG-140 and 141 are PRJ-140, DWG-150 and 151 belong to no project (in no project's tabs). Reservations and cutting sheets follow their drawing; Activities and Cost structure follow their WBS.
+  3. **ASSUMPTIONs:** the 403 text "Project <ref> is not assigned to you" (Jira gives only the 403) and that an unknown project gets the same answer; rows ordered by reference; Cost structure is one row per `cbs_activity`, so PRJ-140's is empty in the seed; a drawing with no project is in no project.
+  4. **One rule for all eleven personas:** ppc-team needs its own `user_project` row like anyone (the PPC Team can assign itself on the Users and projects page).
+  5. **Split with BPA-78:** `/api/v1/activities`, `/drawings`, `/materials` and `/departments` are unchanged and unscoped; BPA-78 scopes Work Pack creation with the same `ProjectScope`.
+  6. **SOR Notes:** they already say "all 11 personas" (comment 10514 proposed it).
+  7. **New package `scope`** (see above): a decision for Ahsan.
+  8. **Jira status:** In Progress since 24 Nov 16:55 (the Development panel shows BPA-76's merged PR, nothing open for BPA-77), unchanged.
+
 
 ## Human-gap log
 - **DoR:** whether the PO's move to Ready was recorded.
 - **DoD:** "Demoed at sprint review". People.
 - **DoD:** "passing in CI". Actions may not start (billing).
-- **The local check** in the portal (as cost-controller and supervisor) is a person's.
+- **The local check:** run over the API the screen calls (see Progress); nobody has recorded clicking the portal as cost-controller (the picker offers PRJ-140 only, the tabs, PRJ-139 refused) and as supervisor (the empty state). Ahsan or Khitaba can do it in a few minutes.
+- **CI:** the full backend suite was run on ff1b783 (797 of 797); after the review only `ProjectMasterDataApiTest` was rerun, so CI is the first full run of the final commit. The frontend `BPA6_dateToCompleteBoundary` timeout under load may show there.
+- **Decision for Ahsan:** the new package `scope` (see the review section).
