@@ -2,9 +2,14 @@ package com.lcs.star.bpa;
 
 import static com.lcs.star.bpa.CamundaSteps.json;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.lcs.star.bpa.CamundaRest.Reply;
+import com.lcs.star.bpa.adapter.CamundaProcessClient;
 import com.lcs.star.bpa.api.TestBrowser;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
@@ -21,6 +26,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -60,6 +66,10 @@ class WorkPackProjectScopeApiTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    /** The real client, watched: "no process instance starts" is proved by camunda.start never being called, not by counting instances (Camunda's search is eventually consistent and shared by the test classes). */
+    @MockitoSpyBean
+    CamundaProcessClient processes;
+
     private AssignmentFlow flow;
 
     @BeforeEach
@@ -87,12 +97,11 @@ class WorkPackProjectScopeApiTest {
     @Test
     void BPA78_apiRejectsUnassignedProject() {
         TestBrowser analyst = flow.loggedInAs("time-method-analyst");
-        int before = instances();
 
         HttpResponse<String> response = analyst.post("/api/v1/workpacks", "{\"projectRef\":\"PRJ-142\"}");
 
         assertRefused(response, 403, "Project PRJ-142 is not assigned to you");
-        assertThat(instances()).as("no process instance of Process_PPC_WorkPackAssignment starts").isEqualTo(before);
+        verifyNothingStarted(); // no process instance of Process_PPC_WorkPackAssignment starts: Camunda is never asked to
     }
 
     // --- not scenarios (plan BPA-78) -----------------------------------------------------------------------------------------
@@ -104,6 +113,7 @@ class WorkPackProjectScopeApiTest {
         HttpResponse<String> response = analyst.post("/api/v1/workpacks", "{\"projectRef\":\"PRJ-139\"}");
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(201);
+        verify(processes).start(eq(PROCESS), eq(Map.of("projectRef", "PRJ-139"))); // the instance is started with the project
         long instance = Long.parseLong(json(response.body()).path("processInstanceKey").asText());
         // Camunda's variable search is eventually consistent (BPA-25), so wait for it
         String carried = CamundaSteps.poll(() -> CamundaSteps.variable(instance, "projectRef"), v -> v != null, "projectRef of instance " + instance);
@@ -117,12 +127,11 @@ class WorkPackProjectScopeApiTest {
     @Test
     void startWithoutAProjectIsRefused() {
         TestBrowser analyst = flow.loggedInAs("time-method-analyst");
-        int before = instances();
 
         assertRefused(analyst.post("/api/v1/workpacks", ""), 400, "Project is required");
         assertRefused(analyst.post("/api/v1/workpacks", "{}"), 400, "Project is required");
         assertRefused(analyst.post("/api/v1/workpacks", "{\"projectRef\":\"  \"}"), 400, "Project is required");
-        assertThat(instances()).as("no instance started").isEqualTo(before);
+        verifyNothingStarted();
     }
 
     /** An unknown project has no user_project row, so it is refused like an unassigned one (the answer does not say whether a project exists). */
@@ -138,13 +147,12 @@ class WorkPackProjectScopeApiTest {
     void otherGroupsAreStillRefusedForTheirGroup() {
         assign("production-team", "PRJ-139");
         TestBrowser productionTeam = flow.loggedInAs("production-team");
-        int before = instances();
 
         HttpResponse<String> response = productionTeam.post("/api/v1/workpacks", "{\"projectRef\":\"PRJ-139\"}");
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(403);
         assertThat(json(response.body()).path("detail").asText()).as("refused for the group, not for the project").contains("groups do not allow");
-        assertThat(instances()).isEqualTo(before);
+        verifyNothingStarted();
     }
 
     /** One rule for every persona: an analyst with two projects may start for either; a project assigned later is allowed from then on. */
@@ -157,6 +165,21 @@ class WorkPackProjectScopeApiTest {
         assertThat(analyst.post("/api/v1/workpacks", "{\"projectRef\":\"PRJ-142\"}").statusCode()).isEqualTo(201);
     }
 
+    /**
+     * QA review (BPA-76 had the same case in the Users and projects API): a JSON NUL in the reference would reach Postgres as an invalid byte sequence and answer 500.
+     * It is refused like an unassigned project, with the same 403, and Camunda is never asked to start.
+     */
+    @Test
+    void aControlCharacterInTheProjectIsRefusedNotACrash() {
+        TestBrowser analyst = flow.loggedInAs("time-method-analyst");
+
+        HttpResponse<String> response = analyst.post("/api/v1/workpacks", "{\"projectRef\":\"PRJ-139\\u0000\"}");
+
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(403);
+        assertThat(json(response.body()).path("detail").asText()).startsWith("Project PRJ-139").endsWith("is not assigned to you");
+        verifyNothingStarted();
+    }
+
     // --- helpers ----------------------------------------------------------------------------------------------------------
 
     private void assign(String username, String projectRef) {
@@ -164,11 +187,9 @@ class WorkPackProjectScopeApiTest {
                 username, projectRef);
     }
 
-    /** How many instances of Process_PPC_WorkPackAssignment Camunda holds, in any state. */
-    private static int instances() {
-        Reply found = IntegrationApp.admin.post("/v2/process-instances/search",
-                Map.of("filter", Map.of("processDefinitionId", PROCESS), "page", Map.of("limit", 1)));
-        return found.body().path("page").path("totalItems").asInt();
+    private void verifyNothingStarted() {
+        verify(processes, never()).start(anyString(), anyMap());
+        verify(processes, never()).start(anyString());
     }
 
     private static List<String> refs(JsonNode array) {

@@ -3,6 +3,7 @@ package com.lcs.star.bpa.scope;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.lcs.star.bpa.persistence.UserProjectRepository;
@@ -63,5 +64,20 @@ class ProjectScopeTest {
         when(rows.exists("ppc-team", "PRJ-139")).thenReturn(false);
 
         assertThat(scope.allows("ppc-team", "PRJ-139")).isFalse();
+    }
+
+    /**
+     * QA review of BPA-78 (BPA-76 had the same case): a blank reference, or one with a control character, is never a project. A NUL reaches Postgres as an invalid
+     * byte sequence and answers 500, so the check says no without asking the database; every caller (the start, BPA-79) gets the same 403 for it.
+     */
+    @Test
+    void aBlankOrControlCharacterReferenceIsNotAllowedAndTheDatabaseIsNotAsked() {
+        assertThat(scope.allows("project-engineer", null)).isFalse();
+        assertThat(scope.allows("project-engineer", "")).isFalse();
+        assertThat(scope.allows("project-engineer", "   ")).isFalse();
+        assertThat(scope.allows("project-engineer", "PRJ-139" + (char) 0)).isFalse();
+        assertThat(scope.allows("project-engineer", "PRJ-1\n39")).isFalse();
+        assertThatThrownBy(() -> scope.require("project-engineer", "PRJ-139" + (char) 0)).isInstanceOf(ProjectNotAssignedException.class);
+        verifyNoInteractions(rows);
     }
 }

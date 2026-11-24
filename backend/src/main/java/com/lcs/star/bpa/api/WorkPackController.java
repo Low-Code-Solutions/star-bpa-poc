@@ -173,6 +173,7 @@ public class WorkPackController implements WorkpacksApi {
     /** ASSUMPTION (plan BPA-78): a missing body, an unreadable one, or no {@code projectRef} in it is "Project is required"; the start is the only operation here with a body. */
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class})
     ResponseEntity<ProblemDetail> projectRequired(Exception e) {
+        LOG.warn("Work Pack start refused, the body is missing or unreadable: {}", e.getMessage());
         return problemResponse(HttpStatus.BAD_REQUEST, PROJECT_REQUIRED);
     }
 

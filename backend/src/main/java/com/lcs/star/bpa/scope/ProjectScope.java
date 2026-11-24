@@ -25,8 +25,14 @@ public class ProjectScope {
         return userProjects.projectsOf(username);
     }
 
-    /** True when a row (username, projectRef) exists; for filtering a list (BPA-79). */
+    /**
+     * True when a row (username, projectRef) exists; for filtering a list (BPA-79). A blank reference, or one with a control character, is never a project and the
+     * database is not asked: a NUL would reach Postgres as an invalid byte sequence and fail the call (BPA-76 had the same case in the Users and projects API).
+     */
     public boolean allows(String username, String projectRef) {
+        if (projectRef == null || projectRef.isBlank() || projectRef.chars().anyMatch(Character::isISOControl)) {
+            return false;
+        }
         return userProjects.exists(username, projectRef);
     }
 

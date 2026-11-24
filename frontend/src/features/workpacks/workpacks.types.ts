@@ -15,6 +15,5 @@ export type CreateWorkPackForm = {
   materials: MaterialRow[];
 };
 
-/** POST /api/v1/workpacks: the started instance, or the HTTP status of the refusal (403 outside time-method-analyst). */
 /** The started instance, or the refusal: its status and the contract's problem `detail` (BPA-78: 403 "Project PRJ-142 is not assigned to you"). */
 export type StartResult = StartWorkPackResponse | { status: number; detail?: string };

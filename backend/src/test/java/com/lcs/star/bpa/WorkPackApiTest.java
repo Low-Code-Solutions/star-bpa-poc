@@ -324,6 +324,20 @@ class WorkPackApiTest {
         assertThat(json(response.body()).path("detail").asText()).isEqualTo("Variable completedBy is not allowed for this task");
     }
 
+    /** BPA-78 (QA review): projectRef is on the Create task's read list only, so a client cannot write or change the project after the start. */
+    @Test
+    void theProjectCannotBeWrittenByTheCreateTask() {
+        TestBrowser analyst = analyst();
+        HttpResponse<String> started = AssignmentFlow.startWorkPack(analyst, jdbc);
+        String task = createTask(analyst, json(started.body()).path("processInstanceKey").asText(), null);
+
+        HttpResponse<String> response = analyst.post("/api/v1/tasks/" + task + "/complete",
+                toJson(Map.of("variables", with(validWorkPack(), "projectRef", "PRJ-140"))));
+
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(json(response.body()).path("detail").asText()).isEqualTo("Variable projectRef is not allowed for this task");
+    }
+
     /** D64, data model §6.1: one audit row per business column, old value null, canonical value, the user and the clock. */
     @Test
     void newWorkPackIsAudited() {
