@@ -70,6 +70,8 @@ tags:
     description: The weekly FMS hours files PPC downloads and uploads to FMS by hand (BPA-58; E2-08)
   - name: users
     description: Portal users and the projects the PPC Team assigns to them (BPA-76; ADR 0005, data model 13.7)
+  - name: project-master-data
+    description: The projects of the logged-in user and the master data of each, by project (BPA-77; data model 3.7, docs/03)
 paths:
   /api/v1/auth/login:
     post:
@@ -1812,6 +1814,60 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/v1/me/projects:
+    get:
+      tags: [project-master-data]
+      operationId: listMyProjects
+      summary: The projects assigned to the logged-in user
+      description: |
+        BPA-77. The session user's `user_project` rows only (the PPC Team assigns them, BPA-76), by project reference; empty when the user has none. Any logged-in
+        group, ppc-team included: one rule for every persona, no group exception (plan Q3, 24 Nov 2026). No parameter selects another user. This is the general read;
+        `GET /api/v1/projects` (every project that can be assigned) stays ppc-team only.
+      x-assumption: true
+      x-assumption-note: the path and the shape are ASSUMPTIONs of the plan (Jira BPA-77 gives no API specification)
+      responses:
+        '200':
+          description: The user's projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/projects/{projectRef}/master-data:
+    parameters:
+      - $ref: '#/components/parameters/ProjectRef'
+    get:
+      tags: [project-master-data]
+      operationId: getProjectMasterData
+      summary: The master data of one of the user's projects, in five tabs
+      description: |
+        BPA-77. Read-only seeded copies of the project's Activities, Cost structure, Drawings, Reserved materials and Cutting sheets, each tab with the system of
+        record it comes from (the SOR matrix, docs/03). Allowed only when a `user_project` row (username, projectRef) exists for the session user: any other
+        project, an unknown one included, answers 403 (the same answer, so it does not say whether a project exists; ASSUMPTION). Any logged-in group. Rows are
+        ordered by their reference (ASSUMPTION). A drawing belongs to a project through `drawing.project_ref` (V8, ASSUMPTION: no source gives the link); reserved
+        materials and cutting sheets follow their drawing, Cost structure follows its activity. The reference lists `/api/v1/activities`, `/drawings`, `/materials`
+        and `/departments` are not scoped by this story (BPA-78 scopes Work Pack creation).
+      x-assumption: true
+      x-assumption-note: the path, the shape, the row order and the 403 text "Project <ref> is not assigned to you" are ASSUMPTIONs of the plan; the 403 itself is Jira's
+      responses:
+        '200':
+          description: The project's master data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMasterData'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The project is not assigned to the user (or does not exist)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 403, title: Forbidden, detail: Project PRJ-142 is not assigned to you }
   /api/v1/users/{username}/projects:
     parameters:
       - $ref: '#/components/parameters/Username'
@@ -3351,6 +3407,142 @@ components:
         projectRef:
           type: string
           example: PRJ-139
+    ProjectMasterData:
+      type: object
+      description: The master data of one project, in the five tabs of the Projects and master data screen (BPA-77); every tab names its system of record
+      required: [projectRef, activities, costStructure, drawings, reservedMaterials, cuttingSheets]
+      properties:
+        projectRef:
+          type: string
+          example: PRJ-142
+        activities:
+          $ref: '#/components/schemas/ActivitiesTab'
+        costStructure:
+          $ref: '#/components/schemas/CostStructureTab'
+        drawings:
+          $ref: '#/components/schemas/DrawingsTab'
+        reservedMaterials:
+          $ref: '#/components/schemas/ReservedMaterialsTab'
+        cuttingSheets:
+          $ref: '#/components/schemas/CuttingSheetsTab'
+    ActivitiesTab:
+      type: object
+      required: [systemOfRecord, rows]
+      properties:
+        systemOfRecord:
+          type: string
+          description: The real system of record (docs/03-sor-matrix.md); the POC holds a seeded copy
+          example: P6, read through the D365 PMS database
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/Activity'
+    CostStructureTab:
+      type: object
+      required: [systemOfRecord, rows]
+      properties:
+        systemOfRecord:
+          type: string
+          description: The real system of record (docs/03-sor-matrix.md); the POC holds a seeded copy
+          example: D365 F&O Cost Control Report
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/CbsActivity'
+    DrawingsTab:
+      type: object
+      required: [systemOfRecord, rows]
+      properties:
+        systemOfRecord:
+          type: string
+          description: The real system of record (docs/03-sor-matrix.md); the POC holds a seeded copy
+          example: D365 F&O Document Control
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectDrawing'
+    ReservedMaterialsTab:
+      type: object
+      required: [systemOfRecord, rows]
+      properties:
+        systemOfRecord:
+          type: string
+          description: The real system of record (docs/03-sor-matrix.md); the POC holds a seeded copy
+          example: D365 F&O (PPC)
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReservedMaterial'
+    CuttingSheetsTab:
+      type: object
+      required: [systemOfRecord, rows]
+      properties:
+        systemOfRecord:
+          type: string
+          description: The real system of record (docs/03-sor-matrix.md); the POC holds a seeded copy
+          example: FMS nesting
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/CuttingSheet'
+    CbsActivity:
+      type: object
+      description: An activity with its CBS code (cbs_activity; data model §3.4)
+      required: [activityRef, activityName, cbsCodeRef]
+      properties:
+        activityRef:
+          type: string
+          example: A-2201
+        activityName:
+          type: string
+        cbsCodeRef:
+          type: string
+          example: CBS-139-PIP-01
+    ProjectDrawing:
+      type: object
+      description: A drawing of the project with its latest revision (the one most recently registered, D42); no revision fields when it has none
+      required: [drawingRef, title]
+      properties:
+        drawingRef:
+          type: string
+          example: DWG-118
+        title:
+          type: string
+        latestRevision:
+          type: string
+          example: A
+        status:
+          type: string
+          description: The status of the latest revision, as D365 Document Control sent it
+          example: IFC
+    ReservedMaterial:
+      type: object
+      description: A material reservation on a drawing of the project (material_reservation; data model §3.9)
+      required: [traceabilityNumber, drawingRef, materialRef, description]
+      properties:
+        traceabilityNumber:
+          type: string
+          example: TR-5531
+        drawingRef:
+          type: string
+          example: DWG-118
+        materialRef:
+          type: string
+          example: MAT-PIPE-06
+        description:
+          type: string
+          description: The description of the material
+    CuttingSheet:
+      type: object
+      description: A cutting sheet of a drawing of the project (cutting_sheet; data model §3.10)
+      required: [cuttingSheetRef, drawingRef]
+      properties:
+        cuttingSheetRef:
+          type: string
+          example: CS-3310
+        drawingRef:
+          type: string
+          example: DWG-118
     Problem:
       type: object
       description: RFC 9457 problem details

@@ -23,6 +23,11 @@ public class UserProjectRepository {
         this.jdbc = jdbc;
     }
 
+    /** True when the user has a row for the project (BPA-77: the shared project-scope check reads this). */
+    public boolean exists(String username, String projectRef) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM bpa.user_project WHERE username = ? AND project_ref = ?)", Boolean.class, username, projectRef));
+    }
+
     /** The project references of the user, by reference (ASSUMPTION: no source orders them). */
     public List<String> projectsOf(String username) {
         return jdbc.queryForList("SELECT project_ref FROM bpa.user_project WHERE username = ? ORDER BY project_ref", String.class, username);

@@ -3,6 +3,7 @@
 Status: **ACTIVE, 28 Oct 2026 (Epic 1 rows; updated for 09-architecture-decisions, D58, D59, and PO decision P1 on WBS of 28 Oct).** Applied under PO delegation (D55, confirmed by Khitaba); open to PO challenge.
 Amended 2 Nov 2026 (PO decision 2 Nov 2026, BPA-44): `user_role_scope` removed; test users are the seven personas, access by group only.
 Amended 13 Nov 2026 (BPA-48; Epic 2, data model v0.7, SORs approved by Khitaba for the PO on 11 Nov 2026): nine rows added below the Epic 1 slice entities; eleven personas; project scope returns as `user_project`.
+Amended 24 Nov 2026 (BPA-77): the drawing row names `drawing.project_ref` (V8), so the drawing, reservation and cutting sheet tabs of Projects and master data can be limited to a project.
 Owner: Faraz. Decision references (C, D) are in claude/06-epic1-decisions-draft.md; P1–P4 in claude/11-data-model.md §0.
 Column-level detail (types, constraints, SOR per column) is in claude/11-data-model.md (repo docs/data-model.md, 09 S16).
 
@@ -27,7 +28,7 @@ This matrix labels each **entity**. Column-level labels (including foreign-key c
 | WBS | wbs_ref | D365 F&O Project Management | Reference (seeded copy) | D365 F&O sources WBS data from FMS (batch/file, partner-side); D365 F&O → FMS integration carries updates (PO, 28 Oct, P1) | C8c, P1 |
 | Activity, incl. FAC CRPO/Type/Name, Discipline, baseline dates, budgeted units | activity_ref | P6, read through the D365 PMS database | Reference (seeded copy) | Batch (PMS upload) | C13, D17 |
 | CBS code of an activity | cbs_code_ref | D365 F&O Cost Control Report | Reference (seeded copy) | Real-time | D40 |
-| Drawing and revision, incl. status | drawing_ref, revision | D365 F&O Document Control | Read-only copy, changed only by the DrawingRevised event; the Superseded status of the previous revision is taken from the event, never decided by the POC (D45); supersededRevision is carried as a process variable, not stored (P3) | Real-time event, mocked by POST /api/v1/drawing-revisions | C15, D23, D41, D42, D53, D60 |
+| Drawing and revision, incl. status | drawing_ref, revision, project_ref (V8, BPA-77: which project the drawing belongs to; ASSUMPTION, no source gives the link; its SOR is D365 F&O Project Management) | D365 F&O Document Control | Read-only copy, changed only by the DrawingRevised event; the Superseded status of the previous revision is taken from the event, never decided by the POC (D45); supersededRevision is carried as a process variable, not stored (P3) | Real-time event, mocked by POST /api/v1/drawing-revisions | C15, D23, D41, D42, D53, D60 |
 | Material master | material_ref | D365 F&O Product Information Management | Reference (seeded copy) | Real-time | C12, D54 |
 | Material reservation, incl. Traceability Number | traceability_number; drawing_ref + material_ref | D365 F&O (PPC) | Reference (seeded copy) | Real-time | C12, C5, D54 |
 | Department | department_ref | D365 F&O (organisation / financial dimension) | Reference (seeded copy) | Real-time | D18 |

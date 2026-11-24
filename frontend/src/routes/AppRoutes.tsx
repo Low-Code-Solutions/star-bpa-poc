@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router';
 import { MainLayout } from '@/layouts/MainLayout';
+import { ProjectsPage } from '@/pages/ProjectsPage';
 import { TasksPage } from '@/pages/TasksPage';
 import { UsersPage } from '@/pages/UsersPage';
 import { WorkPackDetailPage } from '@/pages/WorkPackDetailPage';
@@ -20,6 +21,7 @@ export function AppRoutes({ api }: { api: Api }) {
           <Route index element={<TasksPage api={api} />} />
           <Route path="workpacks" element={<WorkPacksPage api={api} />} />
           <Route path="workpacks/:workpackNumber" element={<WorkPackDetailPage api={api} />} />
+          <Route path="projects" element={<ProjectsPage api={api} />} />
           <Route element={<ProtectedRoute groups={['ppc-team']} />}>
             <Route path="users" element={<UsersPage api={api} />} />
           </Route>
