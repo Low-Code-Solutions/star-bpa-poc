@@ -2,6 +2,7 @@ export { CreateWorkPack, fieldMessages } from './components/CreateWorkPack';
 export { ConfirmWorkPack } from './components/ConfirmWorkPack';
 export { SignOffRelease } from './components/SignOffRelease';
 export { WorkPackPrints } from './components/WorkPackPrints';
+export { StartWorkPack } from './components/StartWorkPack';
 export { WorkPackList } from './components/WorkPackList';
 export { WorkPackDetail } from './components/WorkPackDetail';
 export { ScheduleWorkPack } from './components/ScheduleWorkPack';

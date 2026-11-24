@@ -31,7 +31,7 @@ public final class WorkPackValidator {
 
         boolean department(String departmentRef);
 
-        /** COMPILE STUB (BPA-78, red tests first): the project an activity belongs to (activity to WBS to project); null when unknown. */
+        /** BPA-78: the project an activity belongs to (activity to WBS to project); null when the activity is unknown. */
         default String activityProject(String activityRef) {
             return null;
         }
@@ -121,6 +121,14 @@ public final class WorkPackValidator {
         // References must exist in the POC master data (ASSUMPTION texts; the foreign keys are the backstop).
         if (!blank(input.activityRef()) && !known.activity(input.activityRef())) {
             messages.add("Project activity " + input.activityRef() + " is not known");
+        }
+        // BPA-78 (ASSUMPTION for the text): an instance started for a project (projectRef, from the start) takes only that project's activities. An instance started
+        // before BPA-78 has no project and is not checked.
+        if (!blank(input.projectRef()) && !blank(input.activityRef()) && known.activity(input.activityRef())) {
+            String project = known.activityProject(input.activityRef());
+            if (project != null && !project.equals(input.projectRef())) {
+                messages.add("Project activity " + input.activityRef() + " is not in project " + input.projectRef());
+            }
         }
         if (!blank(input.drawingRef()) && !known.drawing(input.drawingRef())) {
             messages.add("Drawing " + input.drawingRef() + " is not known");

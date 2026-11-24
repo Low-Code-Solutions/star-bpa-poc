@@ -188,6 +188,11 @@ public class SaveWorkPackWorker {
             }
 
             @Override
+            public String activityProject(String activityRef) {
+                return references.activityProject(activityRef);
+            }
+
+            @Override
             public boolean department(String departmentRef) {
                 return references.departmentExists(departmentRef);
             }
@@ -215,7 +220,7 @@ public class SaveWorkPackWorker {
             materials.add(new WorkPackInput.Material(text(row.get("materialRef")), text(row.get("phase")), id == null || id.isBlank() ? null : id));
         }
         return new WorkPackInput(text(variables.get("activityRef")), text(variables.get("drawingRef")),
-                text(variables.get("departmentRef")), completionDate, phases, materials);
+                text(variables.get("departmentRef")), completionDate, phases, materials, text(variables.get("projectRef")));
     }
 
     private static List<Map<?, ?>> rows(Object value) {

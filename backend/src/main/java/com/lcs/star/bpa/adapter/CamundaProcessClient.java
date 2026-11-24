@@ -22,17 +22,17 @@ public class CamundaProcessClient {
                 .build();
     }
 
-    /** COMPILE STUB (BPA-78, red tests first): the new instance's key, the process started with these variables. */
-    public String start(String processDefinitionId, Map<String, Object> variables) {
-        throw new UnsupportedOperationException("BPA-78 stub");
-    }
-
     /** The new instance's key; the process starts with no variables (BPA-46 Q1: the request carries no Work Pack data). */
     public String start(String processDefinitionId) {
+        return start(processDefinitionId, Map.of());
+    }
+
+    /** The new instance's key, the process started with these variables (BPA-78: the project the request is for, as {@code projectRef}). */
+    public String start(String processDefinitionId, Map<String, Object> variables) {
         try {
             return rest.post().uri("/v2/process-instances")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("processDefinitionId", processDefinitionId, "variables", Map.of()))
+                    .body(Map.of("processDefinitionId", processDefinitionId, "variables", variables))
                     .exchange((request, response) -> {
                         if (response.getStatusCode().is5xxServerError()) {
                             throw new EngineUnavailableException("Camunda process start returned " + response.getStatusCode().value());

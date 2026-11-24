@@ -27,7 +27,7 @@ Portal: http://localhost:3000. Dates follow the business date 19 Nov 2026.
 
 | # | Persona (login) | Screen / action | Data | Expected |
 | --- | --- | --- | --- | --- |
-| 1 | `time-method-analyst` | Start a Work Pack; task **Create Work Pack** | Activity A-2301; drawing DWG-118; department Fabrication; completion date 31 Dec 2026; phases Cutting 300 h and Welding 200 h; material MAT-PIPE-06 for Cutting (ASSUMPTION: drawing, material, department and date come from the seed) | The Work Pack is saved as WP-000001 |
+| 1 | `time-method-analyst` | Pick project **PRJ-139** in the Project picker beside Start, then Start Work Pack request (BPA-78: the analyst has PRJ-139 and PRJ-140 from `personas.yaml`); task **Create Work Pack**, which offers only PRJ-139 activities | Activity A-2301; drawing DWG-118; department Fabrication; completion date 31 Dec 2026; phases Cutting 300 h and Welding 200 h; material MAT-PIPE-06 for Cutting (ASSUMPTION: drawing, material, department and date come from the seed) | The Work Pack is saved as WP-000001 |
 | 2 | `time-method-analyst` | **Confirm Workpack** | Nothing changed | The release check reads Ready |
 | 3 | `project-engineer` | **Sign off release** | Approved | Work Pack Released |
 | 4 | `production-planner` | **Schedule Work Pack** | Start 26 Nov 2026, end 18 Dec 2026 (ASSUMPTION; the start must be at least 7 days after today) | Scheduled; the print is generated |

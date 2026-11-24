@@ -105,7 +105,9 @@ class WorkPackProjectScopeApiTest {
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(201);
         long instance = Long.parseLong(json(response.body()).path("processInstanceKey").asText());
-        assertThat(CamundaSteps.variable(instance, "projectRef")).as("the instance carries the project").contains("PRJ-139");
+        // Camunda's variable search is eventually consistent (BPA-25), so wait for it
+        String carried = CamundaSteps.poll(() -> CamundaSteps.variable(instance, "projectRef"), v -> v != null, "projectRef of instance " + instance);
+        assertThat(carried).as("the instance carries the project").contains("PRJ-139");
         String task = CamundaSteps.awaitOpenTask(instance, CREATE).path("userTaskKey").asText();
         JsonNode shown = json(analyst.get("/api/v1/tasks/" + task).body());
         assertThat(shown.path("variables").path("projectRef").asText()).as("the Create Work Pack task shows the project (read allow-list)").isEqualTo("PRJ-139");

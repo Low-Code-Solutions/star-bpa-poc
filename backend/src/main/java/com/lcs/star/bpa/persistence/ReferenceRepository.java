@@ -77,6 +77,12 @@ public class ReferenceRepository {
         return exists("SELECT count(*) FROM bpa.material WHERE material_ref = ?", materialRef);
     }
 
+    /** BPA-78: the project of an activity (activity to WBS to project); null for an unknown activity. */
+    public String activityProject(String activityRef) {
+        List<String> found = jdbc.queryForList("SELECT w.project_ref FROM bpa.activity a JOIN bpa.wbs w ON w.wbs_ref = a.wbs_ref WHERE a.activity_ref = ?", String.class, activityRef);
+        return found.isEmpty() ? null : found.get(0);
+    }
+
     public boolean departmentExists(String departmentRef) {
         return exists("SELECT count(*) FROM bpa.department WHERE department_ref = ?", departmentRef);
     }

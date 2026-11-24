@@ -480,6 +480,7 @@ Notes:
 - **No `created_by` business column** (P4): the creator is the audit `created_by`, the Camunda username (D63).
 - `process_instance_key UNIQUE` is what makes `save-workpack` idempotent on retry (D65, 09 S7).
 - **No `project_ref` column.** A Work Pack's project is derived from its activity (BPA-16, C8a); storing it would create a second copy of one value.
+- **As built by BPA-78.** The project is chosen **at the start**: `POST /api/v1/workpacks` carries `{ projectRef }`, `ProjectScope` (BPA-77) refuses a project the user has no `user_project` row for (403 "Project PRJ-142 is not assigned to you", the same for an unknown project) before Camunda is called, so no instance starts, and the instance carries `projectRef` as a process variable (read-only on the Create Work Pack task). Still **no `project_ref` column**: the Work Pack's project stays its activity's, and the save step keeps them equal by refusing an activity of another project ("Project activity A-2206 is not in project PRJ-139", **ASSUMPTION**; skipped for an instance started before BPA-78, which has no `projectRef`). Jira's SOR Notes name `workpack.project_ref`; it is not a column.
 
 ### 4.2 `workpack_phase`
 

@@ -5,6 +5,8 @@ import com.lcs.star.bpa.adapter.CamundaTaskClient.EngineUnavailableException;
 import com.lcs.star.bpa.api.generated.WorkpacksApi;
 import com.lcs.star.bpa.persistence.WorkPackDetailRepository;
 import com.lcs.star.bpa.persistence.WorkPackListRepository;
+import com.lcs.star.bpa.scope.ProjectNotAssignedException;
+import com.lcs.star.bpa.scope.ProjectScope;
 import com.lcs.star.bpa.task.WorkPackOpenTaskService;
 import com.lcs.star.bpa.workpack.WorkPackDetailService;
 import com.lcs.star.bpa.workpack.WorkPackListMapper;
@@ -17,6 +19,7 @@ import com.lcs.star.bpa.api.generated.model.WorkPackListRow;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.validation.ConstraintViolationException;
@@ -24,15 +27,18 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.ErrorResponseException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
  * {@code POST /api/v1/workpacks}: the Time &amp; Method Analyst starts a Work Pack request (BPA-6; D52, 09 S20). SecurityConfig
- * lets only {@code time-method-analyst} through (403 otherwise). The call carries no body (BPA-46 Q1): the Work Pack data is
+ * lets only {@code time-method-analyst} through (403 otherwise). Since BPA-78 the call carries the project ({@code StartWorkPackRequest}), checked with ProjectScope before
+ * Camunda is called (BPA-46 Q1 originally gave it no body): the Work Pack data is
  * entered in the Create Work Pack task that follows, through the task API.
  * {@code GET /api/v1/workpacks} (BPA-72) is the read-only Work Packs list for every logged-in group.
  */
@@ -40,6 +46,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkPackController implements WorkpacksApi {
 
     static final String PROCESS = "Process_PPC_WorkPackAssignment";
+    static final String PROJECT_REQUIRED = "Project is required";
 
     private static final Logger LOG = LoggerFactory.getLogger(WorkPackController.class);
 
@@ -50,12 +57,15 @@ public class WorkPackController implements WorkpacksApi {
     private final WorkPackListRepository list;
     private final WorkPackDetailService details;
     private final WorkPackOpenTaskService openTasks;
+    private final ProjectScope projectScope;
 
-    public WorkPackController(CamundaProcessClient camunda, WorkPackListRepository list, WorkPackDetailService details, WorkPackOpenTaskService openTasks) {
+    public WorkPackController(CamundaProcessClient camunda, WorkPackListRepository list, WorkPackDetailService details, WorkPackOpenTaskService openTasks,
+            ProjectScope projectScope) {
         this.camunda = camunda;
         this.list = list;
         this.details = details;
         this.openTasks = openTasks;
+        this.projectScope = projectScope;
     }
 
 
@@ -140,14 +150,43 @@ public class WorkPackController implements WorkpacksApi {
                 ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Work Pack not found"), null));
     }
 
+    /**
+     * BPA-78: the order is the group (SecurityConfig, 403), the body (400 "Project is required"), the project (ProjectScope, 403 "Project PRJ-142 is not assigned to
+     * you"), then Camunda. A refusal returns before Camunda is called, so no process instance starts. The instance carries {@code projectRef}.
+     */
     @Override
     public ResponseEntity<StartWorkPackResponse> startWorkPack(StartWorkPackRequest startWorkPackRequest) {
+        String projectRef = startWorkPackRequest == null ? null : startWorkPackRequest.getProjectRef();
+        if (projectRef == null || projectRef.isBlank()) {
+            throw problem(HttpStatus.BAD_REQUEST, PROJECT_REQUIRED);
+        }
+        projectScope.require(SecurityContextHolder.getContext().getAuthentication().getName(), projectRef);
         try {
-            return ResponseEntity.status(HttpStatus.CREATED).body(new StartWorkPackResponse(camunda.start(PROCESS)));
+            return ResponseEntity.status(HttpStatus.CREATED).body(new StartWorkPackResponse(camunda.start(PROCESS, Map.of("projectRef", projectRef))));
         } catch (EngineUnavailableException e) {
             LOG.warn("Work Pack request not started: {}", e.getMessage());
             throw new ErrorResponseException(HttpStatus.SERVICE_UNAVAILABLE, ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
                     "The process engine is not available right now; try again later"), null);
         }
+    }
+
+    /** ASSUMPTION (plan BPA-78): a missing body, an unreadable one, or no {@code projectRef} in it is "Project is required"; the start is the only operation here with a body. */
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class})
+    ResponseEntity<ProblemDetail> projectRequired(Exception e) {
+        return problemResponse(HttpStatus.BAD_REQUEST, PROJECT_REQUIRED);
+    }
+
+    /** BPA-77's rule at the start: a project the user has no user_project row for, or that does not exist, is 403 "Project PRJ-142 is not assigned to you" (ASSUMPTION for the text). */
+    @ExceptionHandler(ProjectNotAssignedException.class)
+    ResponseEntity<ProblemDetail> notAssigned(ProjectNotAssignedException e) {
+        return problemResponse(HttpStatus.FORBIDDEN, e.getMessage());
+    }
+
+    private static ResponseEntity<ProblemDetail> problemResponse(HttpStatus status, String detail) {
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(ProblemDetail.forStatusAndDetail(status, detail));
+    }
+
+    private static ErrorResponseException problem(HttpStatus status, String detail) {
+        return new ErrorResponseException(status, ProblemDetail.forStatusAndDetail(status, detail), null);
     }
 }
