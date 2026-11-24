@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { Link } from 'react-router';
 import { ErrorMessage } from '@/components/common/ErrorMessage';
 import { Spinner } from '@/components/common/Spinner';
@@ -20,6 +21,7 @@ type Tab = (typeof TABS)[number];
 export function WorkPackDetail({ api, workpackNumber }: { api: Api; workpackNumber: string }) {
   const [tab, setTab] = useState<Tab>('Overview');
   const { data } = useWorkPack(api, workpackNumber);
+  const { me } = useAuth();
 
   return (
     <section aria-label={`Work Pack ${workpackNumber}`} className="work-pack-detail">
@@ -78,7 +80,14 @@ export function WorkPackDetail({ api, workpackNumber }: { api: Api; workpackNumb
               {tab === 'Overview' ? <OverviewTab detail={data.detail} /> : null}
               {tab === 'Workers' ? <WorkersTab detail={data.detail} /> : null}
               {tab === 'Hours' ? <HoursTab detail={data.detail} /> : null}
-              {tab === 'Progress' ? <ProgressTab detail={data.detail} /> : null}
+              {tab === 'Progress' ? (
+                <ProgressTab
+                  detail={data.detail}
+                  api={api}
+                  workpackNumber={workpackNumber}
+                  canReopen={(me?.groups ?? []).includes('project-manager')}
+                />
+              ) : null}
               {tab === 'History' ? <HistoryTab api={api} workpackNumber={workpackNumber} /> : null}
             </div>
           </div>

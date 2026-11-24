@@ -128,6 +128,7 @@ services:
       SPRING_PROFILES_ACTIVE: ${BPA_PROFILES:-local}
       # QA only (BPA-81): the business date, yyyy-MM-dd. Empty or absent means the system clock. Ignored (with a WARN) unless profile qa is active.
       BPA_CLOCK_TODAY: ${BPA_CLOCK_TODAY:-}
+      BPA_PROGRESS_ALLOW_REOPEN: ${BPA_PROGRESS_ALLOW_REOPEN:-false} # BPA-83: true lets the Project Manager reopen a Locked week (demo only)
       CAMUNDA_GRPC_ADDRESS: http://camunda:26500
       CAMUNDA_REST_ADDRESS: http://camunda:8080
       CAMUNDA_ADMIN_USER: ${CAMUNDA_ADMIN_USER:-demo}

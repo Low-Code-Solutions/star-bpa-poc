@@ -108,6 +108,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/users", "/api/v1/users/**", "/api/v1/projects").hasAuthority(PPC_TEAM)
                         // BPA-59: only the PPC Team uploads the weekly completion report and reads its result
                         .requestMatchers("/api/v1/completion-reports/**", "/api/v1/completion-reports").hasAuthority(PPC_TEAM)
+                        // BPA-83: only the Project Manager reopens a Locked week (every method, so HEAD cannot skip the rule); before the BPA-60 rule below, which lets the PPC Team in
+                        .requestMatchers("/api/v1/progress-periods/*/reopen").hasAuthority(PROJECT_MANAGER)
                         // BPA-64: the Cost Controller and the Project Manager read the week's CBS actuals (delta section 7); before the BPA-60 rule below
                         .requestMatchers("/api/v1/progress-periods/*/cbs-actuals").hasAnyAuthority(COST_CONTROLLER, PROJECT_MANAGER)
                         // BPA-65: any logged-in persona may ask for its own variance alerts (the list is the session user's only); a persona with none gets an empty list, not a 403

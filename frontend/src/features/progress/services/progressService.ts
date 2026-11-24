@@ -42,3 +42,24 @@ export async function getEarnedManhours(api: Api, weekEnding: string): Promise<E
     return null;
   }
 }
+
+/** The answer of a call that changes something: ok, or the status and the backend's problem text (BPA-83). */
+export type ReopenResult = { ok: true } | { ok: false; status: number; detail?: string };
+
+/**
+ * POST /api/v1/progress-periods/{weekEnding}/reopen (BPA-83): the Project Manager reopens a Locked week with a reason. The backend checks the setting, the group, the reason and the
+ * status and answers with the story's texts ("Enter a reason to reopen the week", "Reopening a locked week is not allowed"); the screen shows them as they come.
+ */
+export async function reopenWeek(api: Api, weekEnding: string, reason: string): Promise<ReopenResult> {
+  try {
+    const { response, error } = await api.POST('/api/v1/progress-periods/{weekEnding}/reopen', {
+      params: { path: { weekEnding } },
+      body: { reason },
+    });
+    return response.ok
+      ? { ok: true }
+      : { ok: false, status: response.status, detail: (error as { detail?: string } | undefined)?.detail };
+  } catch {
+    return { ok: false, status: 0 };
+  }
+}

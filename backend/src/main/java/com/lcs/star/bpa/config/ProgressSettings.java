@@ -14,6 +14,7 @@ public class ProgressSettings {
 
     static final String SOURCE = "bpa.progress.source";
     static final String BASIS = "bpa.progress.basis";
+    static final String ALLOW_REOPEN = "bpa.progress.allow-reopen";
 
     private final Environment environment;
 
@@ -26,9 +27,9 @@ public class ProgressSettings {
         return "HOURS".equalsIgnoreCase(environment.getProperty(BASIS, "Physical").trim()) ? "Hours" : "Physical";
     }
 
-    /** BPA-83 (compile stub for the red run): whether a Project Manager may reopen a Locked week (C-E3-3). Not read from the environment yet. */
+    /** BPA-83 (C-E3-3, decided 11 Nov 2026): whether a Project Manager may reopen a Locked week. False by default; only the value true switches it on. */
     public boolean allowReopen() {
-        return false;
+        return "true".equalsIgnoreCase(environment.getProperty(ALLOW_REOPEN, "false").trim());
     }
 
     /** The configured progress source, "FMS" or "PMS". */

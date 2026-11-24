@@ -1,3 +1,7 @@
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { ErrorMessage } from '@/components/common/ErrorMessage';
+import { reopenWeek } from '@/features/progress/services/progressService';
 import type { Api } from '@/services/apiClient';
 import type { WorkPackDetail } from '@/types/api';
 import { showDate, showInstantDate } from '@/utils/dates';
@@ -132,38 +136,119 @@ export function HoursTab({ detail }: { detail: WorkPackDetail }) {
   );
 }
 
-/** The Progress tab (BPA-73): each week the Work Pack has a progress row: status, reported and approved %, the Earned man-hours of its activity, retractions. */
-export function ProgressTab({ detail }: { detail: WorkPackDetail }) {
+/**
+ * The Progress tab (BPA-73): each week the Work Pack has a progress row: status, reported and approved %, the Earned man-hours of its activity, retractions. BPA-83: for the
+ * project-manager group a Locked week has a "Reopen week" button that asks for a reason and posts it (ASSUMPTION for the labels); the backend decides (the setting, the group, the
+ * reason, the status) and its text is shown. A reopen applies to the whole week, not only this Work Pack, and the screen says so.
+ */
+export function ProgressTab({
+  detail,
+  api,
+  workpackNumber,
+  canReopen = false,
+}: {
+  detail: WorkPackDetail;
+  api?: Api;
+  workpackNumber?: string;
+  canReopen?: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [reopening, setReopening] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
   if (detail.progress.length === 0) {
     return <p>No progress recorded yet</p>;
   }
+  const actions = canReopen && api !== undefined;
+
+  async function submit(weekEnding: string) {
+    if (!api || busy) {
+      return;
+    }
+    setBusy(true);
+    setProblem(null);
+    const result = await reopenWeek(api, weekEnding, reason);
+    setBusy(false);
+    if (result.ok) {
+      setReopening(null);
+      setReason('');
+      await queryClient.invalidateQueries({ queryKey: ['workpacks', 'detail', workpackNumber] });
+    } else {
+      setProblem(result.detail ?? `The week could not be reopened (${result.status})`);
+    }
+  }
+
   return (
-    <table className="sign-table" aria-label="Progress">
-      <thead>
-        <tr>
-          <th>Week ending</th>
-          <th>Status</th>
-          <th>Reported %</th>
-          <th>Approved %</th>
-          <th>Earned MH (activity)</th>
-          <th>Retractions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {detail.progress.map((w) => (
-          <tr key={w.weekEnding}>
-            <td>{showDate(w.weekEnding)}</td>
-            <td>{w.periodStatus}</td>
-            <td>{two(w.reportedPct)}</td>
-            <td>{two(w.approvedPct)}</td>
-            <td>{two(w.earnedManhours)}</td>
-            <td>
-              {w.retractions.length === 0 ? EMPTY : w.retractions.map((r) => `${r.reason} (${r.decision ?? 'open'})`).join('; ')}
-            </td>
+    <>
+      <table className="sign-table" aria-label="Progress">
+        <thead>
+          <tr>
+            <th>Week ending</th>
+            <th>Status</th>
+            <th>Reported %</th>
+            <th>Approved %</th>
+            <th>Earned MH (activity)</th>
+            <th>Retractions</th>
+            {actions ? <th>Action</th> : null}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {detail.progress.map((w) => (
+            <tr key={w.weekEnding}>
+              <td>{showDate(w.weekEnding)}</td>
+              <td>{w.periodStatus}</td>
+              <td>{two(w.reportedPct)}</td>
+              <td>{two(w.approvedPct)}</td>
+              <td>{two(w.earnedManhours)}</td>
+              <td>
+                {w.retractions.length === 0
+                  ? EMPTY
+                  : w.retractions.map((r) => `${r.reason} (${r.decision ?? 'open'})`).join('; ')}
+              </td>
+              {actions ? (
+                <td>
+                  {w.periodStatus === 'Locked' ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReopening(w.weekEnding);
+                        setProblem(null);
+                      }}
+                    >
+                      Reopen week
+                    </button>
+                  ) : null}
+                </td>
+              ) : null}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {actions && reopening ? (
+        <form
+          aria-label="Reopen week"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submit(reopening);
+          }}
+        >
+          <p>Reopening week ending {showDate(reopening)} reopens the whole week, not only this Work Pack.</p>
+          <label>
+            Reason
+            <textarea value={reason} onChange={(event) => setReason(event.target.value)} />
+          </label>
+          <button type="submit" disabled={busy}>
+            Reopen
+          </button>
+          <button type="button" onClick={() => setReopening(null)}>
+            Cancel
+          </button>
+          <ErrorMessage text={problem} />
+        </form>
+      ) : null}
+    </>
   );
 }
 

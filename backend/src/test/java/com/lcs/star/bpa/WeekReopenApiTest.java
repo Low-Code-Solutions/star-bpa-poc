@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -104,7 +105,8 @@ class WeekReopenApiTest {
     @MockitoSpyBean
     CamundaProcessClient processes;
 
-    private final Map<String, Object> overrides = new HashMap<>();
+    /** Static: JUnit makes a new test instance per test, and the property source is added once, so every test must reach the same map. */
+    private static final Map<String, Object> overrides = new HashMap<>();
     private AssignmentFlow flow;
     private UUID period;
 
@@ -152,6 +154,19 @@ class WeekReopenApiTest {
         period = jdbc.queryForObject("SELECT id FROM bpa.progress_period WHERE week_ending = ?", UUID.class, java.sql.Date.valueOf(W19));
         approved(period, "WP-000457", "40");
         approved(period, "WP-000461", "60");
+    }
+
+    /**
+     * The instances this test started (the reopen's new instance, and the next week's) are cancelled and waited for: a message start event allows one active instance per
+     * correlation key, so a leftover instance of the week would refuse the next test's reopen ("already being approved"), and all classes share one Camunda.
+     */
+    @AfterEach
+    void cancelStartedInstances() {
+        for (Long key : jdbc.queryForList("SELECT process_instance_key FROM bpa.progress_period WHERE process_instance_key > 1000000000000", Long.class)) {
+            IntegrationApp.admin.post("/v2/process-instances/" + key + "/cancellation", Map.of());
+            poll(() -> IntegrationApp.admin.post("/v2/process-instances/search", Map.of("filter", Map.of("processInstanceKey", Long.toString(key), "state", "ACTIVE"))).body().path("items").size(),
+                    active -> active == 0, "the instance " + key + " cancelled");
+        }
     }
 
     // --- the scenarios ----------------------------------------------------------------------------------------------------
@@ -224,7 +239,7 @@ class WeekReopenApiTest {
     @Test
     void BPA83_reopenedWeekLocksAgainThroughApproval() {
         allowReopen();
-        assertThat(flow.loggedInAs("project-manager").post(REOPEN, toJson(Map.of("reason", REASON))).statusCode()).isEqualTo(200);
+        reopenOk();
         long instance = newInstance();
         assertThat(ppcApprove(awaitTask(instance, COMPLETION), "WP-000457", "50").statusCode()).isEqualTo(204);
 
@@ -264,7 +279,7 @@ class WeekReopenApiTest {
         assertThat(cutOff.statusCode()).as(cutOff.body()).isEqualTo(409);
         assertThat(json(cutOff.body()).path("detail").asText()).isEqualTo("Week ending 19 Nov 2026 is not locked");
         jdbc.update("UPDATE bpa.progress_period SET status = 'Locked', locked_at = now() WHERE id = ?", period);
-        assertThat(flow.loggedInAs("project-manager").post(REOPEN, toJson(Map.of("reason", REASON))).statusCode()).isEqualTo(200);
+        reopenOk();
         HttpResponse<String> again = flow.loggedInAs("project-manager").post(REOPEN, toJson(Map.of("reason", REASON)));
         assertThat(again.statusCode()).as(again.body()).isEqualTo(409);
         assertThat(json(again.body()).path("detail").asText()).isEqualTo("Week ending 19 Nov 2026 is not locked");
@@ -284,7 +299,7 @@ class WeekReopenApiTest {
     @Test
     void theNextWeekWaitsUntilTheReopenedWeekIsLockedAgain() {
         allowReopen();
-        assertThat(flow.loggedInAs("project-manager").post(REOPEN, toJson(Map.of("reason", REASON))).statusCode()).isEqualTo(200);
+        reopenOk();
         jdbc.update("""
                 INSERT INTO bpa.progress_period (week_ending, cut_off_at, status, process_instance_key, created_by, updated_by)
                 VALUES (?, ?, 'CutOff', 9000000026, 'test', 'test')""", java.sql.Date.valueOf(W26), Timestamp.from(Instant.parse("2026-11-26T20:59:00Z")));
@@ -293,7 +308,7 @@ class WeekReopenApiTest {
         jdbc.update("UPDATE bpa.progress_period SET process_instance_key = ? WHERE id = ?", instance, next);
 
         HttpResponse<String> refused = flow.loggedInAs("ppc-team").post("/api/v1/tasks/" + awaitTask(instance, COMPLETION) + "/complete",
-                toJson(Map.of("variables", Map.of("completionApprovals", List.of()))));
+                toJson(Map.of("variables", Map.of("completionApprovals", List.of(Map.of("workpackNumber", "WP-000457", "approvedPct", new BigDecimal("50"), "remark", "Next week"))))));
 
         assertThat(refused.statusCode()).as(refused.body()).isEqualTo(409);
         assertThat(json(refused.body()).path("detail").asText()).isEqualTo("Week ending 19 Nov 2026 must be locked first");
@@ -313,6 +328,11 @@ class WeekReopenApiTest {
     }
 
     // --- helpers ----------------------------------------------------------------------------------------------------------
+
+    private void reopenOk() {
+        HttpResponse<String> response = flow.loggedInAs("project-manager").post(REOPEN, toJson(Map.of("reason", REASON)));
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
+    }
 
     private void allowReopen() {
         overrides.put(SETTING, "true");

@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -147,10 +148,40 @@ public class ProgressPeriodRepository {
             return false;
         }
         Timestamp at = Timestamp.from(clock.instant().truncatedTo(ChronoUnit.MICROS));
+        // BPA-83: a week locked again (after a reopen) has a locked_at already: audit it as the old value
+        Timestamp lockedBefore = jdbc.queryForObject("SELECT locked_at FROM bpa.progress_period WHERE id = ?", Timestamp.class, before.id());
+        String oldLockedAt = lockedBefore == null ? null : lockedBefore.toInstant().toString();
         jdbc.update("UPDATE bpa.progress_period SET status = 'Locked', locked_at = ?, updated_at = ?, updated_by = ? WHERE id = ?", at, at, username, before.id());
         audit(before.id(), "status", before.status(), "Locked", username, at);
-        audit(before.id(), "locked_at", null, at.toInstant().toString(), username, at);
+        audit(before.id(), "locked_at", oldLockedAt, at.toInstant().toString(), username, at);
         return true;
+    }
+
+    /**
+     * BPA-83: the Project Manager reopened a Locked week with a reason: status Locked to Reopened, {@code reopened_by}, {@code reopened_at} (now, from the injected clock) and
+     * {@code reopen_reason}, the process instance the reopen started (the period is found by its instance key) and the earlier week approval cleared (a re-approval is recorded
+     * afresh; the old values stay in {@code audit_log}), one audit row per changed column (D64), exactly one of them carrying the reason. Call it in the transaction that holds
+     * {@link #lockState}. Returns the time written.
+     */
+    public Timestamp reopen(State before, String reason, long newInstanceKey, String username) {
+        Timestamp at = Timestamp.from(clock.instant().truncatedTo(ChronoUnit.MICROS));
+        Map<String, Object> old = jdbc.queryForMap("SELECT process_instance_key, reopened_by, reopened_at, reopen_reason FROM bpa.progress_period WHERE id = ?", before.id());
+        jdbc.update("""
+                UPDATE bpa.progress_period SET status = 'Reopened', reopened_by = ?, reopened_at = ?, reopen_reason = ?, process_instance_key = ?,
+                       week_approved_by = NULL, week_approved_at = NULL, updated_at = ?, updated_by = ? WHERE id = ?""",
+                username, at, reason, newInstanceKey, at, username, before.id());
+        audit(before.id(), "status", before.status(), "Reopened", username, at);
+        audit(before.id(), "reopened_by", (String) old.get("reopened_by"), username, username, at);
+        audit(before.id(), "reopened_at", old.get("reopened_at") == null ? null : ((Timestamp) old.get("reopened_at")).toInstant().toString(), at.toInstant().toString(), username, at);
+        audit(before.id(), "reopen_reason", (String) old.get("reopen_reason"), reason, username, at);
+        audit(before.id(), "process_instance_key", String.valueOf(old.get("process_instance_key")), String.valueOf(newInstanceKey), username, at);
+        if (before.weekApprovedBy() != null) {
+            audit(before.id(), "week_approved_by", before.weekApprovedBy(), null, username, at);
+        }
+        if (before.weekApprovedAt() != null) {
+            audit(before.id(), "week_approved_at", before.weekApprovedAt().toInstant().toString(), null, username, at);
+        }
+        return at;
     }
 
     private void audit(UUID recordId, String column, String oldValue, String newValue, String username, Timestamp at) {

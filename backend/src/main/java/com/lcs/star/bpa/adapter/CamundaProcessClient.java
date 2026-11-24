@@ -78,11 +78,33 @@ public class CamundaProcessClient {
     }
 
     /**
-     * BPA-83 (compile stub for the red run; the real call is written after the red tests are committed): correlates a message start event and returns the key of
-     * the instance it started, or empty when nothing started.
+     * BPA-83: the same call as {@link #correlate}, for a message start event, answering the key of the instance it started (the 200 of {@code POST /v2/messages/correlation}
+     * carries {@code processInstanceKey}, proved by {@code Bpa13CorrelationChecksTest}); empty when nothing started (404: an instance with this correlation key is already
+     * active, or there is no such message start event).
      */
     public java.util.OptionalLong correlateForKey(String messageName, String correlationKey, Map<String, Object> variables) {
-        throw new UnsupportedOperationException("BPA-83: not built yet");
+        try {
+            return rest.post().uri("/v2/messages/correlation")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("name", messageName, "correlationKey", correlationKey, "variables", variables))
+                    .exchange((request, response) -> {
+                        if (response.getStatusCode().is5xxServerError()) {
+                            throw new EngineUnavailableException("Camunda message correlation returned " + response.getStatusCode().value());
+                        }
+                        if (response.getStatusCode().value() == 404) {
+                            return java.util.OptionalLong.empty();
+                        }
+                        if (!response.getStatusCode().is2xxSuccessful()) {
+                            throw new IllegalStateException("Camunda message correlation returned " + response.getStatusCode().value()
+                                    + ": " + new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8));
+                        }
+                        Started started = response.bodyTo(Started.class);
+                        return started == null || started.processInstanceKey() == null || started.processInstanceKey().isBlank() ? java.util.OptionalLong.empty()
+                                : java.util.OptionalLong.of(Long.parseLong(started.processInstanceKey()));
+                    });
+        } catch (ResourceAccessException e) {
+            throw new EngineUnavailableException("Camunda cannot be reached: " + e.getMessage());
+        }
     }
 
     /**
