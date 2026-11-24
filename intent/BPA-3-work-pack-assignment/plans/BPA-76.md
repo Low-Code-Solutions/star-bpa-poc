@@ -1,7 +1,7 @@
 # Plan: BPA-76 PPC Team can assign projects to a user
 Jira: BPA-76 (Story, epic BPA-3)
 Story last updated: 2026-11-24T14:25:25.588+0400
-Status: Approved (Ahsan, 24 Nov 2026)
+Status: Closed (24 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-76-assign-projects-to-user, from main 6f25090
 
@@ -171,9 +171,40 @@ All five paths are **ppc-team only**: two `SecurityConfig` matchers, `"/api/v1/u
 - **Departure 1 (React):** `BPA76_otherPersonasCannotAssignProjects` in React passes before code, because the page and the link do not exist yet for anyone, so there is nothing to hide. The plan said all ten tests would be red; the backend five are, the React five are four red and this one green. It guards against showing the link or calling `/api/v1/users` for another group once the page exists.
 - **Departure 2 (test Background):** the integration database has no seeded persona rows (the S22 sync of `IntegrationApp` writes to the shared Camunda's own database), so the backend tests seed the eleven `app_user` rows with `RevisionFlow.seedAppUsers` and clear `user_project` instead of "leaving the four personas' rows alone and restoring them".
 - **Extra added to the backend table:** `otherPersonasCannotReadOrRemoveEither` (every method of every path is ppc-team only).
+- **Green (8db0b5d):** `UserController`, `UserProjectRepository`, `AppUserRepository`, `ReferenceRepository.projects()` and `projectExists()`, the ppc-team matcher, four GROUP READ grants (`PersonaSyncTest.expectedServicePermissions` edited to match, said in the PR), the page, the route (first use of `ProtectedRoute groups`), the Sidebar link, the data model note.
+- **Full suite:** `./mvnw -B verify` on 8db0b5d: **779 tests, 0 failures**, BUILD SUCCESS. After the review fixes the affected classes were rerun, not the whole backend: `UserProjectApiTest` 12/12, `UserControllerEngineDownTest` 1/1, `PersonaSyncTest` 4/4. Frontend (full): 29 files, **181 tests** pass; `npm run lint`, `format:check` and `build` clean.
+- **Local-stack check (24 Nov, over the API the screen calls, as ppc-team; the screen itself was not clicked by me):** project-engineer had none; PRJ-140 assigned (201, audit rows `username` and `project_ref` as ppc-team); duplicate 400 "PRJ-140 is already assigned to project-engineer"; PRJ-999 400 "Project PRJ-999 does not exist"; unknown user 404 "User not found"; a NUL reference 400; supervisor 403. After `docker compose restart bpa-app` the PPC Team's assignment was still there. Removing timekeeper's only project and restarting made the persona sync seed PRJ-139 again (ADR 0005). The data was restored (the rows equal the starting rows).
+- **No BPMN, DMN, migration or seed change** (`git diff --stat models/` empty).
+- **Departure 3 (Sidebar):** the Sidebar takes `groups` as an optional prop with a default of `[]`, so the existing `Sidebar.test.tsx` test is **not edited**; two tests were added instead (the link for ppc-team, none for another group). The plan said the existing test gains the prop.
+- **Departure 4 (pickers):** the User and Project drop-downs are shown only once their lists have loaded (the first version rendered the User select with only its placeholder, and six tests failed on that race).
+- **Departure 5 (order):** `AppUserRepository.all()` orders `BY username COLLATE "C"`. Postgres put `timekeeper` before `time-method-analyst` under its default collation and the test (and the contract's "by username") expects byte order; the code was changed, not the test.
+- **Departure 6 (commit messages):** the commits 428b0d7 and 8db0b5d said "plan unaffected" or "recorded in the plan" before the plan said so; the hook warned and this section is the record.
+- **Extras in the diff beyond the plan's list:** React `ppcTeamSeesTheSidebarLinkAndThePage`, `noWarningWhenTheUserHasTwoProjects`, `aDoubleClickOnAssignSendsOneRequest`, `theLastProjectNoteDoesNotPromiseAReseed`; the two Sidebar tests; `UserControllerEngineDownTest` (a standalone `MockMvc` with a group client that fails); backend `aBlankOrControlCharacterProjectIsRejectedNotACrash`.
+
+## After the `qa-reviewer` pass (24 Nov 2026; REVIEW.md "BPA-76 at 8db0b5d")
+- **0 High, 2 Important, 6 Nits.**
+- **Important 1, fixed (test only, no code change needed):** the 503 for an unreadable Camunda group had no test. `UserControllerEngineDownTest` builds the controller alone with a failing group client and asserts 503, `application/problem+json` and the contract's text; it passed at once (a guard of existing behaviour).
+- **Important 2, fixed (red first):** the last-project note promised a re-seed that cannot happen for the six users with no `projects:` in `personas.yaml` (project-engineer, the user of every Jira scenario, among them). The note now says "seeds the projects listed for this user in personas.yaml again, if it has any (ADR 0005)"; the data model note says the same.
+- **Nit 1, fixed (red first):** a double click on Assign sent two requests and showed the second one's "already assigned" over the success. One change at a time now (a ref guard and disabled buttons while a call is out).
+- **Nit 2, fixed (red first):** a JSON NUL escape in `projectRef` made Postgres answer 500. My first version of the test sent a raw NUL byte, which Spring rejects as unreadable JSON, so it wrongly looked like a 400 already; with the proper JSON escape it was a 500 (red). The controller now treats a blank reference or one with a control character as an unknown project: 400 "Project <ref> does not exist". No contract `minLength` or pattern was added (no source gives one).
+- **Nit 3, accepted for the POC:** a project removed from `project_job_code` between the existence check and the insert would give a 500 (the seed never deletes).
+- **Nits 4 and 5:** the plan lists are updated here; REVIEW.md and `intent/README.md` are in this commit.
+- **Nit 6, fixed:** the redundant `?? []` removed, a spinner while the projects load, a comment on why `PersonaSync.GROUPS` is public.
+- **For Ahsan and Jira (shown first, posted only on a yes):**
+  1. **Not in Jira:** no Definition of Ready or Done and no API or screen specification (the prototype screens are in Pega, not the repo), so the five paths, the screen and the texts below are ours.
+  2. **Jira's two texts, used verbatim (both 400):** "Project PRJ-999 does not exist" and "PRJ-139 is already assigned to project-engineer".
+  3. **ASSUMPTIONs:** every path is ppc-team only, `GET /api/v1/projects` included; 404 "User not found"; 404 "PRJ-140 is not assigned to project-engineer" when unassigning a project the user does not have; 201 with `{ username, projectRef }` on an assignment; 503 "The process engine is not available right now; try again later" when a group read fails; users listed by username in byte order; the users list shows email and `employeeRef` to ppc-team only (synthetic).
+  4. **Audit:** one `audit_log` row per business column (`username`, `project_ref`) per assignment and per unassignment, as the session user.
+  5. **Last project:** a user may have several projects (decision 11 Nov). Removing the last one is allowed; the next application start seeds the projects `personas.yaml` lists for that user again, if it lists any (ADR 0005). `project-engineer` has none. The screen says so as a note, not a rule.
+  6. **Nothing is scoped by these rows until BPA-77 to BPA-79.** BPA-72 and BPA-73 stay unscoped.
+  7. **Stale text:** the Epic 1 `spec.md` shared-contract row still says "seven personas, no scope (BPA-44)" and names the sync as the only writer; it was left alone (PO-accepted). ADR 0005 and the SOR matrix already record the change.
+  8. **Deploy note:** four GROUP READ grants are added to `bpa-service`; they are applied by the persona sync at the next start.
+  9. **Jira status:** In Progress since 24 Nov 14:25, unchanged; the 11 Nov comment says Faraz would move it to Ready (not recorded in the history I read).
+
 
 ## Human-gap log
 - **DoR:** whether the PO's move to Ready was recorded (the 11 Nov comment says Faraz would do it; the item is In Progress since 24 Nov).
 - **DoD:** "Demoed at sprint review". People.
 - **DoD:** "passing in CI". Actions may not start (billing).
-- **The local check** is a person clicking the portal as ppc-team (assign, restart, unassign the last project, restart, restore).
+- **The local check:** run here over the API the screen calls (see Progress); a person clicking the portal as ppc-team (assign, unassign, the last-project note, a restart, then the blank page for supervisor) has not been recorded by me. Ahsan or Khitaba can do it in a few minutes.
+- **CI:** the full backend suite was run on 8db0b5d (779 of 779); after the review fixes only the affected backend classes were rerun, so CI is the first full run of the final commit.
