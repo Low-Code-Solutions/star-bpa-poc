@@ -21,7 +21,8 @@ function fakeBackend(groups: string[], initial: Record<string, string[]> = {}) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown, type = 'application/json') =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': type } });
-  const problem = (status: number, detail: string) => json(status, { status, title: 'Problem', detail }, 'application/problem+json');
+  const problem = (status: number, detail: string) =>
+    json(status, { status, title: 'Problem', detail }, 'application/problem+json');
   const fetchMock = vi.fn(async (input: Request) => {
     const url = new URL(input.url);
     const path = url.pathname;
@@ -40,7 +41,10 @@ function fakeBackend(groups: string[], initial: Record<string, string[]> = {}) {
       const body = input.method === 'POST' ? await input.clone().json() : null;
       calls.push({ method: input.method, path, body });
       if (input.method === 'GET') {
-        return json(200, (assigned[username] ?? []).map((p) => ({ projectRef: p })));
+        return json(
+          200,
+          (assigned[username] ?? []).map((p) => ({ projectRef: p })),
+        );
       }
       if (input.method === 'POST') {
         const ref = (body as { projectRef: string }).projectRef;
@@ -106,7 +110,10 @@ describe('UsersPage', () => {
 
     await waitFor(() => expect(projectsShown('project-engineer')).toEqual(['PRJ-139', 'PRJ-142']));
     const posts = calls.filter((c) => c.method === 'POST');
-    expect(posts.map((c) => c.path)).toEqual(['/api/v1/users/project-engineer/projects', '/api/v1/users/project-engineer/projects']);
+    expect(posts.map((c) => c.path)).toEqual([
+      '/api/v1/users/project-engineer/projects',
+      '/api/v1/users/project-engineer/projects',
+    ]);
     expect(posts.map((c) => c.body)).toEqual([{ projectRef: 'PRJ-139' }, { projectRef: 'PRJ-142' }]);
   });
 
@@ -118,7 +125,9 @@ describe('UsersPage', () => {
     await user.click(screen.getByRole('button', { name: 'Unassign PRJ-142' }));
 
     await waitFor(() => expect(projectsShown('project-engineer')).toEqual(['PRJ-139']));
-    expect(calls.filter((c) => c.method === 'DELETE').map((c) => c.path)).toEqual(['/api/v1/users/project-engineer/projects/PRJ-142']);
+    expect(calls.filter((c) => c.method === 'DELETE').map((c) => c.path)).toEqual([
+      '/api/v1/users/project-engineer/projects/PRJ-142',
+    ]);
   });
 
   it('BPA76_unknownProjectIsRejected', async () => {

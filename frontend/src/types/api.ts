@@ -43,3 +43,5 @@ export type EarnedManhoursRow = Schemas['EarnedManhoursRow'];
 export type HoursSubmission = Schemas['HoursSubmission'];
 export type HoursSubmissionLine = Schemas['HoursSubmissionLine'];
 export type LineAmendment = Schemas['LineAmendment'];
+export type PortalUser = Schemas['PortalUser'];
+export type Project = Schemas['Project'];

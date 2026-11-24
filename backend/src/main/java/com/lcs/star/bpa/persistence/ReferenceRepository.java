@@ -4,6 +4,7 @@ import com.lcs.star.bpa.api.generated.model.Activity;
 import com.lcs.star.bpa.api.generated.model.Department;
 import com.lcs.star.bpa.api.generated.model.Drawing;
 import com.lcs.star.bpa.api.generated.model.Material;
+import com.lcs.star.bpa.api.generated.model.Project;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.util.List;
@@ -78,6 +79,15 @@ public class ReferenceRepository {
 
     public boolean departmentExists(String departmentRef) {
         return exists("SELECT count(*) FROM bpa.department WHERE department_ref = ?", departmentRef);
+    }
+
+    /** BPA-76: the projects that can be assigned to a user (project_job_code.project_ref; D365 F&O Project Management, seeded copy), by reference. */
+    public List<Project> projects() {
+        return jdbc.query("SELECT project_ref FROM bpa.project_job_code ORDER BY project_ref", (rs, n) -> new Project(rs.getString("project_ref")));
+    }
+
+    public boolean projectExists(String projectRef) {
+        return exists("SELECT count(*) FROM bpa.project_job_code WHERE project_ref = ?", projectRef);
     }
 
     private boolean exists(String sql, String ref) {

@@ -101,6 +101,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/hours-submissions/**").hasAnyAuthority(TIMEKEEPER, PRODUCTION_SUPERVISOR, PPC_TEAM)
                         // BPA-58: only the PPC Team downloads the weekly FMS hours file (agreed 10 Nov 2026 (a))
                         .requestMatchers("/api/v1/fms-hours-exports/**").hasAuthority(PPC_TEAM)
+                        // BPA-76: only the PPC Team lists the portal users and the projects and assigns or removes a user's projects (every method; ASSUMPTION, Jira gives no group rule beyond "PPC Team can assign")
+                        .requestMatchers("/api/v1/users", "/api/v1/users/**", "/api/v1/projects").hasAuthority(PPC_TEAM)
                         // BPA-59: only the PPC Team uploads the weekly completion report and reads its result
                         .requestMatchers("/api/v1/completion-reports/**", "/api/v1/completion-reports").hasAuthority(PPC_TEAM)
                         // BPA-64: the Cost Controller and the Project Manager read the week's CBS actuals (delta section 7); before the BPA-60 rule below
