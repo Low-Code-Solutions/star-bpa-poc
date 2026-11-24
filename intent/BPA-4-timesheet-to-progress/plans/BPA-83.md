@@ -208,3 +208,10 @@ The 409 text for a week that is not Locked; the setting checked before the body;
 ## Human-gap log
 - **DoR:** epic intent.md and spec.md acceptance unticked in Jira (reported).
 - **DoD:** the whole suite runs only in CI. The demo at sprint review. Clicking the portal as project-manager is a person's.
+
+## Progress and departures (25 Nov 2026, red phase)
+- Contract (`reopenProgressPeriod`, `ReopenRequest`, `ProgressPeriodReopened`, status enum + Reopened), `V9__progress_period_reopen.sql` (as approved, the CHECK name `progress_period_status_check` is Postgres's own for V2's unnamed one) and the BPMN (`StartEvent_WeekReopened` → `Gateway_MergeApproval`, `Message_WeekReopened`) are committed with the red tests. `npm run gen:api` parses the contract; `lint:bpmn` is clean.
+- **Departure: no correlation key in the BPMN.** `Message_WeekReopened` has no `zeebe:subscription` (a message start event takes none, as `Message_DrawingRevised`); the endpoint still sends the week ending as the correlation key, which is what makes Zeebe start one instance per week (proved by the probe).
+- **Compile stubs only** (they throw or answer false): `CamundaProcessClient.correlateForKey`, `ProgressSettings.allowReopen`, `ProgressPeriodController.reopenProgressPeriod`.
+- **Red run, targeted:** `WeekReopenApiTest` 9 of 9 fail (the stub answers 500 where the story's answers are expected); `ProgressSettingsTest` 2 of 4 fail (true is not read; the two false cases are guards); React `BPA83_pmReopensLockedWeekWithReason` and `BPA83_reasonIsRequired` fail (no button).
+- **Pass before code (guards, said so):** `FlywayBaselineTest` (V9 exists in this commit); React `BPA83_otherPersonasCannotReopen` (no button exists; the plan said all three red); `Bpa13CorrelationChecksTest.probeCorrelateOfTheWeekReopenedMessage` (it checks Camunda with the new BPMN: 200 with the new instance's key, a second correlate for the same week while it is active answers 404; it deploys the weekly process itself, as that class runs no application).

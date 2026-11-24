@@ -63,6 +63,31 @@ class Bpa13CorrelationChecksTest {
         throw new AssertionError("no replace-worker-assignment job activated for instance " + instance);
     }
 
+    /**
+     * BPA-83 (plan §4): what {@code POST /v2/messages/correlation} answers for the message start event {@code WeekReopened} of Process_PPC_WeeklyProgressPeriod:
+     * 200 with the key of the instance it started (the reopen links the period to it), and a second correlate for the same key, while that instance is active,
+     * starts nothing (404), as the replacement message does. Not a Gherkin scenario. The instance is cancelled at the end.
+     */
+    @Test
+    void probeCorrelateOfTheWeekReopenedMessage() {
+        // no application runs in this class, so nothing has deployed the weekly process: deploy it, as the application does at start-up
+        Reply deployed = IntegrationApp.admin.deploy(new org.springframework.core.io.ClassPathResource("bpmn/Process_PPC_WeeklyProgressPeriod.bpmn"));
+        assertThat(deployed.status()).as("the weekly process deploys: " + deployed.body()).isEqualTo(200);
+        String week = "2099-01-" + (10 + (int) (Math.random() * 18));
+        Map<String, Object> body = Map.of("name", "WeekReopened", "correlationKey", week,
+                "variables", Map.of("progressPeriodId", UUID.randomUUID().toString(), "weekEnding", week));
+
+        Reply first = IntegrationApp.admin.post("/v2/messages/correlation", body);
+        assertThat(first.status()).as("first correlate: " + first.body()).isEqualTo(200);
+        String instance = first.body().path("processInstanceKey").asText();
+        assertThat(instance).as("the answer carries the key of the instance it started").isNotBlank();
+
+        Reply second = IntegrationApp.admin.post("/v2/messages/correlation", body);
+        assertThat(second.status()).as("second correlate while active: " + second.body()).isEqualTo(404);
+
+        IntegrationApp.admin.post("/v2/process-instances/" + instance + "/cancellation", Map.of());
+    }
+
     @Test
     void BPA13_probeCorrelateOfTheReplacementMessage() {
         String key = "BPA13-WP-" + UUID.randomUUID();

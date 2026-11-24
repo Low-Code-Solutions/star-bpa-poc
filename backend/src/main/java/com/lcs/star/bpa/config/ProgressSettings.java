@@ -26,6 +26,11 @@ public class ProgressSettings {
         return "HOURS".equalsIgnoreCase(environment.getProperty(BASIS, "Physical").trim()) ? "Hours" : "Physical";
     }
 
+    /** BPA-83 (compile stub for the red run): whether a Project Manager may reopen a Locked week (C-E3-3). Not read from the environment yet. */
+    public boolean allowReopen() {
+        return false;
+    }
+
     /** The configured progress source, "FMS" or "PMS". */
     public String source() {
         String value = environment.getProperty(SOURCE, "FMS").trim().toUpperCase(Locale.ROOT);

@@ -78,6 +78,14 @@ public class CamundaProcessClient {
     }
 
     /**
+     * BPA-83 (compile stub for the red run; the real call is written after the red tests are committed): correlates a message start event and returns the key of
+     * the instance it started, or empty when nothing started.
+     */
+    public java.util.OptionalLong correlateForKey(String messageName, String correlationKey, Map<String, Object> variables) {
+        throw new UnsupportedOperationException("BPA-83: not built yet");
+    }
+
+    /**
      * Publishes a message with time-to-live 0 and a message id: {@code POST /v2/messages/publication} (BPA-49). Unlike {@link #correlate} it does not
      * say whether anything received it: a message start event that already has an active instance with this correlation key drops it silently, which is
      * what a retried publish needs. Only a 5xx or an unreachable engine is an error.

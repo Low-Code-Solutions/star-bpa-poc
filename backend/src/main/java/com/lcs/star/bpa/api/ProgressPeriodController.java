@@ -5,7 +5,9 @@ import com.lcs.star.bpa.api.generated.model.CbsActualRow;
 import com.lcs.star.bpa.api.generated.model.CbsActualsWeek;
 import com.lcs.star.bpa.api.generated.model.EarnedManhoursRow;
 import com.lcs.star.bpa.api.generated.model.EarnedManhoursWeek;
+import com.lcs.star.bpa.api.generated.model.ProgressPeriodReopened;
 import com.lcs.star.bpa.api.generated.model.ProgressWeek;
+import com.lcs.star.bpa.api.generated.model.ReopenRequest;
 import com.lcs.star.bpa.api.generated.model.UnsentLine;
 import com.lcs.star.bpa.api.generated.model.WorkpackProgressRow;
 import com.lcs.star.bpa.progress.CbsActualsReadService;
@@ -37,6 +39,12 @@ public class ProgressPeriodController implements ProgressPeriodsApi {
         this.cbsActuals = cbsActuals;
         this.earned = earned;
         this.service = service;
+    }
+
+    /** BPA-83 (compile stub for the red run; written after the red tests are committed). */
+    @Override
+    public ResponseEntity<ProgressPeriodReopened> reopenProgressPeriod(LocalDate weekEnding, ReopenRequest reopenRequest) {
+        throw new UnsupportedOperationException("BPA-83: not built yet");
     }
 
     @Override

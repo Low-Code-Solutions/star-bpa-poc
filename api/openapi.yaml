@@ -1629,6 +1629,72 @@ paths:
               schema:
                 $ref: '#/components/schemas/Problem'
               example: { status: 404, title: Not Found, detail: Week not found }
+  /api/v1/progress-periods/{weekEnding}/reopen:
+    parameters:
+      - name: weekEnding
+        in: path
+        required: true
+        description: The week's Thursday, as progress_period.week_ending (YYYY-MM-DD)
+        schema:
+          type: string
+          format: date
+    post:
+      tags: [progress-periods]
+      operationId: reopenProgressPeriod
+      summary: Reopen a Locked week with a reason (Project Manager only)
+      description: |
+        BPA-83 (E2, FRD-21 §21.7, FRD-10 §10.10). Only the group project-manager (403 for every other group). Only when the setting
+        `bpa.progress.allow-reopen` is true (default false; C-E3-3): otherwise 409. Only a Locked week can be reopened. The reason is required (trimmed, not blank).
+        The week becomes Reopened, the reopen is recorded in progress_period (`reopenedBy`, `reopenedAt`, `reopenReason`) and in audit_log, the earlier week approval
+        is cleared, and a new instance of Process_PPC_WeeklyProgressPeriod starts at Approve completion % (message WeekReopened, correlation key the week ending),
+        so the week goes through the normal approval and is Locked again. Order of the checks: the group, the setting, the week (404), the reason (400), the status (409).
+        The certificate behaviour of Epic 3 is not part of this call.
+      x-assumption: true
+      x-assumption-note: the path, the 409 text for a week that is not Locked, the order of the checks and the 200 shape are ASSUMPTIONs of the plan (BPA-83); the other texts are Jira's
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReopenRequest'
+      responses:
+        '200':
+          description: The week is Reopened
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressPeriodReopened'
+        '400':
+          description: No reason (missing, empty or blank); the week stays Locked
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 400, title: Bad Request, detail: Enter a reason to reopen the week }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No progress period for this week ending
+          x-assumption: true
+          x-assumption-note: text not stated by any story (the same as the other progress-period reads)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 404, title: Not Found, detail: Week not found }
+        '409':
+          description: |
+            The setting `bpa.progress.allow-reopen` is false ("Reopening a locked week is not allowed", Jira), or the week is not Locked (a CutOff or an already
+            Reopened week; "Week ending 19 Nov 2026 is not locked", ASSUMPTION).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 409, title: Conflict, detail: Reopening a locked week is not allowed }
+        '503':
+          $ref: '#/components/responses/EngineUnavailable'
   /api/v1/fms-hours-exports/{fmsHoursExportId}/file:
     parameters:
       - name: fmsHoursExportId
@@ -2648,7 +2714,7 @@ components:
           format: date
         periodStatus:
           type: string
-          enum: [CutOff, Locked]
+          enum: [CutOff, Locked, Reopened]
         reportedPct:
           type: number
         approvedPct:
@@ -2885,6 +2951,32 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DigitalTimesheetLine'
+    ReopenRequest:
+      type: object
+      description: BPA-83. The reason is required, but not in `required`, so the service answers the story's problem text and not a validation error.
+      properties:
+        reason:
+          type: string
+          example: FMS report double-counted WP-000457
+    ProgressPeriodReopened:
+      type: object
+      description: BPA-83. The week after the reopen (ASSUMPTION for the shape).
+      required: [weekEnding, status, reopenedBy, reopenedAt, reopenReason]
+      properties:
+        weekEnding:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [Reopened]
+        reopenedBy:
+          type: string
+          example: project-manager
+        reopenedAt:
+          type: string
+          format: date-time
+        reopenReason:
+          type: string
     LineAmendment:
       type: object
       required: [hours]

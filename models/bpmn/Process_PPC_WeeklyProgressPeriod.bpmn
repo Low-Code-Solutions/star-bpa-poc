@@ -14,6 +14,7 @@
         <bpmn:flowNodeRef>UserTask_ApproveCompletion</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_ProjectManager" name="Project Manager">
+        <bpmn:flowNodeRef>StartEvent_WeekReopened</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>UserTask_ApproveRetraction</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>UserTask_ApproveWeeklyProgress</bpmn:flowNodeRef>
       </bpmn:lane>
@@ -55,6 +56,11 @@
       <bpmn:timerEventDefinition id="TimerEventDefinition_WeeklyCutOff">
         <bpmn:timeCycle xsi:type="bpmn:tFormalExpression">0 59 20 * * THU</bpmn:timeCycle>
       </bpmn:timerEventDefinition>
+    </bpmn:startEvent>
+    <bpmn:startEvent id="StartEvent_WeekReopened" name="Week reopened">
+      <bpmn:documentation>BPA-83 (FRD-21 §21.7, FRD-10 §10.10). Message WeekReopened, correlated by POST /api/v1/progress-periods/{weekEnding}/reopen (project-manager only, only when bpa.progress.allow-reopen is true; default false) after it checks the week is Locked and a reason is given. Starts a new instance of the week at Gateway_MergeApproval with progressPeriodId and weekEnding; the endpoint makes the new instance the period's process_instance_key and sets the status to Reopened. The week then goes through Approve completion % to the week approval and is Locked again. Never started while the setting is false (ASSUMPTION: the message start event, plan BPA-83 Q1, decided 25 Nov 2026).</bpmn:documentation>
+      <bpmn:outgoing>Flow_WeekReopened</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_WeekReopened" messageRef="Message_WeekReopened" />
     </bpmn:startEvent>
     <bpmn:serviceTask id="ServiceTask_OpenProgressPeriod" name="Open progress period">
       <bpmn:documentation>E2-16. Creates progress_period (week_ending = cut-off date, status CutOff); from now on hours dated on or before week_ending cannot be added or changed. Outputs progressPeriodId, weekEnding. Re-run key: process instance key.</bpmn:documentation>
@@ -118,6 +124,7 @@
       <bpmn:incoming>Flow_ProgressBlocked</bpmn:incoming>
       <bpmn:incoming>Flow_RetractionDeclined</bpmn:incoming>
       <bpmn:incoming>Flow_WeekChangesRequested</bpmn:incoming>
+      <bpmn:incoming>Flow_WeekReopened</bpmn:incoming>
       <bpmn:outgoing>Flow_ToApproveCompletion</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:userTask id="UserTask_ApproveCompletion" name="Approve completion %">
@@ -321,7 +328,7 @@
       <bpmn:outgoing>Flow_WeekCostReviewRequested</bpmn:outgoing>
     </bpmn:exclusiveGateway>
     <bpmn:serviceTask id="ServiceTask_LockProgressPeriod" name="Lock progress period">
-      <bpmn:documentation>E2-16, E2-19. After the Project Manager approves the week. progress_period status Locked; approved % and Earned MH of the week can no longer change (FRD-21 §21.9.1; reopening is out of scope).</bpmn:documentation>
+      <bpmn:documentation>E2-16, E2-19. After the Project Manager approves the week. progress_period status Locked; approved % and Earned MH of the week can no longer change (FRD-21 §21.9.1). BPA-83: with bpa.progress.allow-reopen true the Project Manager may reopen a Locked week (StartEvent_WeekReopened); the week goes through the approval again and this step locks it a second time.</bpmn:documentation>
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="lock-progress-period" retries="3" />
       </bpmn:extensionElements>
@@ -350,6 +357,7 @@
     <bpmn:sequenceFlow id="Flow_ToUploadReport" sourceRef="Gateway_MergeReport" targetRef="UserTask_UploadCompletionReport" />
     <bpmn:sequenceFlow id="Flow_ToReadReport" sourceRef="UserTask_UploadCompletionReport" targetRef="ServiceTask_ReadCompletionReport" />
     <bpmn:sequenceFlow id="Flow_ToMergeApproval" sourceRef="ServiceTask_ReadCompletionReport" targetRef="Gateway_MergeApproval" />
+    <bpmn:sequenceFlow id="Flow_WeekReopened" sourceRef="StartEvent_WeekReopened" targetRef="Gateway_MergeApproval" />
     <bpmn:sequenceFlow id="Flow_ToApproveCompletion" sourceRef="Gateway_MergeApproval" targetRef="UserTask_ApproveCompletion" />
     <bpmn:sequenceFlow id="Flow_ToRecordApproval" sourceRef="UserTask_ApproveCompletion" targetRef="ServiceTask_RecordCompletionApproval" />
     <bpmn:sequenceFlow id="Flow_ToMergeProgressCheck" sourceRef="ServiceTask_RecordCompletionApproval" targetRef="Gateway_MergeProgressCheck" />
@@ -391,6 +399,7 @@
     <bpmn:sequenceFlow id="Flow_ToPeriodLocked" sourceRef="ServiceTask_LockProgressPeriod" targetRef="EndEvent_PeriodLocked" />
     <bpmn:sequenceFlow id="Flow_ReportInvalid" sourceRef="BoundaryEvent_ReportInvalid" targetRef="Gateway_MergeReport" />
   </bpmn:process>
+  <bpmn:message id="Message_WeekReopened" name="WeekReopened" />
   <bpmn:error id="Error_ReportInvalid" name="Completion report invalid" errorCode="REPORT_INVALID" />
   <bpmndi:BPMNDiagram id="BPMNDiagram_Process_PPC_WeeklyProgressPeriod">
     <bpmndi:BPMNPlane id="BPMNPlane_Process_PPC_WeeklyProgressPeriod" bpmnElement="Collaboration_WeeklyProgressPeriod">
@@ -408,6 +417,12 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_System_di" bpmnElement="Lane_System" isHorizontal="true">
         <dc:Bounds x="190" y="660" width="4990" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_WeekReopened_di" bpmnElement="StartEvent_WeekReopened">
+        <dc:Bounds x="1300" y="300" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1268" y="341" width="100" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="StartEvent_WeeklyCutOff_di" bpmnElement="StartEvent_WeeklyCutOff">
         <dc:Bounds x="292" y="742" width="36" height="36" />
@@ -574,6 +589,11 @@
         <di:waypoint x="1285" y="160" />
         <di:waypoint x="1285" y="760" />
         <di:waypoint x="1310" y="760" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_WeekReopened_di" bpmnElement="Flow_WeekReopened">
+        <di:waypoint x="1318" y="300" />
+        <di:waypoint x="1318" y="160" />
+        <di:waypoint x="1485" y="160" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_ToMergeApproval_di" bpmnElement="Flow_ToMergeApproval">
         <di:waypoint x="1410" y="760" />
