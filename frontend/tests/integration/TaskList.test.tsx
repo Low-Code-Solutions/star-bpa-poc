@@ -156,7 +156,7 @@ describe('TaskList', () => {
       { phase: 'Cutting', manhours: 150 },
       { phase: 'Welding', manhours: 50 },
     ]);
-  });
+  }, 15_000); // a long flow (start, fill, reject, reopen, correct); BPA-78 added the Project picker and one more request, so under the full suite's load it passes the default 5 s
 
   // BPA-78: the Start Work Pack request offers only the user's projects (GET /api/v1/me/projects) and the start carries the project picked. The two BPA78_ names
   // are the two Gherkin scenarios, as in WorkPackProjectScopeApiTest (Jira gives no names, so they follow docs/04).
