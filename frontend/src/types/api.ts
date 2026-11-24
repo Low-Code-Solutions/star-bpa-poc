@@ -45,3 +45,4 @@ export type HoursSubmissionLine = Schemas['HoursSubmissionLine'];
 export type LineAmendment = Schemas['LineAmendment'];
 export type PortalUser = Schemas['PortalUser'];
 export type Project = Schemas['Project'];
+export type ProjectMasterData = Schemas['ProjectMasterData'];

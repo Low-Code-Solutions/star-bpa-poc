@@ -23,9 +23,9 @@ public class UserProjectRepository {
         this.jdbc = jdbc;
     }
 
-    /** COMPILE STUB (BPA-77, red tests first): true when a row (username, projectRef) exists. */
+    /** True when the user has a row for the project (BPA-77: the shared project-scope check reads this). */
     public boolean exists(String username, String projectRef) {
-        throw new UnsupportedOperationException("BPA-77 stub");
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM bpa.user_project WHERE username = ? AND project_ref = ?)", Boolean.class, username, projectRef));
     }
 
     /** The project references of the user, by reference (ASSUMPTION: no source orders them). */

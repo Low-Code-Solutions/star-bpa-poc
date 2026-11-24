@@ -381,8 +381,11 @@ Required by BPA-6 (option list; background "department Fabrication"), the `workp
 | `id` | `uuid` | NOT NULL | PK | — | |
 | `drawing_ref` | `text` | NOT NULL | UNIQUE | D365 F&O Document Control | BPA-6, BPA-16; C15; 09 S20 |
 | `title` | `text` | NOT NULL **(A)** | | D365 F&O Document Control | **(A)** |
+| `project_ref` | `text` | NULL **(A)** | FK → `project_job_code(project_ref)` (V8, BPA-77) | D365 F&O Project Management | BPA-77 **(A)** |
 
 Required by BPA-16: `POST /api/v1/drawing-revisions` returns **404 `Drawing not found`** for an unknown drawing, which only works if drawings exist independently of their revisions (G6).
+
+**As built by BPA-77 (V8).** `drawing.project_ref` is **nullable** and says which project a drawing belongs to; nothing in the sources gives the link, so it and the seeded mapping are **ASSUMPTION**: DWG-118, 119, 121 and 130 belong to PRJ-139, DWG-140 and 141 to PRJ-140, DWG-150 and 151 to no project (a drawing with no project is in no project's tabs). `material_reservation` (§3.9) and `cutting_sheet` (§3.10) have no project of their own and reach one through their `drawing_ref`; an activity and its CBS (`cbs_activity`, §3.4) reach one through `activity.wbs_ref → wbs.project_ref`. These joins feed `GET /api/v1/projects/{projectRef}/master-data` (ProjectMasterDataRepository): Activities, Cost structure, Drawings (with the latest revision, the one most recently registered, D42), Reserved materials and Cutting sheets, each tab naming its system of record from `docs/03-sor-matrix.md`. `material` (the master) and `department` have no project and are not tabs. A user reads a project only with a `user_project` row (`ProjectScope`, BPA-77; reused by BPA-78 and BPA-79).
 
 ### 3.8 `drawing_revision`
 

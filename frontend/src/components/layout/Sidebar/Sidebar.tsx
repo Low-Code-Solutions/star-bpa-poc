@@ -3,7 +3,8 @@ import { NavLink } from 'react-router';
 const PPC_TEAM = 'ppc-team';
 
 /**
- * The portal's navigation (BPA-72): Home, and under it the Work Packs list, for every logged-in group. BPA-76 adds "Users and projects" for the PPC Team only.
+ * The portal's navigation (BPA-72): Home, and under it the Work Packs list, for every logged-in group. BPA-77 adds "Projects and master data", also for every group
+ * (the backend limits it to the user's own projects). BPA-76 adds "Users and projects" for the PPC Team only.
  * The groups come in as a prop from MainLayout (the portal's group gating is prop-based, and a bare <Sidebar /> has no AuthProvider); this only hides the link,
  * the backend's 403 is the real check (ADR 0004).
  */
@@ -18,6 +19,9 @@ export function Sidebar({ groups = [] }: { groups?: string[] }) {
           <ul>
             <li>
               <NavLink to="/workpacks">Work Packs</NavLink>
+            </li>
+            <li>
+              <NavLink to="/projects">Projects and master data</NavLink>
             </li>
             {groups.includes(PPC_TEAM) ? (
               <li>

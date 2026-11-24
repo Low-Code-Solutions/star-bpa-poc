@@ -101,6 +101,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/hours-submissions/**").hasAnyAuthority(TIMEKEEPER, PRODUCTION_SUPERVISOR, PPC_TEAM)
                         // BPA-58: only the PPC Team downloads the weekly FMS hours file (agreed 10 Nov 2026 (a))
                         .requestMatchers("/api/v1/fms-hours-exports/**").hasAuthority(PPC_TEAM)
+                        // BPA-77: any logged-in group reads its own projects and the master data of one of them (the scope rule is ProjectScope, 403 for a project that is not the user's). Listed before the PPC Team's
+                        // /api/v1/projects matcher below so that a later widening of that one to /** cannot lock the users out.
+                        .requestMatchers("/api/v1/me/projects", "/api/v1/projects/*/master-data").authenticated()
                         // BPA-76: only the PPC Team lists the portal users and the projects and assigns or removes a user's projects (every method; ASSUMPTION, Jira gives no group rule beyond "PPC Team can assign")
                         .requestMatchers("/api/v1/users", "/api/v1/users/**", "/api/v1/projects").hasAuthority(PPC_TEAM)
                         // BPA-59: only the PPC Team uploads the weekly completion report and reads its result
