@@ -145,6 +145,14 @@ function fakeBackend(
         total: 1,
       });
     }
+    if (path.startsWith('/api/v1/workpacks/WP-000500')) {
+      // BPA-79: a Work Pack of PRJ-142, which the user does not have (the detail and the other two reads answer the same)
+      return json(
+        403,
+        { status: 403, title: 'Forbidden', detail: 'Project PRJ-142 is not assigned to you' },
+        'application/problem+json',
+      );
+    }
     if (path.startsWith('/api/v1/workpacks/')) {
       return json(404, { status: 404, title: 'Not Found', detail: 'Work Pack not found' }, 'application/problem+json');
     }
@@ -348,5 +356,17 @@ describe('WorkPackDetailPage', () => {
     const main = within(screen.getByRole('main'));
     await waitFor(() => expect(main.getByRole('tabpanel')).toBeInTheDocument());
     expect(main.queryAllByRole('button', { name: /create|edit|new|delete|save|release|approve week/i })).toHaveLength(0);
+  });
+
+  // BPA-79: opening another project's Work Pack by its link: the backend answers 403, the page shows its text and nothing else, so the history and the open tasks
+  // are never asked for.
+  it('BPA79_directLinkToOtherProjectIsRefused', async () => {
+    const { fetchMock } = await openDetail('WP-000500', ['workpack-owner']);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Project PRJ-142 is not assigned to you');
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    const paths = fetchMock.mock.calls.map(([r]) => new URL((r as Request).url).pathname);
+    expect(paths).not.toContain('/api/v1/workpacks/WP-000500/history');
+    expect(paths).not.toContain('/api/v1/workpacks/WP-000500/open-tasks');
   });
 });

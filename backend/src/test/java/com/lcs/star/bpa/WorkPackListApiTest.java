@@ -79,6 +79,7 @@ class WorkPackListApiTest {
         schedule("WP-000457", "2026-11-03", "2026-11-06");
         schedule("WP-000461", "2026-11-10", "2026-11-12");
         schedule("WP-000480", "2026-11-16", "2026-11-18");
+        AssignmentFlow.assignPersonasTheSeededProjects(jdbc); // BPA-79: the list shows a user only its projects' Work Packs
         flow = new AssignmentFlow(port, jdbc);
     }
 

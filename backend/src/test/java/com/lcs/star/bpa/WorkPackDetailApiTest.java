@@ -108,6 +108,7 @@ class WorkPackDetailApiTest {
         ids = fixture.reset();
         flow = new AssignmentFlow(port, jdbc);
         new RevisionFlow(port, jdbc).seedAppUsers();
+        AssignmentFlow.assignPersonasTheSeededProjects(jdbc); // BPA-79: the detail is open only to a user with the Work Pack's project
         wp457 = ids.workpackId();
         jdbc.update("UPDATE bpa.workpack SET status = 'In Progress' WHERE id = ?", wp457);
         jdbc.update("UPDATE bpa.workpack_phase SET manhours = 150 WHERE workpack_id = ? AND phase = 'Cutting'", wp457);

@@ -131,6 +131,12 @@ Decision 11 Nov 2026 (Khitaba for the PO, comment 10522): BPA-76 to BPA-79 appro
 - **Q2:** the task inbox, `/print` and `/look-ahead` are out; a new story is proposed.
 - **403 text:** BPA-77's "Project PRJ-142 is not assigned to you".
 
+## Progress and departures (25 Nov 2026)
+- **Contract first:** a shared response `WorkPackProjectNotAssigned` (403, BPA-77's text) is on `getWorkPack`, `getWorkPackHistory` and `listWorkPackOpenTasks`; the list and detail descriptions say "since BPA-79" and the `?project=` narrowing (an unassigned project gives an empty list, ASSUMPTION). `npm run gen:api` parses it. (My first scripted edit of the contract matched `getWorkPackHistory` and `getWorkPackPrint` as well, inserted the 403 before every line and corrupted the file; I restored it from git before anything was committed and redid it with exact `awk` anchors, `git diff --stat`: 23 insertions, 6 deletions.)
+- **No compile stubs were needed:** the new tests are HTTP-only, so no new class or method is referenced.
+- **Existing tests edited (they pass before code, by design):** `AssignmentFlow` gains `assignPersonasTheSeededProjects(jdbc)` (every persona's `app_user` row and PRJ-139 and PRJ-140 in the class's own database); `WorkPackListApiTest` and `WorkPackDetailApiTest` call it in their setup; `PersonaSyncTest` expects 19 rows; the React `WorkPacksPage.test.tsx` fake backend can limit the list to a user's projects and `WorkPackDetailPage.test.tsx` answers a 403 for WP-000500.
+- **Red first:** `WorkPackReadScopeApiTest` 7 of 9 fail (the PRJ-142 Work Pack is listed and opens: 200 where a 403 is expected; the supervisor, ppc-team and `?project=PRJ-142` lists are not empty); `PersonaSyncTest` 2 fail (7 rows, not 19); React `BPA79_directLinkToOtherProjectIsRefused` fails (the page says "The Work Pack could not be loaded", not the backend's text). Green before code, by design (guards): `anUnknownNumberIsStillNotFound`, `myProjectsWorkPackOpensWithItsTabs`, and the React `BPA79_listFilteredByProject` (the Project filter already follows the rows the backend returns; `WorkPackReadScopeApiTest.BPA79_listFilteredByProject` is the real test of the limit). `WorkPackListApiTest` 14 and `WorkPackDetailApiTest` 20 pass with the new fixtures.
+
 ## Human-gap log
 - **DoR:** none open (the status is Ready).
 - **DoD:** "passing in CI": the whole suite runs only in CI for this story; Actions may not start (billing).

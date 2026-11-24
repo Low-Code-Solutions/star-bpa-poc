@@ -79,6 +79,23 @@ public final class AssignmentFlow {
                 projectRef);
     }
 
+    /**
+     * BPA-79: a user reads only the Work Packs of the projects it has a user_project row for, so a test class that reads the list or the detail as some persona needs
+     * that persona's rows in its own database (the persona sync of IntegrationApp writes to the shared Camunda's database, not to this one). Every persona gets
+     * PRJ-139 and PRJ-140, as personas.yaml gives the ones that have both; the Work Packs of the fixtures are on PRJ-139 activities. Idempotent.
+     */
+    public static void assignPersonasTheSeededProjects(JdbcTemplate jdbc) {
+        for (PersonaFile.Persona persona : PersonaFile.load(new ClassPathResource("personas.yaml")).users()) {
+            jdbc.update("""
+                    INSERT INTO bpa.app_user (username, employee_ref, email, created_by, updated_by)
+                    VALUES (?, ?, ?, 'test', 'test') ON CONFLICT (username) DO NOTHING""", persona.username(), persona.employeeRef(), persona.email());
+            for (String project : List.of("PRJ-139", "PRJ-140")) {
+                jdbc.update("INSERT INTO bpa.user_project (username, project_ref, created_by, updated_by) VALUES (?, ?, 'test', 'test') ON CONFLICT (username, project_ref) DO NOTHING",
+                        persona.username(), project);
+            }
+        }
+    }
+
     /** Starts a Work Pack request for {@link #PROJECT} as the analyst (BPA-78: the start carries the project, and the analyst has it assigned). */
     public static HttpResponse<String> startWorkPack(TestBrowser analyst, JdbcTemplate jdbc) {
         assignAnalystProject(jdbc, PROJECT);

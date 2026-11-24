@@ -52,7 +52,25 @@ const ROWS = [
   },
 ];
 
-function fakeBackend(groups: string[]) {
+// BPA-79: a Work Pack of a project the user does not have. The real backend limits the list to the user's projects (WorkPackReadScopeApiTest); this fake does the
+// same when a test gives the user's projects, and lists only ROWS (all PRJ-139) when it does not, as every test above.
+const OTHER_ROW = {
+  workpackNumber: 'WP-000500',
+  activityRef: 'A-4201',
+  drawingRef: 'DWG-118',
+  departmentRef: 'Fabrication',
+  projectRef: 'PRJ-142',
+  status: 'Released',
+  assignmentState: 'Assigned',
+  plannedStartDate: '2026-11-16',
+  plannedEndDate: '2026-11-18',
+  approvedPct: null,
+  approvedWeekEnding: null,
+  earnedManhours: null,
+};
+const rowsFor = (projects?: string[]) => (projects ? [...ROWS, OTHER_ROW].filter((r) => projects.includes(r.projectRef)) : ROWS);
+
+function fakeBackend(groups: string[], projects?: string[]) {
   const listCalls: URLSearchParams[] = [];
   const json = (status: number, body: unknown, type = 'application/json') =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': type } });
@@ -68,7 +86,7 @@ function fakeBackend(groups: string[]) {
       const search = (url.searchParams.get('search') ?? '').toLowerCase();
       return json(
         200,
-        ROWS.filter(
+        rowsFor(projects).filter(
           (r) =>
             (statuses.length === 0 || statuses.includes(r.status)) &&
             (!project || r.projectRef === project) &&
@@ -90,8 +108,8 @@ function fakeBackend(groups: string[]) {
   return { fetchMock, listCalls };
 }
 
-async function openList(groups: string[] = ['ppc-team']) {
-  const backend = fakeBackend(groups);
+async function openList(groups: string[] = ['ppc-team'], projects?: string[]) {
+  const backend = fakeBackend(groups, projects);
   vi.stubGlobal('fetch', backend.fetchMock);
   window.history.pushState({}, '', '/workpacks');
   const user = userEvent.setup();
@@ -189,5 +207,21 @@ describe('WorkPacksPage', () => {
     expect(main.queryAllByRole('button', { name: /create|edit|new|delete|start/i })).toHaveLength(0);
     expect(main.queryAllByRole('link', { name: /create|edit|new|delete|start/i })).toHaveLength(0);
     expect(within(table).queryAllByRole('button')).toHaveLength(0);
+  });
+
+  // BPA-79: the backend limits the list to the user's projects, so the table shows only those Work Packs and the Project filter (built from the rows) offers only those
+  // projects. Passes before BPA-79's code: the filter already follows the rows (a guard, said so); WorkPackReadScopeApiTest is the real test of the limit.
+  it('BPA79_listFilteredByProject', async () => {
+    await openList(['workpack-owner'], ['PRJ-139']);
+
+    await screen.findByRole('table', { name: 'Work Packs' });
+    await waitFor(() => expect(numbersShown()).toEqual(['WP-000480', 'WP-000461', 'WP-000457']));
+    expect(numbersShown()).not.toContain('WP-000500');
+    const filter = screen.getByLabelText('Project');
+    expect(
+      within(filter)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['All', 'PRJ-139']);
   });
 });
