@@ -669,7 +669,7 @@ paths:
       operationId: listWorkPackOpenTasks
       summary: The open user tasks on a Work Pack, from every group (read only; no task data)
       description: |
-        The "Open tasks" side panel of the Work Pack detail (BPA-73 scenario 7). Every open user task on this Work Pack, **whatever its group**, with its name, its Since BPA-79 only for a Work Pack of one of the user's projects: 403 otherwise, and 404 for a number that does not exist.
+        The "Open tasks" side panel of the Work Pack detail (BPA-73 scenario 7). Every open user task on this Work Pack, **whatever its group**, with its name, its
         element, the groups it is for and when it was created, and `canOpen`: true when one of the user's groups is one of the task's. No task variables or data
         are returned. A task opens only through `GET /api/v1/tasks/{taskKey}`, which still answers 403 to a user outside its groups; `canOpen` only tells the
         screen whether to offer it. The tasks are those of the Work Pack's Epic 1 instance, of its timesheet process instance and (ASSUMPTION) of the weekly
@@ -677,6 +677,7 @@ paths:
         `READ_USER_TASK` on these processes (BPA-73 proves it). It is a separate read because it calls the process engine: 503 when the engine is not
         reachable, and the page still shows.
         Built by BPA-73; ASSUMPTION (no FRD names it).
+        Since BPA-79 only for a Work Pack of one of the user's projects: 403 otherwise, and 404 for a number that does not exist.
       x-assumption: true
       x-assumption-note: the cross-group task list, its scope (including the weekly process) and canOpen are not stated by an FRD (BPA-73)
       responses:

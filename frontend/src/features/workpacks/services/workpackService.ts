@@ -104,7 +104,11 @@ export async function getWorkPack(api: Api, workpackNumber: string): Promise<Wor
       return { notFound: true };
     }
     if (response.status === 403) {
-      return { forbidden: (error as { detail?: string } | undefined)?.detail ?? 'You cannot open this Work Pack' };
+      return {
+        forbidden:
+          (error as { detail?: string } | undefined)?.detail ??
+          'You cannot open this Work Pack' /* ASSUMPTION: UI text, shown only when the 403 has no detail */,
+      };
     }
     return data ? { detail: data } : null;
   } catch {

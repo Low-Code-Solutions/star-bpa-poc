@@ -1,7 +1,7 @@
 # Plan: BPA-79 Portal user can see only Work Packs of their assigned projects
 Jira: BPA-79 (Story, epic BPA-3)
 Story last updated: 2026-11-24T01:10:02.373+0400
-Status: Approved (Ahsan, 25 Nov 2026)
+Status: Closed (25 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-79-workpacks-by-project, from main 847bbac (the merge of PR #69, BPA-78; it includes BPA-77, d203f37)
 
@@ -146,3 +146,10 @@ Decision 11 Nov 2026 (Khitaba for the PO, comment 10522): BPA-76 to BPA-79 appro
 ## Green (25 Nov 2026)
 - Built as planned: `Filter.projects` (null = not scoped, used only by the detail's own one-number lookup after the check; empty = no rows, no query; `b.project_ref = ANY (?)`), `Header.projectRef` (activity to WBS join), `readable()` for the three BPA-73 reads, the six personas' projects, the React 403 (`{ forbidden }`, alert text only), the data-model note.
 - Targeted proof only (Ahsan's rule): backend `WorkPackReadScopeApiTest` 9, `PersonaSyncTest` 4, `WorkPackListApiTest` 14, `WorkPackDetailApiTest` 20, `ProjectScopeTest` 7 = 54, 0 failures; frontend `WorkPacksPage` and `WorkPackDetailPage` 20 of 20; `tsc`, lint, format check clean. The whole suites run only in CI.
+
+## Review and departures (25 Nov 2026)
+- qa-reviewer at 99f84b8 (REVIEW.md "BPA-79 at 99f84b8"): 0 High, 2 Important (fixed: the spliced sentence in the open-tasks description of `api/openapi.yaml`; this file table), 4 Nits (fixed or recorded).
+- **Files that changed, as built, differ from the table above:** not changed: `workpacks.types.ts` (`WorkPackResult` lives in `workpackService.ts`). Added: `workpack/WorkPackDetailService.java` (its one-number lookup passes `projects = null`, "not scoped", after the controller's check), `AssignmentFlow.java` (test helper), `WorkPackList.tsx` (comment only), `REVIEW.md`, `intent/README.md`.
+- Departure: the persona ASSUMPTION is one comment above the users in `personas.yaml`, not one per persona.
+- Follow-up story to propose (unscoped reads that show other projects' work): the task inbox `GET /api/v1/tasks`, `/print`, `/look-ahead`, `GET /api/v1/progress-periods/{weekEnding}/workpacks` and the hours-submissions reads.
+- Human gaps: whole backend and frontend suites run only in CI (Ahsan's rule); local portal check as cost-controller; sprint-review demo.
