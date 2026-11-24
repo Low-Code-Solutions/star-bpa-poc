@@ -15,6 +15,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lcs.star.bpa.api.TestBrowser;
+import com.lcs.star.bpa.config.PersonaFile;
 import java.net.http.HttpResponse;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -23,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -58,6 +60,31 @@ public final class AssignmentFlow {
         }
     }
 
+    /** BPA-78: the project the tests start Work Packs for; every Work Pack of the seed and the fixtures is on a PRJ-139 activity (A-2201, A-2299, A-2301). */
+    public static final String PROJECT = "PRJ-139";
+
+    /**
+     * BPA-78: time-method-analyst may start a Work Pack only for a project assigned to it, so a test class's own database needs the analyst's app_user row (the
+     * persona sync of IntegrationApp writes to the shared Camunda's database, not to this one) and a user_project row. Idempotent: a reset in between does no harm.
+     */
+    public static void assignAnalystProject(JdbcTemplate jdbc, String projectRef) {
+        for (PersonaFile.Persona persona : PersonaFile.load(new ClassPathResource("personas.yaml")).users()) {
+            if ("time-method-analyst".equals(persona.username())) {
+                jdbc.update("""
+                        INSERT INTO bpa.app_user (username, employee_ref, email, created_by, updated_by)
+                        VALUES (?, ?, ?, 'test', 'test') ON CONFLICT (username) DO NOTHING""", persona.username(), persona.employeeRef(), persona.email());
+            }
+        }
+        jdbc.update("INSERT INTO bpa.user_project (username, project_ref, created_by, updated_by) VALUES ('time-method-analyst', ?, 'test', 'test') ON CONFLICT (username, project_ref) DO NOTHING",
+                projectRef);
+    }
+
+    /** Starts a Work Pack request for {@link #PROJECT} as the analyst (BPA-78: the start carries the project, and the analyst has it assigned). */
+    public static HttpResponse<String> startWorkPack(TestBrowser analyst, JdbcTemplate jdbc) {
+        assignAnalystProject(jdbc, PROJECT);
+        return analyst.post("/api/v1/workpacks", "{\"projectRef\":\"" + PROJECT + "\"}");
+    }
+
     // --- Work Packs in the state a scenario needs ---------------------------------------------------------------------------
 
     public Work draft() {
@@ -67,7 +94,7 @@ public final class AssignmentFlow {
     /** A Work Pack for this activity (A-2201 has a CBS code; A-2299 has none, BPA-15), at the Confirm task. */
     public Work draft(String activityRef) {
         TestBrowser analyst = loggedInAs("time-method-analyst");
-        HttpResponse<String> started = analyst.post("/api/v1/workpacks", "");
+        HttpResponse<String> started = startWorkPack(analyst, jdbc);
         assertThat(started.statusCode()).as("POST /api/v1/workpacks: " + started.body()).isEqualTo(201);
         long instance = Long.parseLong(json(started.body()).path("processInstanceKey").asText());
         String create = awaitOpenTask(instance, CREATE).path("userTaskKey").asText();

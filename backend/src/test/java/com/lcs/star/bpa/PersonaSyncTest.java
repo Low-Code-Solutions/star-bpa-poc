@@ -86,9 +86,9 @@ class PersonaSyncTest {
         assertThat(jdbc.queryForList("SELECT table_name FROM information_schema.tables WHERE table_schema = 'bpa' AND table_name LIKE '%scope%'",
                 String.class)).as("no scope table").isEmpty();
         // BPA-48 (ASSUMPTION, plan Q6): project access for the project-scoped personas, written by the sync from personas.yaml
-        assertThat(jdbc.queryForList("SELECT username || ' ' || project_ref FROM bpa.user_project ORDER BY username, project_ref", String.class))
-                .containsExactly("cost-controller PRJ-140", "production-supervisor PRJ-139", "project-manager PRJ-139", "project-manager PRJ-140",
-                        "timekeeper PRJ-139");
+        assertThat(jdbc.queryForList("SELECT username || ' ' || project_ref FROM bpa.user_project", String.class))
+                .containsExactlyInAnyOrder("cost-controller PRJ-140", "production-supervisor PRJ-139", "project-manager PRJ-139", "project-manager PRJ-140",
+                        "timekeeper PRJ-139", "time-method-analyst PRJ-139", "time-method-analyst PRJ-140"); // BPA-78 (ASSUMPTION): the analyst has both seeded projects, like project-manager
     }
 
     @Test
@@ -102,7 +102,7 @@ class PersonaSyncTest {
         sync().sync();
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.app_user", Integer.class)).isEqualTo(11);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.user_project", Integer.class)).as("project rows are upserted, not doubled").isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.user_project", Integer.class)).as("project rows are upserted, not doubled").isEqualTo(7); // 5 + the analyst's two (BPA-78)
         assertThat(admin.authorizations("bpa-service")).hasSize(authorizationsBefore);
         assertThat(permissionsOf("bpa-service")).isEqualTo(permissionsBefore);
     }

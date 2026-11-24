@@ -433,7 +433,7 @@ class PrintApiTest {
     /** Create, confirm unchanged, release check Ready, the Project Engineer approves: the process waits at Schedule Work Pack. */
     private Work atSchedule(String drawing, List<Map<String, Object>> phases, List<Map<String, Object>> materials) {
         TestBrowser analyst = loggedInAs("time-method-analyst");
-        HttpResponse<String> started = analyst.post("/api/v1/workpacks", "");
+        HttpResponse<String> started = AssignmentFlow.startWorkPack(analyst, jdbc);
         assertThat(started.statusCode()).as("POST /api/v1/workpacks: " + started.body()).isEqualTo(201);
         long instance = Long.parseLong(json(started.body()).path("processInstanceKey").asText());
         String create = awaitOpenTask(instance, CREATE).path("userTaskKey").asText();

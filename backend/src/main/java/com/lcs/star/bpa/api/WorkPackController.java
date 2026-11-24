@@ -8,6 +8,7 @@ import com.lcs.star.bpa.persistence.WorkPackListRepository;
 import com.lcs.star.bpa.task.WorkPackOpenTaskService;
 import com.lcs.star.bpa.workpack.WorkPackDetailService;
 import com.lcs.star.bpa.workpack.WorkPackListMapper;
+import com.lcs.star.bpa.api.generated.model.StartWorkPackRequest;
 import com.lcs.star.bpa.api.generated.model.StartWorkPackResponse;
 import com.lcs.star.bpa.api.generated.model.OpenTask;
 import com.lcs.star.bpa.api.generated.model.WorkPackDetail;
@@ -140,7 +141,7 @@ public class WorkPackController implements WorkpacksApi {
     }
 
     @Override
-    public ResponseEntity<StartWorkPackResponse> startWorkPack() {
+    public ResponseEntity<StartWorkPackResponse> startWorkPack(StartWorkPackRequest startWorkPackRequest) {
         try {
             return ResponseEntity.status(HttpStatus.CREATED).body(new StartWorkPackResponse(camunda.start(PROCESS)));
         } catch (EngineUnavailableException e) {

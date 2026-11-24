@@ -14,7 +14,7 @@ type Call = { method: string; path: string; body: unknown };
 
 // businessDate: what GET /api/v1/business-date answers (BPA-82); by default the Riyadh date of the faked browser clock, as a backend
 // without a QA date would; 'fail' makes the call answer 500.
-function fakeBackend(businessDate: string = todayInRiyadh()) {
+function fakeBackend(businessDate: string = todayInRiyadh(), taskVariables: Record<string, unknown> = {}) {
   const calls: Call[] = [];
   const json = (status: number, body: unknown) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -36,7 +36,7 @@ function fakeBackend(businessDate: string = todayInRiyadh()) {
           elementId: 'UserTask_CreateWorkPack',
           processInstanceKey: '2251799813685501',
           creationDate: '2026-10-21T06:00:00Z',
-          variables: {},
+          variables: taskVariables,
           validationMessages: [],
         });
       case '/api/v1/business-date':
@@ -64,6 +64,13 @@ function fakeBackend(businessDate: string = todayInRiyadh()) {
             projectRef: 'PRJ-139',
             jobCodeRef: 'JC-139',
           },
+          {
+            activityRef: 'A-2206',
+            activityName: 'Synthetic piping module M-03',
+            wbsRef: '14001',
+            projectRef: 'PRJ-140',
+            jobCodeRef: 'JC-140',
+          },
         ]);
       case '/api/v1/drawings':
         return json(200, [{ drawingRef: 'DWG-118', title: 'Synthetic drawing 118' }]);
@@ -86,8 +93,8 @@ function fakeBackend(businessDate: string = todayInRiyadh()) {
 
 type User = ReturnType<typeof userEvent.setup>;
 
-async function renderScreen(businessDate?: string) {
-  const backend = fakeBackend(businessDate);
+async function renderScreen(businessDate?: string, taskVariables?: Record<string, unknown>) {
+  const backend = fakeBackend(businessDate, taskVariables);
   vi.stubGlobal('fetch', backend.fetchMock);
   const onDone = vi.fn();
   const user = userEvent.setup();
@@ -343,4 +350,27 @@ describe('CreateWorkPack', () => {
       vi.unstubAllGlobals();
     }
   }, 20_000); // five full form fills, one per Examples row
+
+  // BPA-78: the start carried the project (a read-only task variable, not on the write allow-list); the Activity list offers only that project's activities, and
+  // shows the project. A task with no projectRef (started before BPA-78) shows every activity, as every test above.
+  it('theActivityListShowsOnlyTheTasksProject', async () => {
+    await renderScreen(undefined, { projectRef: 'PRJ-139' });
+
+    const select = screen.getByLabelText('Project activity');
+    await waitFor(() => expect(within(select).queryByRole('option', { name: /A-2206/ })).not.toBeInTheDocument());
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['', 'A-2201 Synthetic piping module M-01', 'A-2299 Synthetic activity without plan data']);
+    expect(screen.getByText('Project: PRJ-139')).toBeInTheDocument();
+  });
+
+  it('aTaskWithNoProjectShowsEveryActivity', async () => {
+    await renderScreen();
+
+    const select = screen.getByLabelText('Project activity');
+    expect(within(select).getByRole('option', { name: /A-2206/ })).toBeInTheDocument();
+    expect(screen.queryByText(/^Project: /)).not.toBeInTheDocument();
+  });
 });

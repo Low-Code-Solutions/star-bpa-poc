@@ -30,6 +30,11 @@ public final class WorkPackValidator {
         boolean material(String materialRef);
 
         boolean department(String departmentRef);
+
+        /** COMPILE STUB (BPA-78, red tests first): the project an activity belongs to (activity to WBS to project); null when unknown. */
+        default String activityProject(String activityRef) {
+            return null;
+        }
     }
 
     private WorkPackValidator() {

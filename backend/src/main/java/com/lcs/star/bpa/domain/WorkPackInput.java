@@ -9,7 +9,12 @@ import java.util.List;
  * allow-list and docs/data-model.md §4.1-4.3). Any field may be missing: the validator reports what is.
  */
 public record WorkPackInput(String activityRef, String drawingRef, String departmentRef, LocalDate completionDate,
-        List<Phase> phases, List<Material> materials) {
+        List<Phase> phases, List<Material> materials, String projectRef) {
+
+    /** Without a project: the Confirm task, and an instance started before BPA-78 (no projectRef variable). */
+    public WorkPackInput(String activityRef, String drawingRef, String departmentRef, LocalDate completionDate, List<Phase> phases, List<Material> materials) {
+        this(activityRef, drawingRef, departmentRef, completionDate, phases, materials, null);
+    }
 
     public record Phase(String phase, BigDecimal manhours) {
     }

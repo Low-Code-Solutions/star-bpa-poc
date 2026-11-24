@@ -22,6 +22,11 @@ public class CamundaProcessClient {
                 .build();
     }
 
+    /** COMPILE STUB (BPA-78, red tests first): the new instance's key, the process started with these variables. */
+    public String start(String processDefinitionId, Map<String, Object> variables) {
+        throw new UnsupportedOperationException("BPA-78 stub");
+    }
+
     /** The new instance's key; the process starts with no variables (BPA-46 Q1: the request carries no Work Pack data). */
     public String start(String processDefinitionId) {
         try {
