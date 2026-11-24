@@ -165,6 +165,13 @@ All five paths are **ppc-team only**: two `SecurityConfig` matchers, `"/api/v1/u
 - **Q3 (the POST answer):** 201 with `{ username, projectRef }`.
 - **Q4, Q5:** the Jira comment is shown first and posted only on a yes; I ask before any Jira transition.
 
+## Progress and departures (24 Nov 2026)
+- **Contract first (428b0d7):** the five operations, the `users` tag, the parameters `Username` and `ProjectRef`, the response `UserNotFound` and the schemas `PortalUser`, `Project`, `NewUserProject`, `UserProject` are in `api/openapi.yaml`; `npm run gen:api` parses it.
+- **Red first (428b0d7):** `UserProjectApiTest` 11 of 11 fail (the new paths answer 404 "No static resource" where 201, 200, 400 or 403 is expected); `UsersPage.test.tsx` 7 of 8 fail (no "User" field, no Sidebar link).
+- **Departure 1 (React):** `BPA76_otherPersonasCannotAssignProjects` in React passes before code, because the page and the link do not exist yet for anyone, so there is nothing to hide. The plan said all ten tests would be red; the backend five are, the React five are four red and this one green. It guards against showing the link or calling `/api/v1/users` for another group once the page exists.
+- **Departure 2 (test Background):** the integration database has no seeded persona rows (the S22 sync of `IntegrationApp` writes to the shared Camunda's own database), so the backend tests seed the eleven `app_user` rows with `RevisionFlow.seedAppUsers` and clear `user_project` instead of "leaving the four personas' rows alone and restoring them".
+- **Extra added to the backend table:** `otherPersonasCannotReadOrRemoveEither` (every method of every path is ppc-team only).
+
 ## Human-gap log
 - **DoR:** whether the PO's move to Ready was recorded (the 11 Nov comment says Faraz would do it; the item is In Progress since 24 Nov).
 - **DoD:** "Demoed at sprint review". People.
