@@ -19,6 +19,8 @@ export function useWorkPackForm(api: Api) {
   const [completionDate, setCompletionDate] = useState('');
   const [phases, setPhases] = useState<PhaseRow[]>([]);
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
+  // BPA-78: the project the request was started for. Read-only: the Create task's read list has it, its write list does not, so variables() never sends it.
+  const [projectRef, setProjectRef] = useState('');
 
   const form: CreateWorkPackForm = { activityRef, drawingRef, departmentRef, completionDate, phases, materials };
 
@@ -30,6 +32,7 @@ export function useWorkPackForm(api: Api) {
     setDrawingRef(text(v.drawingRef));
     setDepartmentRef(text(v.departmentRef));
     setCompletionDate(text(v.completionDate));
+    setProjectRef(text(v.projectRef));
     if (Array.isArray(v.phases)) {
       setPhases(
         v.phases.map((p: { phase?: unknown; manhours?: unknown }) => ({
@@ -61,6 +64,7 @@ export function useWorkPackForm(api: Api) {
   }
 
   return {
+    projectRef,
     form,
     setActivityRef,
     setDrawingRef,

@@ -180,12 +180,25 @@ paths:
     post:
       tags: [workpacks]
       operationId: startWorkPack
-      summary: Start a Work Pack request (process start from the portal)
+      summary: Start a Work Pack request for one of the user's projects (process start from the portal)
       description: |
         Starts `Process_PPC_WorkPackAssignment` at `StartEvent_WorkPackRequested` (09 S2, S20; D52). Only group
-        `time-method-analyst` may call it (BPA-6 "Other roles cannot create a Work Pack"). The call carries no Work Pack
-        data: the Analyst enters it in the Create Work Pack task that follows (`UserTask_CreateWorkPack`, BPA-6), through
-        the task API. Built by BPA-6.
+        `time-method-analyst` may call it (BPA-6 "Other roles cannot create a Work Pack"). Since BPA-78 the call carries the project the Work Pack is for:
+        `ProjectScope` (BPA-77) refuses a project the session user has no `user_project` row for, and a project that does not exist (the same answer), with 403
+        **before** Camunda is called, so no process instance starts (Jira: "the response is 403 and no process instance of Process_PPC_WorkPackAssignment starts").
+        The order is: the group (403), the body (400 "Project is required", ASSUMPTION), the project (403 "Project PRJ-142 is not assigned to you", ASSUMPTION for the
+        text), then the start. The instance carries `projectRef` as a process variable; the Work Pack data is still entered in the Create Work Pack task that follows
+        (`UserTask_CreateWorkPack`, BPA-6), through the task API, where the Activity must belong to that project (the save step refuses another: "Project activity
+        A-2206 is not in project PRJ-139", ASSUMPTION). A Work Pack has no project column of its own: its project is its activity's (activity to WBS to project).
+        Built by BPA-6; the project by BPA-78.
+      x-assumption: true
+      x-assumption-note: the body, the 400 text and the 403 text for a project are ASSUMPTIONs of the plan (Jira BPA-78 gives the 403 and "no instance starts")
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartWorkPackRequest'
       responses:
         '201':
           description: Work Pack request started
@@ -195,10 +208,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StartWorkPackResponse'
+        '400':
+          description: No project, or a blank one
+          x-assumption: true
+          x-assumption-note: text not stated by any story
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example: { status: 400, title: Bad Request, detail: Project is required }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: '#/components/responses/Forbidden'
+          description: |
+            The user's group does not allow the call (BPA-6), or the project is not assigned to the user, or does not exist (BPA-78; the same answer, so it does
+            not say whether a project exists). Either way no process instance starts.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                group:
+                  value: { status: 403, title: Forbidden, detail: Your groups do not allow this call, or the CSRF token is missing }
+                project:
+                  value: { status: 403, title: Forbidden, detail: Project PRJ-142 is not assigned to you }
         '503':
           $ref: '#/components/responses/EngineUnavailable'
     get:
@@ -2184,6 +2217,15 @@ components:
           type: string
           description: The business zone (app.business-zone)
           example: Asia/Riyadh
+    StartWorkPackRequest:
+      type: object
+      description: The project a Work Pack request is for (BPA-78); one of the session user's projects (GET /api/v1/me/projects)
+      required: [projectRef]
+      properties:
+        projectRef:
+          type: string
+          description: project_job_code.project_ref (D365 F&O Project Management), for example PRJ-139
+          example: PRJ-139
     StartWorkPackResponse:
       type: object
       description: The started process instance (x-assumption; BPA-6 does not state the response)

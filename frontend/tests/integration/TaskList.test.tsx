@@ -23,7 +23,11 @@ const ENTERED = {
   materials: [{ materialRef: 'MAT-PIPE-06', phase: 'Cutting' }],
 };
 
-function fakeBackend() {
+// options.projects: what GET /api/v1/me/projects lists (BPA-77); options.refuse: projects the start answers 403 for (BPA-78: assignment removed after the list was read)
+function fakeBackend(options: { projects?: string[]; refuse?: string[] } = {}) {
+  const projects = options.projects ?? ['PRJ-139'];
+  const refuse = options.refuse ?? [];
+  const started: Array<{ projectRef?: string }> = [];
   let open: string[] = [];
   const completed: Array<{ key: string; variables: Record<string, unknown> }> = [];
   const json = (status: number, body: unknown) =>
@@ -37,7 +41,22 @@ function fakeBackend() {
   });
   const fetchMock = vi.fn(async (input: Request) => {
     const path = new URL(input.url).pathname;
+    if (path === '/api/v1/me/projects') {
+      return json(
+        200,
+        projects.map((projectRef) => ({ projectRef })),
+      );
+    }
     if (path === '/api/v1/workpacks' && input.method === 'POST') {
+      const text = await input.clone().text();
+      const body = (text ? JSON.parse(text) : {}) as { projectRef?: string };
+      started.push(body);
+      if (body.projectRef && refuse.includes(body.projectRef)) {
+        return new Response(
+          JSON.stringify({ status: 403, title: 'Forbidden', detail: `Project ${body.projectRef} is not assigned to you` }),
+          { status: 403, headers: { 'Content-Type': 'application/problem+json' } },
+        );
+      }
       open = [FIRST];
       return json(201, { processInstanceKey: INSTANCE });
     }
@@ -79,7 +98,7 @@ function fakeBackend() {
         return json(404, {});
     }
   });
-  return { fetchMock, completed };
+  return { fetchMock, completed, started };
 }
 
 describe('TaskList', () => {
@@ -137,5 +156,61 @@ describe('TaskList', () => {
       { phase: 'Cutting', manhours: 150 },
       { phase: 'Welding', manhours: 50 },
     ]);
+  }, 15_000); // a long flow (start, fill, reject, reopen, correct); BPA-78 added the Project picker and one more request, so under the full suite's load it passes the default 5 s
+
+  // BPA-78: the Start Work Pack request offers only the user's projects (GET /api/v1/me/projects) and the start carries the project picked. The two BPA78_ names
+  // are the two Gherkin scenarios, as in WorkPackProjectScopeApiTest (Jira gives no names, so they follow docs/04).
+  it('BPA78_pickerListsOnlyAssignedProjects', async () => {
+    const { fetchMock, started } = fakeBackend({ projects: ['PRJ-139'] });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(<TaskList api={apiClient()} groups={['time-method-analyst']} />);
+
+    const picker = await screen.findByLabelText('Project');
+    expect(
+      within(picker)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['PRJ-139']);
+    expect(within(picker).queryByRole('option', { name: 'PRJ-142' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Start Work Pack request' }));
+
+    await screen.findByRole('option', { name: /Fabrication/ });
+    expect(started).toEqual([{ projectRef: 'PRJ-139' }]);
+  });
+
+  it('BPA78_apiRejectsUnassignedProject', async () => {
+    // the list was read while PRJ-142 was still assigned; the backend now refuses it with 403 and starts nothing
+    const { fetchMock, started } = fakeBackend({ projects: ['PRJ-139', 'PRJ-142'], refuse: ['PRJ-142'] });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(<TaskList api={apiClient()} groups={['time-method-analyst']} />);
+
+    await user.selectOptions(await screen.findByLabelText('Project'), 'PRJ-142');
+    await user.click(screen.getByRole('button', { name: 'Start Work Pack request' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Project PRJ-142 is not assigned to you');
+    expect(started).toEqual([{ projectRef: 'PRJ-142' }]);
+    expect(screen.queryByLabelText('Project activity')).not.toBeInTheDocument(); // no Create Work Pack screen opened
+  });
+
+  it('noProjectMeansNoStart', async () => {
+    const { fetchMock, started } = fakeBackend({ projects: [] });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<TaskList api={apiClient()} groups={['time-method-analyst']} />);
+
+    expect(await screen.findByText('No projects assigned. Ask the PPC Team.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start Work Pack request' })).not.toBeInTheDocument();
+    expect(started).toEqual([]);
+  });
+
+  it('otherGroupsSeeNoStartAndNoProjectCall', async () => {
+    const { fetchMock } = fakeBackend();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<TaskList api={apiClient()} groups={['supervisor']} />);
+
+    expect(await screen.findByText('No open tasks')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start Work Pack request' })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.map(([r]) => new URL((r as Request).url).pathname)).not.toContain('/api/v1/me/projects');
   });
 });

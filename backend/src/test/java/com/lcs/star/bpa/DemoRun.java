@@ -129,7 +129,7 @@ final class DemoRun {
      */
     Run epic1() {
         TestBrowser analyst = flow.loggedInAs("time-method-analyst");
-        HttpResponse<String> started = analyst.post("/api/v1/workpacks", "");
+        HttpResponse<String> started = AssignmentFlow.startWorkPack(analyst, jdbc);
         assertThat(started.statusCode()).as("POST /api/v1/workpacks: " + started.body()).isEqualTo(201);
         long instance = Long.parseLong(json(started.body()).path("processInstanceKey").asText());
         String create = awaitOpenTask(instance, CREATE).path("userTaskKey").asText();

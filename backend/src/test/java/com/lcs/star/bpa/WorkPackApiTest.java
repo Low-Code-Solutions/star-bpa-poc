@@ -280,7 +280,7 @@ class WorkPackApiTest {
     void BPA6_otherRolesCannotCreateWorkPack() {
         // An open Create Work Pack task exists, so "lists no Create Work Pack task for me" is about the group, not an empty list.
         TestBrowser analyst = analyst();
-        HttpResponse<String> started = analyst.post("/api/v1/workpacks", "");
+        HttpResponse<String> started = AssignmentFlow.startWorkPack(analyst, jdbc);
         assertThat(started.statusCode()).isEqualTo(201);
         String instance = json(started.body()).path("processInstanceKey").asText();
         String openTask = createTask(analyst, instance, null);
@@ -295,13 +295,26 @@ class WorkPackApiTest {
                 .noneMatch(t -> openTask.equals(t.path("key").asText()));
     }
 
+    /**
+     * BPA-78 (plan, save backstop; ASSUMPTION for the text): the instance carries the project its start was for (PRJ-139, AssignmentFlow.startWorkPack); an Activity of
+     * another project (A-2206 is on PRJ-140's WBS 14001) is refused at save, the Create task comes back with the message, and no Work Pack is written.
+     */
+    @Test
+    void theSaveRefusesAnActivityOfAnotherProject() {
+        Outcome outcome = submit(analyst(), with(validWorkPack(), "activityRef", "A-2206"));
+
+        assertThat(outcome.saved()).as(outcome.toString()).isFalse();
+        assertThat(outcome.validationMessages()).contains("Project activity A-2206 is not in project PRJ-139");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.workpack WHERE activity_ref = 'A-2206'", Integer.class)).as("no Work Pack written").isZero();
+    }
+
     // --- decisions and data-model rules without a scenario of their own (BPA-6 review) -----------------------------------
 
     /** D63: completedBy is set by the task API from the session; a client that sends it is refused. */
     @Test
     void completedByCannotBeSentByTheClient() {
         TestBrowser analyst = analyst();
-        HttpResponse<String> started = analyst.post("/api/v1/workpacks", "");
+        HttpResponse<String> started = AssignmentFlow.startWorkPack(analyst, jdbc);
         String task = createTask(analyst, json(started.body()).path("processInstanceKey").asText(), null);
 
         HttpResponse<String> response = analyst.post("/api/v1/tasks/" + task + "/complete",
@@ -309,6 +322,20 @@ class WorkPackApiTest {
 
         assertThat(response.statusCode()).isEqualTo(400);
         assertThat(json(response.body()).path("detail").asText()).isEqualTo("Variable completedBy is not allowed for this task");
+    }
+
+    /** BPA-78 (QA review): projectRef is on the Create task's read list only, so a client cannot write or change the project after the start. */
+    @Test
+    void theProjectCannotBeWrittenByTheCreateTask() {
+        TestBrowser analyst = analyst();
+        HttpResponse<String> started = AssignmentFlow.startWorkPack(analyst, jdbc);
+        String task = createTask(analyst, json(started.body()).path("processInstanceKey").asText(), null);
+
+        HttpResponse<String> response = analyst.post("/api/v1/tasks/" + task + "/complete",
+                toJson(Map.of("variables", with(validWorkPack(), "projectRef", "PRJ-140"))));
+
+        assertThat(response.statusCode()).isEqualTo(400);
+        assertThat(json(response.body()).path("detail").asText()).isEqualTo("Variable projectRef is not allowed for this task");
     }
 
     /** D64, data model §6.1: one audit row per business column, old value null, canonical value, the user and the clock. */
@@ -353,7 +380,7 @@ class WorkPackApiTest {
 
     /** Starts a Work Pack request, completes its Create Work Pack task with these variables and waits for the save step. */
     private Outcome submit(TestBrowser analyst, Map<String, Object> variables) {
-        HttpResponse<String> started = analyst.post("/api/v1/workpacks", "");
+        HttpResponse<String> started = AssignmentFlow.startWorkPack(analyst, jdbc);
         assertThat(started.statusCode()).as("POST /api/v1/workpacks: " + started.body()).isEqualTo(201);
         String instance = json(started.body()).path("processInstanceKey").asText();
         String task = createTask(analyst, instance, null);

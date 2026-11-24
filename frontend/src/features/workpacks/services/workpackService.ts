@@ -10,11 +10,11 @@ import type {
 } from '@/types/api';
 import type { StartResult } from '../workpacks.types';
 
-/** POST /api/v1/workpacks (BPA-6, D52, S20): starts a Work Pack request; no body (BPA-46 Q1). */
-export async function startWorkPack(api: Api): Promise<StartResult> {
-  const { data, response } = await api.POST('/api/v1/workpacks');
+/** POST /api/v1/workpacks (BPA-6, D52, S20; BPA-78): starts a Work Pack request for one of the user's projects; a refusal answers its status and detail. */
+export async function startWorkPack(api: Api, projectRef: string): Promise<StartResult> {
+  const { data, error, response } = await api.POST('/api/v1/workpacks', { body: { projectRef } });
   if (!response.ok || !data) {
-    return { status: response.status };
+    return { status: response.status, detail: (error as { detail?: string } | undefined)?.detail };
   }
   return data;
 }

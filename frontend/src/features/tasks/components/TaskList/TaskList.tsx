@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Button } from '@/components/common/Button';
 import { appConfig } from '@/config/app.config';
+import { StartWorkPack } from '@/features/workpacks/components/StartWorkPack';
 import { useStartWorkPack } from '@/features/workpacks/hooks/useStartWorkPack';
 import type { Api } from '@/services/apiClient';
 import { USER_TASKS } from '@/utils/constants';
@@ -42,10 +43,10 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
 
   const refresh = async () => (await refetch()).data ?? [];
 
-  async function startRequest() {
-    const started = await start();
+  async function startRequest(projectRef: string) {
+    const started = await start(projectRef);
     if (!('processInstanceKey' in started)) {
-      setNotice(`The Work Pack request could not be started (${started.status})`);
+      setNotice(started.detail ?? `The Work Pack request could not be started (${started.status})`); // BPA-78: a refusal shows the backend's text
       return;
     }
     // The new Create Work Pack task reaches the task search a moment later (BPA-25: eventually consistent).
@@ -111,7 +112,7 @@ export function TaskList({ api, groups }: { api: Api; groups: string[] }) {
   return (
     <section aria-label="My tasks" className="tasks">
       <h2>My tasks</h2>
-      {groups.includes('time-method-analyst') && <Button onClick={startRequest}>Start Work Pack request</Button>}
+      {groups.includes('time-method-analyst') && <StartWorkPack api={api} onStart={startRequest} />}
       {notice && <p role="status">{notice}</p>}
       {tasks.length === 0 ? (
         <p>No open tasks</p>

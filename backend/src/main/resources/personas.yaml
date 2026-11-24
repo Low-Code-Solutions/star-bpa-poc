@@ -13,6 +13,7 @@ users:
     employeeRef: E9001
     email: time-method-analyst@example.com
     groups: [time-method-analyst]
+    projects: [PRJ-139, PRJ-140] # BPA-78 (ASSUMPTION, no source gives it): the analyst starts Work Packs only for its projects, so it has both seeded ones, like project-manager
   - username: project-engineer
     name: Synthetic Project Engineer
     employeeRef: E9002

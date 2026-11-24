@@ -26,9 +26,11 @@ export function WorkPackFields({ api, state }: { api: Api; state: WorkPackFormSt
   const drawings = useDrawings(api);
   const materialList = useMaterials(api);
   const departments = useDepartments(api);
-  const { form, setActivityRef, setDrawingRef, setDepartmentRef, setCompletionDate, setPhases, setMaterials } = state;
+  const { form, projectRef, setActivityRef, setDrawingRef, setDepartmentRef, setCompletionDate, setPhases, setMaterials } = state;
 
   const activity = activities.find((a) => a.activityRef === form.activityRef);
+  // BPA-78: a request started for a project takes only that project's activities; one started before BPA-78 (no projectRef) shows them all.
+  const offered = projectRef ? activities.filter((a) => a.projectRef === projectRef) : activities;
   // D16: a material's phase is one of this Work Pack's phases.
   const enteredPhases = PHASES.filter((p) => form.phases.some((row) => row.phase === p));
 
@@ -39,8 +41,9 @@ export function WorkPackFields({ api, state }: { api: Api; state: WorkPackFormSt
 
   return (
     <>
+      {projectRef ? <p>Project: {projectRef}</p> : null}
       <Field label="Project activity">
-        <ActivitySelect activities={activities} value={form.activityRef} onChange={setActivityRef} />
+        <ActivitySelect activities={offered} value={form.activityRef} onChange={setActivityRef} />
       </Field>
 
       <section aria-label="Activity context" className="context-panel">

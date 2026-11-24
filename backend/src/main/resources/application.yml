@@ -123,7 +123,7 @@ bpa:
         read: [weekEnding]
       "[UserTask_CreateWorkPack]": # time-method-analyst (G9), BPA-6
         write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
-        read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
+        read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials, projectRef] # BPA-78: projectRef is read only (the start sets it), never written by the screen
       "[UserTask_ConfirmWorkPack]": # time-method-analyst (G9), BPA-8, BPA-23; a material line's id sits inside materials
         write: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]
         read: [activityRef, drawingRef, departmentRef, completionDate, phases, materials]

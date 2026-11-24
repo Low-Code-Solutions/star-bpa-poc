@@ -293,7 +293,7 @@ class HourJournalHeaderApiTest {
     /** Starts a request and completes Create Work Pack as the Analyst; waits for the save step's Work Pack. */
     private Saved createWorkPack(List<Map<String, Object>> phases, List<Map<String, Object>> materials) {
         TestBrowser analyst = loggedInAs("time-method-analyst");
-        HttpResponse<String> started = analyst.post("/api/v1/workpacks", "");
+        HttpResponse<String> started = AssignmentFlow.startWorkPack(analyst, jdbc);
         assertThat(started.statusCode()).as("POST /api/v1/workpacks: " + started.body()).isEqualTo(201);
         String instance = json(started.body()).path("processInstanceKey").asText();
         String task = awaitOpenTask(Long.parseLong(instance), CREATE).path("userTaskKey").asText();

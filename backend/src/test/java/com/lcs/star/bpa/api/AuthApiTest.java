@@ -8,18 +8,22 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.lcs.star.bpa.adapter.CamundaIdentityClient;
+import com.lcs.star.bpa.AssignmentFlow;
 import com.lcs.star.bpa.adapter.CamundaProcessClient;
 import com.lcs.star.bpa.adapter.CamundaIdentityClient.CamundaUser;
 import java.net.http.HttpResponse;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -45,6 +49,9 @@ class AuthApiTest {
     /** BPA-6: the process start is Camunda's side too; this class tests the gate in front of it. */
     @MockitoBean
     CamundaProcessClient processes;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     TestBrowser browser;
 
@@ -156,10 +163,12 @@ class AuthApiTest {
      */
     @Test
     void BPA43_startWorkPackIsAllowedForTimeMethodAnalyst() {
-        when(processes.start("Process_PPC_WorkPackAssignment")).thenReturn("2251799813685501");
+        // BPA-78: the start carries the project, ProjectScope (real, over this class's database) checks it, and the instance gets it as a variable
+        AssignmentFlow.assignAnalystProject(jdbc, "PRJ-139");
+        when(processes.start("Process_PPC_WorkPackAssignment", Map.of("projectRef", "PRJ-139"))).thenReturn("2251799813685501");
         browser.login("time-method-analyst", "right");
 
-        HttpResponse<String> response = browser.post("/api/v1/workpacks", "{}");
+        HttpResponse<String> response = browser.post("/api/v1/workpacks", "{\"projectRef\":\"PRJ-139\"}");
 
         assertThat(response.statusCode()).isEqualTo(201);
         assertThat(response.body()).contains("2251799813685501");
