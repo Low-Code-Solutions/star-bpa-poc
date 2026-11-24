@@ -31,6 +31,7 @@ public class PersonaSync implements SmartInitializingSingleton {
     static final String SERVICE_USER = "bpa-service";
 
     /** The eleven S6 groups: the seven of Epic 1, and the four of Epic 2 (E2-D1, BPA-48). */
+    /** Public for UserController (BPA-76), which reads the members of each group for the users list; an immutable list. */
     public static final List<String> GROUPS = List.of("time-method-analyst", "project-engineer", "production-planner", "workpack-owner",
             "ppc-team", "supervisor", "production-team", "timekeeper", "production-supervisor", "cost-controller", "project-manager");
 

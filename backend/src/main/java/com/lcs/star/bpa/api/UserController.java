@@ -84,7 +84,8 @@ public class UserController implements UsersApi {
     public ResponseEntity<UserProject> assignProject(String username, NewUserProject newUserProject) {
         requireUser(username);
         String projectRef = newUserProject.getProjectRef();
-        if (!references.projectExists(projectRef)) {
+        // A blank reference, or one with a control character (a JSON NUL would reach Postgres as an invalid byte sequence and answer 500), cannot be a project.
+        if (!isPlausibleRef(projectRef) || !references.projectExists(projectRef)) {
             throw refused(HttpStatus.BAD_REQUEST, "Project " + projectRef + " does not exist");
         }
         if (!userProjects.assign(username, projectRef, sessionUser(), clock.instant().truncatedTo(ChronoUnit.MICROS))) {
@@ -114,6 +115,10 @@ public class UserController implements UsersApi {
         if (!users.exists(username)) {
             throw refused(HttpStatus.NOT_FOUND, "User not found");
         }
+    }
+
+    private static boolean isPlausibleRef(String projectRef) {
+        return projectRef != null && !projectRef.isBlank() && projectRef.chars().noneMatch(Character::isISOControl);
     }
 
     private static ErrorResponseException refused(HttpStatus status, String detail) {

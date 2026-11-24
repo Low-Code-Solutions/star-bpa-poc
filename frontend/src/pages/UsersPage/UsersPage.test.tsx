@@ -16,7 +16,7 @@ const PROJECTS = ['PRJ-139', 'PRJ-140', 'PRJ-142', 'PRJ-999'].map((projectRef) =
 
 type Call = { method: string; path: string; body: unknown };
 
-function fakeBackend(groups: string[], initial: Record<string, string[]> = {}) {
+function fakeBackend(groups: string[], initial: Record<string, string[]> = {}, postDelayMs = 0) {
   const assigned: Record<string, string[]> = { 'project-engineer': [], timekeeper: ['PRJ-139'], ...initial };
   const calls: Call[] = [];
   const json = (status: number, body: unknown, type = 'application/json') =>
@@ -47,6 +47,9 @@ function fakeBackend(groups: string[], initial: Record<string, string[]> = {}) {
         );
       }
       if (input.method === 'POST') {
+        if (postDelayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, postDelayMs)); // a slow backend: the PPC Team can click again before the answer
+        }
         const ref = (body as { projectRef: string }).projectRef;
         if (ref === 'PRJ-999') {
           return problem(400, 'Project PRJ-999 does not exist');
@@ -67,8 +70,8 @@ function fakeBackend(groups: string[], initial: Record<string, string[]> = {}) {
   return { fetchMock, calls, assigned };
 }
 
-async function openUsers(groups: string[] = ['ppc-team'], initial: Record<string, string[]> = {}) {
-  const backend = fakeBackend(groups, initial);
+async function openUsers(groups: string[] = ['ppc-team'], initial: Record<string, string[]> = {}, postDelayMs = 0) {
+  const backend = fakeBackend(groups, initial, postDelayMs);
   vi.stubGlobal('fetch', backend.fetchMock);
   window.history.pushState({}, '', '/users');
   const user = userEvent.setup();
@@ -191,5 +194,29 @@ describe('UsersPage', () => {
 
     await waitFor(() => expect(projectsShown('project-engineer')).toEqual(['PRJ-139', 'PRJ-142']));
     expect(screen.queryByText(/last project/i)).not.toBeInTheDocument();
+  });
+
+  // QA review: a double click on Assign must send one request; the second one would be refused as a duplicate and hide the success behind an error.
+  it('aDoubleClickOnAssignSendsOneRequest', async () => {
+    const { user, calls } = await openUsers(['ppc-team'], {}, 50);
+
+    await pickUser(user, 'project-engineer');
+    await user.selectOptions(await screen.findByLabelText('Project'), 'PRJ-139');
+    await user.dblClick(screen.getByRole('button', { name: 'Assign project' }));
+
+    await waitFor(() => expect(projectsShown('project-engineer')).toEqual(['PRJ-139']));
+    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  // QA review: the note must not promise a re-seed that cannot happen. project-engineer has no projects in personas.yaml, so a restart seeds nothing for it.
+  it('theLastProjectNoteDoesNotPromiseAReseed', async () => {
+    const { user } = await openUsers(['ppc-team'], { 'project-engineer': ['PRJ-139'] });
+
+    await pickUser(user, 'project-engineer');
+
+    const note = await screen.findByRole('note');
+    expect(note).toHaveTextContent(/if it has any/i);
+    expect(note).not.toHaveTextContent(/seeds the projects of personas\.yaml for this user again/i);
   });
 });

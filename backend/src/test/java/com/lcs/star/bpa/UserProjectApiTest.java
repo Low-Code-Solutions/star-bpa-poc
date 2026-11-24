@@ -221,6 +221,20 @@ class UserProjectApiTest {
         assertThat(refs).containsExactly("PRJ-139", "PRJ-140", "PRJ-142");
     }
 
+    /**
+     * QA review: a blank reference is an unknown project with Jira's text (it passed before any code change), and a JSON NUL escape in the reference, which
+     * reached Postgres as an invalid byte sequence and answered 500 (red first), is a 400 with the same text. Nothing is saved.
+     */
+    @Test
+    void aBlankOrControlCharacterProjectIsRejectedNotACrash() {
+        TestBrowser ppc = flow.loggedInAs("ppc-team");
+
+        assertRefused(assign(ppc, ENGINEER, "   "), 400, "Project     does not exist");
+        HttpResponse<String> unreadable = ppc.post("/api/v1/users/" + ENGINEER + "/projects", "{\"projectRef\":\"PRJ-1\\u00009\"}");
+        assertThat(unreadable.statusCode()).as("a body Spring cannot read is a 400, not a crash: " + unreadable.body()).isEqualTo(400);
+        assertThat(rowCount(ENGINEER)).as("nothing is saved").isZero();
+    }
+
     // --- helpers ----------------------------------------------------------------------------------------------------------
 
     private HttpResponse<String> assign(TestBrowser browser, String username, String projectRef) {
