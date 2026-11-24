@@ -70,8 +70,8 @@ public class WorkPackController implements WorkpacksApi {
 
 
     /**
-     * {@code GET /api/v1/workpacks} (BPA-72): the Work Packs list, read only, for every logged-in user (SecurityConfig: authenticated). Not limited to the
-     * user's projects until BPA-79 (plan BPA-72 Q1). A status that is not one of the four is a 400; no match is a 200 with an empty list.
+     * {@code GET /api/v1/workpacks} (BPA-72): the Work Packs list, read only, for every logged-in user (SecurityConfig: authenticated). Since BPA-79 it lists
+     * only the Work Packs of the user's projects (ProjectScope, BPA-77); {@code project} narrows within them (a project that is not the user's gives an empty list). A status that is not one of the four is a 400; no match is a 200 with an empty list.
      */
     @Override
     public ResponseEntity<List<WorkPackListRow>> listWorkPacks(List<String> status, String project, LocalDate weekEnding, String search) {
@@ -84,7 +84,7 @@ public class WorkPackController implements WorkpacksApi {
             }
         }
         List<WorkPackListRow> rows = new ArrayList<>();
-        for (WorkPackListRepository.Row r : list.list(new WorkPackListRepository.Filter(status, project, weekEnding, search))) {
+        for (WorkPackListRepository.Row r : list.list(new WorkPackListRepository.Filter(status, project, weekEnding, search, projectScope.projectsOf(sessionUser())))) {
             rows.add(WorkPackListMapper.toRow(r));
         }
         return ResponseEntity.ok(rows);
@@ -96,7 +96,7 @@ public class WorkPackController implements WorkpacksApi {
      */
     @Override
     public ResponseEntity<WorkPackDetail> getWorkPack(String workpackNumber) {
-        return ResponseEntity.ok(details.detail(workpackNumber, known(workpackNumber)));
+        return ResponseEntity.ok(details.detail(workpackNumber, readable(workpackNumber)));
     }
 
     /** The History tab (BPA-73): the audit log of the Work Pack and its records, and the drawing notices, newest first, one page. */
@@ -107,7 +107,7 @@ public class WorkPackController implements WorkpacksApi {
         if (pageNo < 0 || pageSize < 1 || pageSize > 200) {
             throw new ErrorResponseException(HttpStatus.BAD_REQUEST, ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "page must be 0 or more and size 1 to 200"), null);
         }
-        return ResponseEntity.ok(details.history(known(workpackNumber), pageNo, pageSize));
+        return ResponseEntity.ok(details.history(readable(workpackNumber), pageNo, pageSize));
     }
 
     /**
@@ -116,7 +116,7 @@ public class WorkPackController implements WorkpacksApi {
      */
     @Override
     public ResponseEntity<List<OpenTask>> listWorkPackOpenTasks(String workpackNumber) {
-        WorkPackDetailRepository.Header header = known(workpackNumber);
+        WorkPackDetailRepository.Header header = readable(workpackNumber);
         List<String> groups = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream().map(a -> a.getAuthority()).toList();
         try {
             return ResponseEntity.ok(openTasks.list(workpackNumber, header, groups));
@@ -139,6 +139,17 @@ public class WorkPackController implements WorkpacksApi {
                         .anyMatch(v -> v.getPropertyPath().toString().endsWith("page") || v.getPropertyPath().toString().endsWith("size")));
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, paging ? "page must be 0 or more and size 1 to 200" : "Workpack number must match WP-######"));
+    }
+
+    /** BPA-79: {@link #known} and then the project of the Work Pack must be one of the user's (403, BPA-77's text); an unknown number stays 404. */
+    private WorkPackDetailRepository.Header readable(String workpackNumber) {
+        WorkPackDetailRepository.Header header = known(workpackNumber);
+        projectScope.require(sessionUser(), header.projectRef());
+        return header;
+    }
+
+    private static String sessionUser() {
+        return SecurityContextHolder.getContext().getAuthentication().getName();
     }
 
     /** The Work Pack of this number: 400 outside WP-###### (the contract's InvalidWorkpackNumber), 404 "Work Pack not found". */

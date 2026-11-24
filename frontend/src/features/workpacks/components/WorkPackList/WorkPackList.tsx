@@ -17,7 +17,7 @@ const two = (value?: number | null) => (value == null ? EMPTY : Number(value).to
  * BPA-72: the Work Packs list, read only. A table of every Work Pack (number, activity, drawing, department, status, assignment state, planned start and end,
  * the latest Locked week's approved completion % and the Earned man-hours of the activity), a status, project and week-ending filter and a search by number.
  * A click on a row opens /workpacks/<number> (BPA-73 builds that page). There is no create, edit or delete here: the list is for finding a Work Pack. The
- * list is not limited to the user's projects until BPA-79; the backend answers every logged-in group.
+ * list holds only the Work Packs of the user's projects (BPA-79; the backend limits it).
  */
 export function WorkPackList({ api }: { api: Api }) {
   const navigate = useNavigate();

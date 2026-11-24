@@ -21,8 +21,11 @@ public class WorkPackListRepository {
         this.jdbc = jdbc;
     }
 
-    /** The filters of the list; a null or empty value is "no filter". */
-    public record Filter(List<String> statuses, String project, LocalDate weekEnding, String search) {
+    /**
+     * The filters of the list; a null or empty value is "no filter", except {@code projects} (BPA-79): null is "not scoped" (the detail's own lookup of one number,
+     * after the controller checked the project), an empty list is "no project" and gives no rows.
+     */
+    public record Filter(List<String> statuses, String project, LocalDate weekEnding, String search, List<String> projects) {
     }
 
     /** One row of the list; the null fields are the ones the Work Pack has no value for yet. */
@@ -31,6 +34,9 @@ public class WorkPackListRepository {
     }
 
     public List<Row> list(Filter filter) {
+        if (filter.projects() != null && filter.projects().isEmpty()) {
+            return List.of();
+        }
         StringBuilder sql = new StringBuilder("""
                 SELECT w.workpack_number, w.activity_ref, w.drawing_ref, w.department_ref, b.project_ref, w.status, w.assignment_state,
                        s.planned_start_date, s.planned_end_date, lp.approved_pct, lp.week_ending, ap.earned_manhours
@@ -51,6 +57,10 @@ public class WorkPackListRepository {
         if (filter.statuses() != null && !filter.statuses().isEmpty()) {
             sql.append(" AND w.status IN (").append(String.join(", ", filter.statuses().stream().map(s -> "?").toList())).append(")");
             args.addAll(filter.statuses());
+        }
+        if (filter.projects() != null) {
+            sql.append(" AND b.project_ref = ANY (?)");
+            args.add(filter.projects().toArray(new String[0]));
         }
         if (filter.project() != null && !filter.project().isBlank()) {
             sql.append(" AND b.project_ref = ?");

@@ -142,3 +142,7 @@ Decision 11 Nov 2026 (Khitaba for the PO, comment 10522): BPA-76 to BPA-79 appro
 - **DoD:** "passing in CI": the whole suite runs only in CI for this story; Actions may not start (billing).
 - **DoD:** "Demoed at sprint review". People.
 - **The local check** in the portal (as cost-controller) is a person's.
+
+## Green (25 Nov 2026)
+- Built as planned: `Filter.projects` (null = not scoped, used only by the detail's own one-number lookup after the check; empty = no rows, no query; `b.project_ref = ANY (?)`), `Header.projectRef` (activity to WBS join), `readable()` for the three BPA-73 reads, the six personas' projects, the React 403 (`{ forbidden }`, alert text only), the data-model note.
+- Targeted proof only (Ahsan's rule): backend `WorkPackReadScopeApiTest` 9, `PersonaSyncTest` 4, `WorkPackListApiTest` 14, `WorkPackDetailApiTest` 20, `ProjectScopeTest` 7 = 54, 0 failures; frontend `WorkPacksPage` and `WorkPackDetailPage` 20 of 20; `tsc`, lint, format check clean. The whole suites run only in CI.

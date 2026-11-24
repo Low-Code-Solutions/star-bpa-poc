@@ -19,31 +19,37 @@ users:
     employeeRef: E9002
     email: project-engineer@example.com
     groups: [project-engineer]
+    projects: [PRJ-139, PRJ-140] # BPA-79 (ASSUMPTION, no source gives it): reads of Work Packs are limited to the user's projects, so these personas have both seeded ones
   - username: production-planner
     name: Synthetic Production Planner
     employeeRef: E9003
     email: production-planner@example.com
     groups: [production-planner]
+    projects: [PRJ-139, PRJ-140] # BPA-79 (ASSUMPTION, no source gives it): reads of Work Packs are limited to the user's projects, so these personas have both seeded ones
   - username: production-team
     name: Synthetic Production Team Member
     employeeRef: E9004
     email: production-team@example.com
     groups: [production-team]
+    projects: [PRJ-139, PRJ-140] # BPA-79 (ASSUMPTION, no source gives it): reads of Work Packs are limited to the user's projects, so these personas have both seeded ones
   - username: ppc-team
     name: Synthetic PPC Team Member
     employeeRef: E9005
     email: ppc-team@example.com
     groups: [ppc-team]
+    projects: [PRJ-139, PRJ-140] # BPA-79 (ASSUMPTION, no source gives it): reads of Work Packs are limited to the user's projects, so these personas have both seeded ones
   - username: supervisor
     name: Synthetic Supervisor
     employeeRef: E9006
     email: supervisor@example.com
     groups: [supervisor]
+    projects: [PRJ-139, PRJ-140] # BPA-79 (ASSUMPTION, no source gives it): reads of Work Packs are limited to the user's projects, so these personas have both seeded ones
   - username: workpack-owner
     name: Synthetic Workpack Owner
     employeeRef: E9007
     email: workpack-owner@example.com
     groups: [workpack-owner]
+    projects: [PRJ-139, PRJ-140] # BPA-79 (ASSUMPTION, no source gives it): reads of Work Packs are limited to the user's projects, so these personas have both seeded ones
   - username: timekeeper
     name: Synthetic Timekeeper
     employeeRef: E9008
