@@ -86,4 +86,5 @@ files themselves, Jira and the ADRs are the record. Do not edit by hand.
 | [BPA-73](BPA-4-timesheet-to-progress/plans/BPA-73.md) | PPC Team can open a Work Pack and see its status, workers, hours and progress in one place | Closed (23 Nov 2026) |
 | [BPA-74](BPA-4-timesheet-to-progress/plans/BPA-74.md) | Approver can be reminded when hours wait more than 48 hours for their decision | Closed (23 Nov 2026) |
 | [BPA-75](BPA-4-timesheet-to-progress/plans/BPA-75.md) | Supervisor can only book hours for a Worker who is not on approved leave that day | Closed (24 Nov 2026) |
+| [BPA-83](BPA-4-timesheet-to-progress/plans/BPA-83.md) | Project Manager can reopen a locked week with a documented justification | Closed (25 Nov 2026) |
 

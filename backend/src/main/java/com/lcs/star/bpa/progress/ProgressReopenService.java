@@ -11,6 +11,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,7 @@ public class ProgressReopenService {
     public static final String REASON_REQUIRED = "Enter a reason to reopen the week";
     public static final String MESSAGE = "WeekReopened";
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH);
+    private static final Logger LOG = LoggerFactory.getLogger(ProgressReopenService.class);
 
     private final ProgressSettings settings;
     private final ProgressPeriodRepository periods;
@@ -66,8 +69,10 @@ public class ProgressReopenService {
         OptionalLong started = camunda.correlateForKey(MESSAGE, weekEnding.toString(),
                 Map.of("progressPeriodId", period.id().toString(), "weekEnding", weekEnding.toString()));
         if (started.isEmpty()) {
-            // ASSUMPTION (text): an instance of this week is already active for the message, so another cannot start
-            throw refused(HttpStatus.CONFLICT, "Week ending " + state.weekEnding().format(DATE) + " is already being approved");
+            // ASSUMPTION (text): Camunda answered 404, so nothing started: an instance of this week is already active for the message, or the message start event is not deployed.
+            // The cause is not told to the user (it cannot be known from the answer); it is logged.
+            LOG.warn("Reopen of week ending {}: message {} started no instance (an instance of the week is active, or the message start event is not deployed)", weekEnding, MESSAGE);
+            throw refused(HttpStatus.CONFLICT, "Week ending " + state.weekEnding().format(DATE) + " could not be reopened; try again");
         }
         Timestamp at = periods.reopen(state, trimmed, started.getAsLong(), username);
         return new Reopened(weekEnding, username, at, trimmed);

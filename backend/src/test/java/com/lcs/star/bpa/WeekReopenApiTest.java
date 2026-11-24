@@ -8,6 +8,7 @@ import static com.lcs.star.bpa.CamundaSteps.toJson;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -191,6 +192,16 @@ class WeekReopenApiTest {
         assertThat(reasonRows.get(0).get("new_value")).isEqualTo(REASON);
         assertThat(reasonRows.get(0).get("username")).isEqualTo("project-manager");
         assertThat((Timestamp) reasonRows.get(0).get("changed_at")).isEqualTo(Timestamp.from(TODAY));
+        // the earlier week approval is cleared (so the re-approval is recorded afresh); the old values stay in the audit log (plan Q4, ASSUMPTION)
+        Map<String, Object> approval = jdbc.queryForMap("SELECT week_approved_by, week_approved_at FROM bpa.progress_period WHERE id = ?", period);
+        assertThat(approval.get("week_approved_by")).isNull();
+        assertThat(approval.get("week_approved_at")).isNull();
+        assertThat(jdbc.queryForObject("""
+                SELECT old_value FROM bpa.audit_log WHERE table_name = 'progress_period' AND record_id = ? AND column_name = 'week_approved_by' AND new_value IS NULL""",
+                String.class, period)).isEqualTo("project-manager");
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM bpa.audit_log WHERE table_name = 'progress_period' AND record_id = ? AND column_name = 'week_approved_at' AND new_value IS NULL""",
+                Integer.class, period)).isEqualTo(1);
         // PPC Team can change the approved % for that week again: the new instance waits at Approve completion %
         String task = awaitTask(newInstance(), COMPLETION);
         HttpResponse<String> changed = ppcApprove(task, "WP-000457", "50");
@@ -238,6 +249,7 @@ class WeekReopenApiTest {
     /** The whole path: reopen, PPC approves a new %, cost-controller reviews, the Project Manager approves the week, and it is Locked again. */
     @Test
     void BPA83_reopenedWeekLocksAgainThroughApproval() {
+        jdbc.update("UPDATE bpa.activity SET budgeted_units = 1200.00 WHERE activity_ref = 'A-2201'"); // as EarnedManhoursApiTest: 600 h of Work Packs, 1200 budgeted units
         allowReopen();
         reopenOk();
         long instance = newInstance();
@@ -257,13 +269,17 @@ class WeekReopenApiTest {
         // Earned man-hours were recalculated once, in this pass: one row for the activity
         assertThat(completed(instance, EARNED, 1)).isTrue();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.activity_progress WHERE progress_period_id = ? AND activity_ref = 'A-2201'", Integer.class, period)).isEqualTo(1);
+        // WP-000457 (500 h) now at 50% and WP-000461 (100 h) at 60%: actual % = (500 x 50 + 100 x 60) / 600 = 51.67, Earned MH = 31000 x 1200 / (600 x 100) = 620.00 (BPA-62's formula)
+        Map<String, Object> earned = jdbc.queryForMap("SELECT actual_pct, earned_manhours FROM bpa.activity_progress WHERE progress_period_id = ? AND activity_ref = 'A-2201'", period);
+        assertThat((BigDecimal) earned.get("actual_pct")).isEqualByComparingTo("51.67");
+        assertThat((BigDecimal) earned.get("earned_manhours")).isEqualByComparingTo("620.00");
         // the approval is recorded afresh, and the second lock audits the first lock's time as its old value
         Map<String, Object> row = jdbc.queryForMap("SELECT week_approved_by, week_approved_at FROM bpa.progress_period WHERE id = ?", period);
         assertThat(row.get("week_approved_by")).isEqualTo("project-manager");
         assertThat((Timestamp) row.get("week_approved_at")).isEqualTo(Timestamp.from(TODAY));
         assertThat(jdbc.queryForObject("""
                 SELECT old_value FROM bpa.audit_log WHERE table_name = 'progress_period' AND record_id = ? AND column_name = 'locked_at'
-                ORDER BY changed_at DESC LIMIT 1""", String.class, period)).as("the old locked_at is audited, not null").isNotNull();
+                ORDER BY changed_at DESC LIMIT 1""", String.class, period)).as("the second lock audits the first lock's time as its old value").isEqualTo("2026-11-19T21:30:00Z");
     }
 
     // --- not scenarios (plan BPA-83) -----------------------------------------------------------------------------------------
@@ -323,6 +339,20 @@ class WeekReopenApiTest {
         HttpResponse<String> response = flow.loggedInAs("project-manager").post(REOPEN, toJson(Map.of("reason", REASON)));
 
         assertThat(response.statusCode()).as(response.body()).isEqualTo(503);
+        assertThat(statusOfW19()).isEqualTo("Locked");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'progress_period' AND record_id = ?", Integer.class, period)).isZero();
+    }
+
+    /** ASSUMPTION (text): Camunda starts nothing (404: an instance of the week is already active, or the message start event is not deployed): 409, nothing changes. */
+    @Test
+    void aMessageThatStartsNothingIsRefused() {
+        allowReopen();
+        doReturn(java.util.OptionalLong.empty()).when(processes).correlateForKey(anyString(), anyString(), anyMap());
+
+        HttpResponse<String> response = flow.loggedInAs("project-manager").post(REOPEN, toJson(Map.of("reason", REASON)));
+
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(409);
+        assertThat(json(response.body()).path("detail").asText()).isEqualTo("Week ending 19 Nov 2026 could not be reopened; try again");
         assertThat(statusOfW19()).isEqualTo("Locked");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.audit_log WHERE table_name = 'progress_period' AND record_id = ?", Integer.class, period)).isZero();
     }

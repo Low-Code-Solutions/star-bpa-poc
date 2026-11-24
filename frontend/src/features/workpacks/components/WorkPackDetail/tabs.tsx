@@ -242,7 +242,14 @@ export function ProgressTab({
           <button type="submit" disabled={busy}>
             Reopen
           </button>
-          <button type="button" onClick={() => setReopening(null)}>
+          <button
+            type="button"
+            onClick={() => {
+              setReopening(null);
+              setReason('');
+              setProblem(null);
+            }}
+          >
             Cancel
           </button>
           <ErrorMessage text={problem} />

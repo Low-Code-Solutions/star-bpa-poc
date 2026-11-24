@@ -3,8 +3,8 @@
 Status: **ACTIVE, 28 Oct 2026 (Epic 1 rows; updated for 09-architecture-decisions, D58, D59, and PO decision P1 on WBS of 28 Oct).** Applied under PO delegation (D55, confirmed by Khitaba); open to PO challenge.
 Amended 2 Nov 2026 (PO decision 2 Nov 2026, BPA-44): `user_role_scope` removed; test users are the seven personas, access by group only.
 Amended 13 Nov 2026 (BPA-48; Epic 2, data model v0.7, SORs approved by Khitaba for the PO on 11 Nov 2026): nine rows added below the Epic 1 slice entities; eleven personas; project scope returns as `user_project`.
-Amended 25 Nov 2026 (BPA-83): the Epic 2 progress row names progress_period.reopened_by, reopened_at and reopen_reason (POC database).
 Amended 24 Nov 2026 (BPA-77): the drawing row names `drawing.project_ref` (V8), so the drawing, reservation and cutting sheet tabs of Projects and master data can be limited to a project.
+Amended 25 Nov 2026 (BPA-83): the Epic 2 progress row names progress_period.reopened_by, reopened_at and reopen_reason (POC database).
 Owner: Faraz. Decision references (C, D) are in claude/06-epic1-decisions-draft.md; P1–P4 in claude/11-data-model.md §0.
 Column-level detail (types, constraints, SOR per column) is in claude/11-data-model.md (repo docs/data-model.md, 09 S16).
 

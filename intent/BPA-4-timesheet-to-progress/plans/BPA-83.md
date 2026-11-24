@@ -1,7 +1,7 @@
 # Plan: BPA-83 Project Manager can reopen a locked week with a documented justification
 Jira: BPA-83 (Story, epic BPA-4)
 Story last updated: 2026-11-25T00:47:29.158+0400
-Status: Approved (Ahsan, 25 Nov 2026)
+Status: Closed (25 Nov 2026)
 Approver: Ahsan, Build Lead
 Branch: BPA-83-reopen-locked-week, from main 6742c1c (the merge of PR #70, BPA-79)
 
@@ -219,7 +219,18 @@ The 409 text for a week that is not Locked; the setting checked before the body;
 ## Green (25 Nov 2026)
 - Built as planned: `bpa.progress.allow-reopen` (`ProgressSettings.allowReopen`, read at each call; compose `BPA_PROGRESS_ALLOW_REOPEN`, `.env.example`), SecurityConfig (project-manager only, before the BPA-60 catch-all), `CamundaProcessClient.correlateForKey`, `ProgressReopenService`, `ProgressPeriodRepository.reopen`, the controller, the Progress tab (Reopen week, reason, Reopen, Cancel; project-manager only; the backend's text shown).
 - **Lock audit fix:** `ProgressPeriodRepository.lock` now audits the real previous `locked_at` (it wrote null), proved by `BPA83_reopenedWeekLocksAgainThroughApproval`.
-- **Departure (ASSUMPTION, text):** when Camunda starts nothing because an instance of the week is already active for the message, the reopen answers 409 "Week ending <d MMM yyyy> is already being approved"; not in the contract's 409 list beyond its generic description.
+- **Departure (ASSUMPTION, text):** when Camunda starts nothing because an instance of the week is already active for the message, the reopen answers 409 "Week ending <d MMM yyyy> could not be reopened; try again" (QA review: the first text named a cause that a 404 cannot prove; the cause is logged); the contract's 409 list covers it by its generic description.
 - **Test-side departures:** `WeekReopenApiTest` cancels the instances it started after each test (one active instance per correlation key; all classes share one Camunda), and the setting is switched on through a static property source (`ProgressSettings` reads the environment at each call).
 - Docs: `docs/data-model.md` (§13.3.1 columns, CHECK, "As built by BPA-83"), `docs/03-sor-matrix.md`.
 - **Targeted proof (Ahsan's rule), backend:** `WeekReopenApiTest` 9, `ProgressSettingsTest` 4, `FlywayBaselineTest` 2, `Bpa13CorrelationChecksTest` 2, `ModelDeployTest` 2, `WeekLockApiTest` 11, `WeekApprovalApiTest` 12, `CompletionApprovalApiTest` 22, `EarnedManhoursApiTest` 14: all pass, 0 failures (one `ModelDeployTest` 10 s socket timeout against Camunda in the first run passed alone, 2 of 2). Frontend `WorkPackDetailPage` and `WorkPacksPage` 23 of 23; `tsc`, lint, format check and `lint:bpmn` clean. The whole suites run only in CI.
+
+## Review and departures (25 Nov 2026)
+- qa-reviewer at 4b92255 (REVIEW.md "BPA-83 at 4b92255"): 0 High, 4 Important (all fixed, below), 5 Nits (fixed or recorded). Jira was not read by the reviewer (no sign-in in its session).
+- **Fixed (tests):** scenario 5 now asserts the recalculated values (actual % 51.67 and Earned MH 620.00, BPA-62's formula) and that the second lock audits the first lock's time (2026-11-19T21:30:00Z) as its old value; scenario 1 now asserts that `week_approved_by/at` are cleared and audited. These passed on the first run (the behaviour was right; the tests were weak).
+- **Fixed (red first):** a 404 from Camunda is reported as "Week ending <d MMM yyyy> could not be reopened; try again" (ASSUMPTION) and logged, not as "already being approved"; `aMessageThatStartsNothingIsRefused` failed on the old text, then passed.
+- **Nits fixed:** Cancel clears the typed reason and the error; the `useAuth` import order; the SOR matrix amendment order.
+- **Nits recorded, not changed:** `ReopenRequest.reason` has no maximum length (no source gives one, so none is invented); `V9`'s header says "section 3.1" where the table is §13.3.1 (the file is applied on a running database, so its checksum is not changed for a comment); only the Work Pack detail query is invalidated after a reopen; `lock` reads `locked_at` with a second SELECT (once per week).
+- **Plan file table, as built:** also changed `docs/03-sor-matrix.md`, `.env.example`, `docker-compose.yml`, `REVIEW.md`, `intent/README.md`; `ProgressSettingsTest` is new (the plan wrote "new or +1").
+- **Setting false:** the API refuses first (409) before any database or Camunda call. The message start event stays deployed, so someone with Camunda admin access could correlate `WeekReopened` directly: accepted in the plan, stated in the PR.
+- **Local check (setting on, then back to false):** as project-manager on the local stack: ppc-team 403; no or blank reason 400 "Enter a reason to reopen the week" (week stays Locked); unknown week 404; reopen with a reason 200 (status Reopened, new instance linked, one `reopen_reason` audit row, `week_approved_*` cleared and audited); a second reopen of the Reopened week 409 "Week ending 19 Nov 2026 is not locked"; PPC changed WP-000001 from 40 to 55 on the new Approve completion % task; Earned MH recalculated (A-2301 55.00 %, 660.00); cost-controller reviewed; the PM approved; the week is Locked again and the second lock's `locked_at` audit row has the first lock's time as its old value. A further reopen was taken back through approval to Locked, so the local week shows `reopen_reason` "second". The setting is back to false (line removed from `.env`): a reopen answers 409 "Reopening a locked week is not allowed".
+- **Human gaps:** nobody has clicked Reopen week in the portal as project-manager; the whole backend and frontend suites run only in CI (Ahsan's rule); the demo at sprint review. Jira DoR: the epic's `intent.md` and `spec.md` acceptance is unticked in Jira (the BPA-4 spec was not read here).
