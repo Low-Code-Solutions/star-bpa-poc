@@ -68,6 +68,8 @@ tags:
     description: The weekly FMS completion report PPC uploads into the open task (BPA-59; E2-09)
   - name: fms-hours-exports
     description: The weekly FMS hours files PPC downloads and uploads to FMS by hand (BPA-58; E2-08)
+  - name: users
+    description: Portal users and the projects the PPC Team assigns to them (BPA-76; ADR 0005, data model 13.7)
 paths:
   /api/v1/auth/login:
     post:
@@ -1761,6 +1763,154 @@ paths:
                   $ref: '#/components/schemas/VarianceAlert'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /api/v1/users:
+    get:
+      tags: [users]
+      operationId: listPortalUsers
+      summary: The portal users, with their Camunda groups
+      description: |
+        BPA-76 (E2-D1, ADR 0005). Every `app_user` (the eleven personas; the technical user `bpa-service` is not one), by username, each with the Camunda groups it
+        belongs to, read from Camunda (`bpa-service` holds GROUP READ on all eleven groups). Group `ppc-team` only (every method). A group Camunda cannot answer for
+        makes the call answer 503 and nothing is listed, so a user is never shown with a missing group.
+      x-assumption: true
+      x-assumption-note: the shape and the ppc-team-only rule are ASSUMPTIONs of the plan (Jira BPA-76 gives no API or screen specification)
+      responses:
+        '200':
+          description: The portal users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PortalUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/EngineUnavailable'
+  /api/v1/projects:
+    get:
+      tags: [users]
+      operationId: listProjects
+      summary: The projects that can be assigned to a user
+      description: |
+        BPA-76. The projects of `project_job_code` (D365 F&O Project Management, seeded copy), by project reference. Group `ppc-team` only (every method); BPA-77
+        to BPA-79 may widen it.
+      x-assumption: true
+      x-assumption-note: the ppc-team-only rule is an ASSUMPTION of the plan
+      responses:
+        '200':
+          description: The projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/users/{username}/projects:
+    parameters:
+      - $ref: '#/components/parameters/Username'
+    get:
+      tags: [users]
+      operationId: listUserProjects
+      summary: The projects assigned to a user
+      description: |
+        BPA-76 (Jira: "project-engineer has 2 projects"). The rows of `user_project` of this user, by project reference; empty when the user has none. Group
+        `ppc-team` only (every method).
+      x-assumption: true
+      x-assumption-note: the shape is an ASSUMPTION of the plan
+      responses:
+        '200':
+          description: The user's projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+    post:
+      tags: [users]
+      operationId: assignProject
+      summary: Assign a project to a user
+      description: |
+        BPA-76. Group `ppc-team` only (every method), ppc-team users included. The project must exist in `project_job_code`; a user may have several projects (decision
+        11 Nov 2026, Khitaba for the PO). One `audit_log` row per business column of the new `user_project` row (`username`, `project_ref`), written as the session
+        user (D64). Nothing is scoped by the rows yet (BPA-77 to BPA-79).
+      x-assumption: true
+      x-assumption-note: the path, the 201 answer and the 404 text "User not found" are ASSUMPTIONs of the plan; the two 400 texts are Jira's
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewUserProject'
+      responses:
+        '201':
+          description: Project assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProject'
+        '400':
+          description: An unknown project, or one the user already has
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                unknownProject:
+                  value: { status: 400, title: Bad Request, detail: Project PRJ-999 does not exist }
+                duplicate:
+                  value: { status: 400, title: Bad Request, detail: PRJ-139 is already assigned to project-engineer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+  /api/v1/users/{username}/projects/{projectRef}:
+    parameters:
+      - $ref: '#/components/parameters/Username'
+      - $ref: '#/components/parameters/ProjectRef'
+    delete:
+      tags: [users]
+      operationId: unassignProject
+      summary: Unassign a project from a user
+      description: |
+        BPA-76 (Jira: "I unassign PRJ-142 from project-engineer"). Group `ppc-team` only (every method). One `audit_log` row per business column of the removed
+        `user_project` row, `new_value` null, written as the session user (D64). Removing a user's last project means the next application start seeds that user's
+        projects from `personas.yaml` again (ADR 0005, ASSUMPTION there); the screen says so.
+      x-assumption: true
+      x-assumption-note: the path and the 404 texts are ASSUMPTIONs of the plan
+      responses:
+        '204':
+          description: Project unassigned
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No such user, or the project is not assigned to the user
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                unknownUser:
+                  value: { status: 404, title: Not Found, detail: User not found }
+                notAssigned:
+                  value: { status: 404, title: Not Found, detail: PRJ-140 is not assigned to project-engineer }
 components:
   securitySchemes:
     sessionCookie:
@@ -1807,6 +1957,22 @@ components:
       description: Workpack number, WP- followed by 6 digits (D15)
       schema:
         $ref: '#/components/schemas/WorkpackNumber'
+    Username:
+      name: username
+      in: path
+      required: true
+      description: app_user.username, the Camunda user name (equal to the group ID for a persona, docs/04)
+      schema:
+        type: string
+        example: project-engineer
+    ProjectRef:
+      name: projectRef
+      in: path
+      required: true
+      description: project_job_code.project_ref (D365 F&O Project Management)
+      schema:
+        type: string
+        example: PRJ-139
   responses:
     TimesheetNotFound:
       description: No Digital Time sheet with this id (BPA-50)
@@ -1822,6 +1988,15 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
           example: { status: 404, title: Not Found, detail: Line not found }
+    UserNotFound:
+      description: No portal user with this username (BPA-76)
+      x-assumption: true
+      x-assumption-note: text not stated by any story
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example: { status: 404, title: Not Found, detail: User not found }
     Unauthorized:
       description: Not logged in, or the session expired (S27)
       x-assumption: true
@@ -3127,6 +3302,55 @@ components:
       properties:
         message:
           type: string
+    PortalUser:
+      type: object
+      description: A portal user (app_user) with the Camunda groups it belongs to (BPA-76; ADR 0005)
+      required: [username, employeeRef, email, groups]
+      properties:
+        username:
+          type: string
+          description: The Camunda user name (SOR Camunda identity)
+          example: project-engineer
+        employeeRef:
+          type: string
+          description: The employee ID (SOR myPeople)
+          example: E9002
+        email:
+          type: string
+          description: The corporate email address (SOR corporate email system, ASSUMPTION; synthetic in the POC)
+        groups:
+          type: array
+          description: The Camunda groups the user belongs to, by name; read from Camunda
+          items:
+            type: string
+          example: [project-engineer]
+    Project:
+      type: object
+      description: A project (project_job_code.project_ref; SOR D365 F&O Project Management, seeded copy)
+      required: [projectRef]
+      properties:
+        projectRef:
+          type: string
+          example: PRJ-139
+    NewUserProject:
+      type: object
+      description: The project to assign to the user in the path (BPA-76)
+      required: [projectRef]
+      properties:
+        projectRef:
+          type: string
+          example: PRJ-139
+    UserProject:
+      type: object
+      description: A user_project row, as assigned (BPA-76; SOR POC database, ASSUMPTION)
+      required: [username, projectRef]
+      properties:
+        username:
+          type: string
+          example: project-engineer
+        projectRef:
+          type: string
+          example: PRJ-139
     Problem:
       type: object
       description: RFC 9457 problem details

@@ -31,7 +31,8 @@ public class PersonaSync implements SmartInitializingSingleton {
     static final String SERVICE_USER = "bpa-service";
 
     /** The eleven S6 groups: the seven of Epic 1, and the four of Epic 2 (E2-D1, BPA-48). */
-    static final List<String> GROUPS = List.of("time-method-analyst", "project-engineer", "production-planner", "workpack-owner",
+    /** Public for UserController (BPA-76), which reads the members of each group for the users list; an immutable list. */
+    public static final List<String> GROUPS = List.of("time-method-analyst", "project-engineer", "production-planner", "workpack-owner",
             "ppc-team", "supervisor", "production-team", "timekeeper", "production-supervisor", "cost-controller", "project-manager");
 
     private static final Set<String> PROCESS_PERMISSIONS = Set.of("READ_USER_TASK", "UPDATE_USER_TASK", "COMPLETE_USER_TASK",
@@ -66,6 +67,11 @@ public class PersonaSync implements SmartInitializingSingleton {
         permissions.put("GROUP:timekeeper", Set.of("READ"));
         permissions.put("GROUP:production-supervisor", Set.of("READ"));
         permissions.put("GROUP:ppc-team", Set.of("READ"));
+        // BPA-76 (ASSUMPTION): read the members of the four groups left, so the PPC Team's users list shows every user with all its groups (an unreadable group would answer an empty list)
+        permissions.put("GROUP:time-method-analyst", Set.of("READ"));
+        permissions.put("GROUP:production-planner", Set.of("READ"));
+        permissions.put("GROUP:supervisor", Set.of("READ"));
+        permissions.put("GROUP:production-team", Set.of("READ"));
         permissions.put("DECISION_DEFINITION:Decision_CostVariance", Set.of("CREATE_DECISION_INSTANCE"));
         SERVICE_PERMISSIONS = Map.copyOf(permissions);
     }
