@@ -15,7 +15,7 @@ type Tab = (typeof TABS)[number];
 /**
  * BPA-73: the Work Pack as one case view, read only. A summary panel and the lifecycle bar, five tabs (Overview, Workers, Hours, Progress, History) and a side
  * panel of the open tasks from every group. Nothing here changes the Work Pack: the actions stay on each group's task screens. An unknown number says
- * "Work Pack not found". The list this page is opened from (BPA-72) is not limited to the user's projects until BPA-79, and neither is this page.
+ * "Work Pack not found". Since BPA-79 a Work Pack of a project the user does not have is refused by the backend (403): the page shows its text and nothing else.
  */
 export function WorkPackDetail({ api, workpackNumber }: { api: Api; workpackNumber: string }) {
   const [tab, setTab] = useState<Tab>('Overview');
@@ -30,6 +30,7 @@ export function WorkPackDetail({ api, workpackNumber }: { api: Api; workpackNumb
       {data === undefined ? <Spinner /> : null}
       {data === null ? <ErrorMessage text="The Work Pack could not be loaded" /> : null}
       {data && 'notFound' in data ? <p>Work Pack not found</p> : null}
+      {data && 'forbidden' in data ? <ErrorMessage text={data.forbidden} /> : null}
       {data && 'detail' in data ? (
         <div className="work-pack-detail__body">
           <div className="work-pack-detail__main">

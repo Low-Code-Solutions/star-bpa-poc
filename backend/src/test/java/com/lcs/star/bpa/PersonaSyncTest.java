@@ -88,7 +88,11 @@ class PersonaSyncTest {
         // BPA-48 (ASSUMPTION, plan Q6): project access for the project-scoped personas, written by the sync from personas.yaml
         assertThat(jdbc.queryForList("SELECT username || ' ' || project_ref FROM bpa.user_project", String.class))
                 .containsExactlyInAnyOrder("cost-controller PRJ-140", "production-supervisor PRJ-139", "project-manager PRJ-139", "project-manager PRJ-140",
-                        "timekeeper PRJ-139", "time-method-analyst PRJ-139", "time-method-analyst PRJ-140"); // BPA-78 (ASSUMPTION): the analyst has both seeded projects, like project-manager
+                        "timekeeper PRJ-139", "time-method-analyst PRJ-139", "time-method-analyst PRJ-140", // BPA-78 (ASSUMPTION): the analyst has both seeded projects, like project-manager
+                        // BPA-79 (ASSUMPTION): the six personas that had none see the demo Work Packs, so they have both seeded projects too
+                        "project-engineer PRJ-139", "project-engineer PRJ-140", "production-planner PRJ-139", "production-planner PRJ-140", "workpack-owner PRJ-139",
+                        "workpack-owner PRJ-140", "ppc-team PRJ-139", "ppc-team PRJ-140", "supervisor PRJ-139", "supervisor PRJ-140", "production-team PRJ-139",
+                        "production-team PRJ-140");
     }
 
     @Test
@@ -102,7 +106,7 @@ class PersonaSyncTest {
         sync().sync();
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.app_user", Integer.class)).isEqualTo(11);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.user_project", Integer.class)).as("project rows are upserted, not doubled").isEqualTo(7); // 5 + the analyst's two (BPA-78)
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bpa.user_project", Integer.class)).as("project rows are upserted, not doubled").isEqualTo(19); // 5 + the analyst's two (BPA-78) + twelve for the six personas that had none (BPA-79)
         assertThat(admin.authorizations("bpa-service")).hasSize(authorizationsBefore);
         assertThat(permissionsOf("bpa-service")).isEqualTo(permissionsBefore);
     }

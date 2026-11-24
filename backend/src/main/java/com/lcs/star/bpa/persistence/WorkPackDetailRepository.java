@@ -25,7 +25,7 @@ public class WorkPackDetailRepository {
         this.jdbc = jdbc;
     }
 
-    public record Header(UUID id, long processInstanceKey, LocalDate completionDate) {
+    public record Header(UUID id, long processInstanceKey, LocalDate completionDate, String projectRef) {
     }
 
     public record Phase(String phase, BigDecimal manhours) {
@@ -58,8 +58,12 @@ public class WorkPackDetailRepository {
     }
 
     public Optional<Header> header(String workpackNumber) {
-        return jdbc.query("SELECT id, process_instance_key, completion_date FROM bpa.workpack WHERE workpack_number = ?",
-                (rs, n) -> new Header(rs.getObject("id", UUID.class), rs.getLong("process_instance_key"), rs.getDate("completion_date").toLocalDate()), workpackNumber)
+        return jdbc.query("""
+                SELECT w.id, w.process_instance_key, w.completion_date, b.project_ref
+                FROM bpa.workpack w JOIN bpa.activity a ON a.activity_ref = w.activity_ref JOIN bpa.wbs b ON b.wbs_ref = a.wbs_ref
+                WHERE w.workpack_number = ?""",
+                (rs, n) -> new Header(rs.getObject("id", UUID.class), rs.getLong("process_instance_key"), rs.getDate("completion_date").toLocalDate(),
+                        rs.getString("project_ref")), workpackNumber)
                 .stream().findFirst();
     }
 

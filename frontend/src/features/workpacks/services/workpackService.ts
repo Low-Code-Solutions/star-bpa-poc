@@ -91,15 +91,24 @@ export async function listWorkPacks(api: Api, filter: WorkPackFilter): Promise<W
   }
 }
 
-/** The detail of a Work Pack (BPA-73), or why there is none: a 404 means "Work Pack not found"; null is a failed call. */
-export type WorkPackResult = { detail: WorkPackDetail } | { notFound: true } | null;
+/** The detail of a Work Pack (BPA-73), or why there is none: a 404 means "Work Pack not found"; a 403 (BPA-79, the Work Pack is of a project the user does not have) carries the backend's text; null is a failed call. */
+export type WorkPackResult = { detail: WorkPackDetail } | { notFound: true } | { forbidden: string } | null;
 
 /** GET /api/v1/workpacks/{workpackNumber} (BPA-73): the read-only Work Pack detail. */
 export async function getWorkPack(api: Api, workpackNumber: string): Promise<WorkPackResult> {
   try {
-    const { data, response } = await api.GET('/api/v1/workpacks/{workpackNumber}', { params: { path: { workpackNumber } } });
+    const { data, error, response } = await api.GET('/api/v1/workpacks/{workpackNumber}', {
+      params: { path: { workpackNumber } },
+    });
     if (response.status === 404) {
       return { notFound: true };
+    }
+    if (response.status === 403) {
+      return {
+        forbidden:
+          (error as { detail?: string } | undefined)?.detail ??
+          'You cannot open this Work Pack' /* ASSUMPTION: UI text, shown only when the 403 has no detail */,
+      };
     }
     return data ? { detail: data } : null;
   } catch {

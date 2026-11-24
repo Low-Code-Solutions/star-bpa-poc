@@ -7,6 +7,7 @@
 # ASSUMPTION (BPA-48, plan Q6): `projects` lists the project_ref values the sync writes to bpa.user_project for a persona. Which personas
 # are project-scoped, and that project-manager has both projects, is not named in any source; the delta (section 8) asks for an in-scope
 # and an out-of-scope case for BPA-77 to BPA-79. user_project cannot be seeded by SQL: its foreign key is to app_user, which this sync writes.
+# ASSUMPTION (BPA-79, no source gives it): reads of Work Packs are limited to the user's projects, so project-engineer, production-planner, production-team, ppc-team, supervisor and workpack-owner have both seeded projects, like the analyst and project-manager.
 users:
   - username: time-method-analyst
     name: Synthetic Time and Method Analyst
@@ -19,31 +20,37 @@ users:
     employeeRef: E9002
     email: project-engineer@example.com
     groups: [project-engineer]
+    projects: [PRJ-139, PRJ-140]
   - username: production-planner
     name: Synthetic Production Planner
     employeeRef: E9003
     email: production-planner@example.com
     groups: [production-planner]
+    projects: [PRJ-139, PRJ-140]
   - username: production-team
     name: Synthetic Production Team Member
     employeeRef: E9004
     email: production-team@example.com
     groups: [production-team]
+    projects: [PRJ-139, PRJ-140]
   - username: ppc-team
     name: Synthetic PPC Team Member
     employeeRef: E9005
     email: ppc-team@example.com
     groups: [ppc-team]
+    projects: [PRJ-139, PRJ-140]
   - username: supervisor
     name: Synthetic Supervisor
     employeeRef: E9006
     email: supervisor@example.com
     groups: [supervisor]
+    projects: [PRJ-139, PRJ-140]
   - username: workpack-owner
     name: Synthetic Workpack Owner
     employeeRef: E9007
     email: workpack-owner@example.com
     groups: [workpack-owner]
+    projects: [PRJ-139, PRJ-140]
   - username: timekeeper
     name: Synthetic Timekeeper
     employeeRef: E9008

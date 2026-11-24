@@ -44,7 +44,7 @@ public class WorkPackDetailService {
     }
 
     public WorkPackDetail detail(String workpackNumber, Header header) {
-        WorkPackListRow summary = list.list(new WorkPackListRepository.Filter(null, null, null, workpackNumber)).stream()
+        WorkPackListRow summary = list.list(new WorkPackListRepository.Filter(null, null, null, workpackNumber, null)).stream()
                 .filter(r -> workpackNumber.equals(r.workpackNumber())).findFirst().map(WorkPackListMapper::toRow).orElseThrow();
         WorkPackOverview overview = new WorkPackOverview(header.completionDate(),
                 detail.phases(header.id()).stream().map(p -> new WorkPackOverviewPhasesInner(WorkPackOverviewPhasesInner.PhaseEnum.fromValue(p.phase()), p.manhours())).toList(),

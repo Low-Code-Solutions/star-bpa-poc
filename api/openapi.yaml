@@ -240,8 +240,8 @@ paths:
       summary: List the Work Packs, with filters (read only)
       description: |
         The Work Packs list of the portal (BPA-72; E2-22): every Work Pack, newest number first, read only. Any logged-in user may read it (all
-        eleven groups; Jira decision 12 Nov 2026, Khitaba for the PO). Until BPA-79 builds the per-user project scope the list is **not** limited to
-        the user's projects: the `project` filter is the user's own choice. The filters combine with AND and all are optional: `status` (one or more of
+        eleven groups; Jira decision 12 Nov 2026, Khitaba for the PO). Since BPA-79 the list is limited to the Work Packs of the session user's projects (a `user_project` row for the project of the Work Pack's activity; a user with no project gets an empty list; one rule for every persona, ppc-team included):
+        the `project` filter narrows within those projects (a project the user does not have gives an empty list, not a 403: ASSUMPTION). The filters combine with AND and all are optional: `status` (one or more of
         Draft, Released, In Progress, Completed), `project` (the project of the Work Pack's activity, through its WBS), `weekEnding` (Work Packs that
         have a progress row for that week, ASSUMPTION) and `search` (the text is part of the Work Pack number, any case, ASSUMPTION). A number that
         matches nothing is not an error: the answer is 200 with an empty list, and the portal shows "Work Pack not found". Each row carries the latest
@@ -585,8 +585,8 @@ paths:
       operationId: getWorkPack
       summary: The Work Pack detail (read only), with summary, overview, workers, hours and progress
       description: |
-        The case view of one Work Pack (BPA-73; E2-23), read only, for every logged-in user (all eleven groups; Jira decision 12 Nov 2026). Until BPA-79
-        builds the per-user project scope it is not limited to the user's projects (as BPA-72). It carries what the summary panel, the lifecycle bar and
+        The case view of one Work Pack (BPA-73; E2-23), read only, for every logged-in user (all eleven groups; Jira decision 12 Nov 2026). Since BPA-79 it is limited to the user's projects: a Work Pack of a project the session user has no `user_project` row for answers **403** (BPA-77's text, the same for every project it does not have), and a number that does not exist is still 404.
+        It carries what the summary panel, the lifecycle bar and
         the Overview, Workers, Hours and Progress tabs show, all from the POC database. The History tab and the open tasks have their own reads, so a
         long history or an engine that is down does not hold the page back.
         `summary` is the row of the Work Packs list (BPA-72). `overview` has the phases and their man-hours, the materials, the schedule and the print
@@ -609,6 +609,8 @@ paths:
           $ref: '#/components/responses/InvalidWorkpackNumber'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/WorkPackProjectNotAssigned'
         '404':
           $ref: '#/components/responses/WorkPackNotFound'
   /api/v1/workpacks/{workpackNumber}/history:
@@ -619,7 +621,7 @@ paths:
       operationId: getWorkPackHistory
       summary: The history of a Work Pack (audit log of the Work Pack and its records, and drawing notices), newest first
       description: |
-        The History tab of the Work Pack detail (BPA-73). Read only, every logged-in user. Items are `audit_log` rows of the Work Pack and of its child
+        The History tab of the Work Pack detail (BPA-73). Read only, every logged-in user, limited to the user's projects since BPA-79 (403 for a Work Pack of another project, 404 for a number that does not exist). Items are `audit_log` rows of the Work Pack and of its child
         records (phases, materials, schedule, print, Worker assignments, Hour Journal header and lines, time sheets and their lines, hours submissions,
         progress rows and retractions) and the drawing-revision notices sent for it, newest first. `audit_log` has no Work Pack column, so the record ids of
         the Work Pack own records are collected first (ASSUMPTION; audit trail per FRD-7 §7.3.3), so the rows of a child record that has since been deleted (a phase, a material, a time sheet line, a Worker assignment) are not in it (the limit of that approach). Times are UTC instants; the portal shows their Asia/Riyadh date. It pages: `page` from 0, `size` 1 to 200 (default 50),
@@ -655,6 +657,8 @@ paths:
           $ref: '#/components/responses/InvalidWorkpackNumber'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/WorkPackProjectNotAssigned'
         '404':
           $ref: '#/components/responses/WorkPackNotFound'
   /api/v1/workpacks/{workpackNumber}/open-tasks:
@@ -673,6 +677,7 @@ paths:
         `READ_USER_TASK` on these processes (BPA-73 proves it). It is a separate read because it calls the process engine: 503 when the engine is not
         reachable, and the page still shows.
         Built by BPA-73; ASSUMPTION (no FRD names it).
+        Since BPA-79 only for a Work Pack of one of the user's projects: 403 otherwise, and 404 for a number that does not exist.
       x-assumption: true
       x-assumption-note: the cross-group task list, its scope (including the weekly process) and canOpen are not stated by an FRD (BPA-73)
       responses:
@@ -688,6 +693,8 @@ paths:
           $ref: '#/components/responses/InvalidWorkpackNumber'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/WorkPackProjectNotAssigned'
         '404':
           $ref: '#/components/responses/WorkPackNotFound'
         '503':
@@ -2138,6 +2145,17 @@ components:
             status: 404
             title: Not Found
             detail: Task not found
+    WorkPackProjectNotAssigned:
+      description: |
+        The Work Pack belongs to a project the session user has no `user_project` row for (BPA-79; the check is `ProjectScope`, BPA-77). The text is BPA-77's and
+        names the Work Pack's project; a number that does not exist is 404, not 403. One rule for every persona, ppc-team included.
+      x-assumption: true
+      x-assumption-note: the text is an ASSUMPTION of the plan (Jira BPA-79 gives only the 403)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example: { status: 403, title: Forbidden, detail: Project PRJ-142 is not assigned to you }
     WorkPackNotFound:
       description: No Work Pack with this number (BPA-7, BPA-11, BPA-14, BPA-15 "Unknown Work Pack")
       content:
