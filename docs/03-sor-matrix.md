@@ -4,6 +4,7 @@ Status: **ACTIVE, 28 Oct 2026 (Epic 1 rows; updated for 09-architecture-decision
 Amended 2 Nov 2026 (PO decision 2 Nov 2026, BPA-44): `user_role_scope` removed; test users are the seven personas, access by group only.
 Amended 13 Nov 2026 (BPA-48; Epic 2, data model v0.7, SORs approved by Khitaba for the PO on 11 Nov 2026): nine rows added below the Epic 1 slice entities; eleven personas; project scope returns as `user_project`.
 Amended 24 Nov 2026 (BPA-77): the drawing row names `drawing.project_ref` (V8), so the drawing, reservation and cutting sheet tabs of Projects and master data can be limited to a project.
+Amended 25 Nov 2026 (BPA-83): the Epic 2 progress row names progress_period.reopened_by, reopened_at and reopen_reason (POC database).
 Owner: Faraz. Decision references (C, D) are in claude/06-epic1-decisions-draft.md; P1–P4 in claude/11-data-model.md §0.
 Column-level detail (types, constraints, SOR per column) is in claude/11-data-model.md (repo docs/data-model.md, 09 S16).
 
@@ -43,7 +44,7 @@ This matrix labels each **entity**. Column-level labels (including foreign-key c
 | Actual cost per CBS and month (Epic 2) | cbs_code_ref, period_month | D365 F&O Finance (new label) | Reference (seeded copy) | Internal D365 integration (FRD-22 §22.8) | E2 delta §4.2 |
 | FMS completion report: completion %, actual hours (Epic 2) | workpack_number | FMS | Upload by PPC (file) | Batch/file, partner-side | E2 delta §3.3 |
 | Approved hours file to FMS (Epic 2) | fms_hours_export | POC database (the file); FMS receives | Download by PPC (file) | Batch/file, partner-side (Int-7 or #8, C-E2-4) | E2 delta §3.2 |
-| Hours submission, decisions, time sheet lines, progress, Earned MH, alerts (Epic 2) | hours_submission, hours_decision, digital_timesheet_line, workpack_progress, activity_progress, variance_alert | POC database (real: D365 timesheet and D365 PMS) | Write | n/a | E2 delta §1-§5 |
+| Hours submission, decisions, time sheet lines, progress, Earned MH, alerts (Epic 2; BPA-83: progress_period.reopened_by, reopened_at, reopen_reason, POC database, decision 12 Nov 2026) | hours_submission, hours_decision, digital_timesheet_line, workpack_progress, activity_progress, variance_alert | POC database (real: D365 timesheet and D365 PMS) | Write | n/a | E2 delta §1-§5 |
 | Worker HR fields: Employee ID, Department, Category, Work Location, Grade, Aramco ID (Epic 2) | worker.employee_id and five more | myPeople (FRD-5-2 names D365 HR, C14) | Reference (seeded copy, synthetic) | n/a in POC | E2 delta §1A |
 | Worker approved leave (Epic 2) | worker_leave | myPeople **(ASSUMPTION)** | Reference (seeded copy, synthetic) | n/a in POC | E2 delta Add. 5 |
 | User-to-project assignment (Epic 2) | user_project | POC database **(ASSUMPTION)**: no STAR system holds portal access scope | Write (PPC Team, BPA-76); seeded by the persona sync | n/a | E2 delta Add. 5 |

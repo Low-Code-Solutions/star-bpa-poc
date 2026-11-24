@@ -106,13 +106,36 @@ function fakeBackend(
 ) {
   const json = (status: number, body: unknown, type = 'application/json') =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': type } });
+  let reopened = false;
   const fetchMock = vi.fn(async (input: Request) => {
     const path = new URL(input.url).pathname;
     if (path === '/api/v1/me') {
       return json(200, { username: groups[0], groups });
     }
+    if (path === '/api/v1/progress-periods/2026-11-19/reopen' && input.method === 'POST') {
+      // BPA-83: the real endpoint is proved by WeekReopenApiTest; this answers its 400 for a blank reason and its 200
+      const body = (await input.clone().json()) as { reason?: string };
+      if (!body.reason?.trim()) {
+        return json(
+          400,
+          { status: 400, title: 'Bad Request', detail: 'Enter a reason to reopen the week' },
+          'application/problem+json',
+        );
+      }
+      reopened = true;
+      return json(200, {
+        weekEnding: '2026-11-19',
+        status: 'Reopened',
+        reopenedBy: 'project-manager',
+        reopenedAt: '2026-11-20T07:00:00Z',
+        reopenReason: body.reason,
+      });
+    }
     if (path === '/api/v1/workpacks/WP-000457') {
-      return json(200, DETAIL_457);
+      return json(
+        200,
+        reopened ? { ...DETAIL_457, progress: DETAIL_457.progress.map((w) => ({ ...w, periodStatus: 'Reopened' })) } : DETAIL_457,
+      );
     }
     if (path === '/api/v1/workpacks/WP-000490') {
       return json(200, DETAIL_490);
@@ -356,6 +379,53 @@ describe('WorkPackDetailPage', () => {
     const main = within(screen.getByRole('main'));
     await waitFor(() => expect(main.getByRole('tabpanel')).toBeInTheDocument());
     expect(main.queryAllByRole('button', { name: /create|edit|new|delete|save|release|approve week/i })).toHaveLength(0);
+  });
+
+  // BPA-83: the Project Manager reopens a Locked week from the Progress tab with a reason; the backend (WeekReopenApiTest) checks the setting, the status and the
+  // reason. The button is for the project-manager group only; the week is the whole week, not only this Work Pack.
+  it('BPA83_pmReopensLockedWeekWithReason', async () => {
+    const { user, fetchMock } = await openDetail('WP-000457', ['project-manager']);
+    await screen.findByRole('tablist');
+    await user.click(screen.getByRole('tab', { name: 'Progress' }));
+
+    await user.click(within(screen.getByRole('tabpanel', { name: 'Progress' })).getByRole('button', { name: /Reopen week/ }));
+    await user.type(screen.getByRole('textbox', { name: /reason/i }), 'FMS report double-counted WP-000457');
+    await user.click(screen.getByRole('button', { name: 'Reopen' }));
+
+    const row = await within(screen.getByRole('tabpanel', { name: 'Progress' })).findByRole('row', {
+      name: /19 Nov 2026.*Reopened/,
+    });
+    expect(row).toBeInTheDocument();
+    const posts = fetchMock.mock.calls.map(([r]) => r as Request).filter((r) => r.method === 'POST');
+    expect(posts).toHaveLength(1);
+    expect(new URL(posts[0].url).pathname).toBe('/api/v1/progress-periods/2026-11-19/reopen');
+    expect(await posts[0].clone().json()).toEqual({ reason: 'FMS report double-counted WP-000457' });
+  });
+
+  it('BPA83_reasonIsRequired', async () => {
+    const { user } = await openDetail('WP-000457', ['project-manager']);
+    await screen.findByRole('tablist');
+    await user.click(screen.getByRole('tab', { name: 'Progress' }));
+
+    await user.click(within(screen.getByRole('tabpanel', { name: 'Progress' })).getByRole('button', { name: /Reopen week/ }));
+    await user.click(screen.getByRole('button', { name: 'Reopen' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter a reason to reopen the week');
+    expect(
+      within(screen.getByRole('tabpanel', { name: 'Progress' })).getByRole('row', { name: /19 Nov 2026/ }),
+    ).toHaveTextContent('Locked');
+  });
+
+  it('BPA83_otherPersonasCannotReopen', async () => {
+    const { user } = await openDetail('WP-000457', ['ppc-team']);
+    await screen.findByRole('tablist');
+
+    await user.click(screen.getByRole('tab', { name: 'Progress' }));
+
+    expect(
+      within(screen.getByRole('tabpanel', { name: 'Progress' })).getByRole('row', { name: /19 Nov 2026/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Reopen week/ })).not.toBeInTheDocument();
   });
 
   // BPA-79: opening another project's Work Pack by its link: the backend answers 403, the page shows its text and nothing else, so the history and the open tasks

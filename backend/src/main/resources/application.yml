@@ -74,6 +74,7 @@ bpa:
   progress:
     basis: Physical # Physical | Hours (C-E2-2); the default follows FRD-21
     source: FMS # FMS | PMS (C-E2-3); the default follows FRD-21
+    allow-reopen: false # BPA-83 (C-E3-3, decided 11 Nov 2026): true lets the Project Manager reopen a Locked week; false (default) never changes a Locked week. Jira writes progress.allowReopen; the key is kebab case under bpa. like the others
   hours:
     month-lock-day: 1 # 1 (FRD-5-3 5.3.3.3) or 16 (FRD-5-3 5.3.8.1), S5
   alerts:

@@ -1,23 +1,31 @@
 package com.lcs.star.bpa.api;
 
+import com.lcs.star.bpa.adapter.CamundaTaskClient.EngineUnavailableException;
 import com.lcs.star.bpa.api.generated.ProgressPeriodsApi;
 import com.lcs.star.bpa.api.generated.model.CbsActualRow;
 import com.lcs.star.bpa.api.generated.model.CbsActualsWeek;
 import com.lcs.star.bpa.api.generated.model.EarnedManhoursRow;
 import com.lcs.star.bpa.api.generated.model.EarnedManhoursWeek;
+import com.lcs.star.bpa.api.generated.model.ProgressPeriodReopened;
 import com.lcs.star.bpa.api.generated.model.ProgressWeek;
+import com.lcs.star.bpa.api.generated.model.ReopenRequest;
 import com.lcs.star.bpa.api.generated.model.UnsentLine;
 import com.lcs.star.bpa.api.generated.model.WorkpackProgressRow;
 import com.lcs.star.bpa.progress.CbsActualsReadService;
 import com.lcs.star.bpa.progress.EarnedManhoursReadService;
 import com.lcs.star.bpa.progress.ProgressReadService;
+import com.lcs.star.bpa.progress.ProgressReopenService;
 import com.lcs.star.bpa.progress.ProgressReadService.Row;
 import com.lcs.star.bpa.progress.ProgressReadService.Week;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,14 +37,36 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class ProgressPeriodController implements ProgressPeriodsApi {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ProgressPeriodController.class);
+
     private final ProgressReadService service;
     private final EarnedManhoursReadService earned;
     private final CbsActualsReadService cbsActuals;
+    private final ProgressReopenService reopen;
 
-    public ProgressPeriodController(ProgressReadService service, EarnedManhoursReadService earned, CbsActualsReadService cbsActuals) {
+    public ProgressPeriodController(ProgressReadService service, EarnedManhoursReadService earned, CbsActualsReadService cbsActuals, ProgressReopenService reopen) {
+        this.reopen = reopen;
         this.cbsActuals = cbsActuals;
         this.earned = earned;
         this.service = service;
+    }
+
+    /**
+     * BPA-83: reopens a Locked week with a reason (ProgressReopenService). SecurityConfig lets only project-manager through (403 for the rest); the setting, the week, the reason
+     * and the status are checked in that order (400, 404, 409); 503 when the process engine cannot be reached, with nothing changed.
+     */
+    @Override
+    public ResponseEntity<ProgressPeriodReopened> reopenProgressPeriod(LocalDate weekEnding, ReopenRequest reopenRequest) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        try {
+            ProgressReopenService.Reopened reopened = reopen.reopen(weekEnding, reopenRequest == null ? null : reopenRequest.getReason(), username);
+            return ResponseEntity.ok(new ProgressPeriodReopened(reopened.weekEnding(), ProgressPeriodReopened.StatusEnum.REOPENED, reopened.reopenedBy(),
+                    reopened.reopenedAt().toInstant().atOffset(ZoneOffset.UTC), reopened.reason()));
+        } catch (EngineUnavailableException e) {
+            LOG.warn("Week ending {} not reopened: {}", weekEnding, e.getMessage());
+            throw new ErrorResponseException(HttpStatus.SERVICE_UNAVAILABLE, ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                    "The process engine is not available right now; try again later"), null);
+        }
     }
 
     @Override

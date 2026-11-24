@@ -14,6 +14,7 @@ public class ProgressSettings {
 
     static final String SOURCE = "bpa.progress.source";
     static final String BASIS = "bpa.progress.basis";
+    static final String ALLOW_REOPEN = "bpa.progress.allow-reopen";
 
     private final Environment environment;
 
@@ -24,6 +25,11 @@ public class ProgressSettings {
     /** The configured progress basis (BPA-60; C-E2-2): "Physical" (default, FRD-21 §21.6: PPC approves the reported physical %) or "Hours" (FRD-7 §7.7.1: pre-filled from logged hours). */
     public String basis() {
         return "HOURS".equalsIgnoreCase(environment.getProperty(BASIS, "Physical").trim()) ? "Hours" : "Physical";
+    }
+
+    /** BPA-83 (C-E3-3, decided 11 Nov 2026): whether a Project Manager may reopen a Locked week. False by default; only the value true switches it on. */
+    public boolean allowReopen() {
+        return "true".equalsIgnoreCase(environment.getProperty(ALLOW_REOPEN, "false").trim());
     }
 
     /** The configured progress source, "FMS" or "PMS". */

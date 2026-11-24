@@ -78,6 +78,36 @@ public class CamundaProcessClient {
     }
 
     /**
+     * BPA-83: the same call as {@link #correlate}, for a message start event, answering the key of the instance it started (the 200 of {@code POST /v2/messages/correlation}
+     * carries {@code processInstanceKey}, proved by {@code Bpa13CorrelationChecksTest}); empty when nothing started (404: an instance with this correlation key is already
+     * active, or there is no such message start event).
+     */
+    public java.util.OptionalLong correlateForKey(String messageName, String correlationKey, Map<String, Object> variables) {
+        try {
+            return rest.post().uri("/v2/messages/correlation")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("name", messageName, "correlationKey", correlationKey, "variables", variables))
+                    .exchange((request, response) -> {
+                        if (response.getStatusCode().is5xxServerError()) {
+                            throw new EngineUnavailableException("Camunda message correlation returned " + response.getStatusCode().value());
+                        }
+                        if (response.getStatusCode().value() == 404) {
+                            return java.util.OptionalLong.empty();
+                        }
+                        if (!response.getStatusCode().is2xxSuccessful()) {
+                            throw new IllegalStateException("Camunda message correlation returned " + response.getStatusCode().value()
+                                    + ": " + new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8));
+                        }
+                        Started started = response.bodyTo(Started.class);
+                        return started == null || started.processInstanceKey() == null || started.processInstanceKey().isBlank() ? java.util.OptionalLong.empty()
+                                : java.util.OptionalLong.of(Long.parseLong(started.processInstanceKey()));
+                    });
+        } catch (ResourceAccessException e) {
+            throw new EngineUnavailableException("Camunda cannot be reached: " + e.getMessage());
+        }
+    }
+
+    /**
      * Publishes a message with time-to-live 0 and a message id: {@code POST /v2/messages/publication} (BPA-49). Unlike {@link #correlate} it does not
      * say whether anything received it: a message start event that already has an active instance with this correlation key drops it silently, which is
      * what a retried publish needs. Only a 5xx or an unreachable engine is an error.
