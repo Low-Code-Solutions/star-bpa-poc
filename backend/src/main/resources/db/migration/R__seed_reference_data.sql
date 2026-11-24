@@ -123,18 +123,20 @@ ON CONFLICT (material_ref) DO UPDATE
 -- -----------------------------------------------------------------------------------------------------
 -- drawing. SOR: D365 F&O Document Control. 8 rows (L8: about 8). DWG-999 must not exist (section 11).
 -- -----------------------------------------------------------------------------------------------------
-INSERT INTO bpa.drawing (drawing_ref, title, created_by, updated_by)
-VALUES ('DWG-118', 'Synthetic drawing 118', 'seed', 'seed'),
-       ('DWG-119', 'Synthetic drawing 119', 'seed', 'seed'),
-       ('DWG-121', 'Synthetic drawing 121', 'seed', 'seed'),
-       ('DWG-130', 'Synthetic drawing 130', 'seed', 'seed'),
-       ('DWG-140', 'Synthetic drawing 140', 'seed', 'seed'),
-       ('DWG-141', 'Synthetic drawing 141', 'seed', 'seed'),
-       ('DWG-150', 'Synthetic drawing 150', 'seed', 'seed'),
-       ('DWG-151', 'Synthetic drawing 151', 'seed', 'seed')
+-- BPA-77 (ASSUMPTION, no source gives the link; V8): project_ref says which project a drawing belongs to. DWG-118 is the drawing of WP-000457 on A-2201 (PRJ-139);
+-- the others by number; DWG-150 and DWG-151 belong to no project.
+INSERT INTO bpa.drawing (drawing_ref, title, project_ref, created_by, updated_by)
+VALUES ('DWG-118', 'Synthetic drawing 118', 'PRJ-139', 'seed', 'seed'),
+       ('DWG-119', 'Synthetic drawing 119', 'PRJ-139', 'seed', 'seed'),
+       ('DWG-121', 'Synthetic drawing 121', 'PRJ-139', 'seed', 'seed'),
+       ('DWG-130', 'Synthetic drawing 130', 'PRJ-139', 'seed', 'seed'),
+       ('DWG-140', 'Synthetic drawing 140', 'PRJ-140', 'seed', 'seed'),
+       ('DWG-141', 'Synthetic drawing 141', 'PRJ-140', 'seed', 'seed'),
+       ('DWG-150', 'Synthetic drawing 150', NULL, 'seed', 'seed'),
+       ('DWG-151', 'Synthetic drawing 151', NULL, 'seed', 'seed')
 ON CONFLICT (drawing_ref) DO UPDATE
-    SET title = EXCLUDED.title, updated_at = now(), updated_by = 'seed'
-    WHERE bpa.drawing.title IS DISTINCT FROM EXCLUDED.title;
+    SET title = EXCLUDED.title, project_ref = EXCLUDED.project_ref, updated_at = now(), updated_by = 'seed'
+    WHERE (bpa.drawing.title, bpa.drawing.project_ref) IS DISTINCT FROM (EXCLUDED.title, EXCLUDED.project_ref);
 
 -- -----------------------------------------------------------------------------------------------------
 -- drawing_revision. SOR: D365 F&O Document Control. Read-only copy; written at runtime only from DrawingRevised

@@ -23,6 +23,11 @@ public class UserProjectRepository {
         this.jdbc = jdbc;
     }
 
+    /** COMPILE STUB (BPA-77, red tests first): true when a row (username, projectRef) exists. */
+    public boolean exists(String username, String projectRef) {
+        throw new UnsupportedOperationException("BPA-77 stub");
+    }
+
     /** The project references of the user, by reference (ASSUMPTION: no source orders them). */
     public List<String> projectsOf(String username) {
         return jdbc.queryForList("SELECT project_ref FROM bpa.user_project WHERE username = ? ORDER BY project_ref", String.class, username);

@@ -172,6 +172,11 @@ Seed today: PRJ-139 (WBS 11031, 11032; activities A-2201 to A-2205, A-2209, A-22
 - **Q4:** `GET /api/v1/projects` stays ppc-team only; `GET /api/v1/me/projects` is the general read.
 - **Q5 to Q7:** as written; the Jira comment is shown first and posted only on a yes; I ask before any Jira transition.
 
+## Progress and departures (24 Nov 2026)
+- **Contract and V8 first:** the two operations, the `project-master-data` tag and the schemas (`ProjectMasterData`, five tab wrappers, `CbsActivity`, `ProjectDrawing`, `ReservedMaterial`, `CuttingSheet`) are in `api/openapi.yaml` (`npm run gen:api` parses it); `V8__drawing_project.sql` adds the nullable `drawing.project_ref` with its FK and SOR comment; the drawing seed upsert sets it (ASSUMPTION); `FlywayBaselineTest` lists "drawing project".
+- **Red first:** `ProjectMasterDataApiTest` 8 of 10 fail (404 "No static resource" where 200 or 403 is expected; `aDrawingWithNoProjectIsInNoProject` was vacuous at first, a 404 body has no drawings, so it now asserts 200 and non-empty drawings and fails too); `ProjectScopeTest` 6 of 6 fail on the stub; React `ProjectsPage.test.tsx` 6 of 6 and the three Sidebar link tests fail. Green before code, by design: `theReferenceListsAreUnchanged` (a guard for the BPA-78 split) and `FlywayBaselineTest` (V8 exists in the same commit).
+- **Departure 1 (package):** the shared check is in a new package `com.lcs.star.bpa.scope` (`ProjectScope`, `ProjectNotAssignedException`), not in `domain/` as the plan said: `domain/` has no dependency on `persistence/` today and `ProjectScope` reads `user_project`. The compile stubs of the red commit are `ProjectScope` (methods throw) and `UserProjectRepository.exists`.
+
 ## Human-gap log
 - **DoR:** whether the PO's move to Ready was recorded.
 - **DoD:** "Demoed at sprint review". People.

@@ -32,3 +32,14 @@ describe('Sidebar by group', () => {
     expect(screen.queryByRole('link', { name: 'Users and projects' })).not.toBeInTheDocument();
   });
 });
+
+// BPA-77: "Projects and master data" is for every persona, so the link is there whatever the groups (none, one, or the PPC Team).
+describe('Sidebar, Projects and master data', () => {
+  afterEach(cleanup);
+
+  it.each([[[]], [['supervisor']], [['ppc-team']]])('offers Projects and master data to the groups %j', (groups: string[]) => {
+    render(<Sidebar groups={groups} />);
+
+    expect(screen.getByRole('link', { name: 'Projects and master data' })).toHaveAttribute('href', '/projects');
+  });
+});
