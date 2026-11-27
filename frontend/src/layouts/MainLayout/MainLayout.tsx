@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { personaOf } from '@/utils/personas';
 
 /**
- * The logged-in portal as the ui-design templates draw it (BPA-125; docs/ui-screen-map.md 11.2 and 11.4): a sidebar column (the logo, the navigation, the persona),
+ * The logged-in portal as the docs/ui-prototype templates draw it (BPA-125; docs/ui-screen-map.md 11.2 and 11.4): a sidebar column (the logo, the navigation, the persona),
  * the top bar and the page. Dark mode is the templates' one rule: the class "dark" on the shell root (a CSS filter). It is white by default and is not remembered:
  * the state lives here, so a reload, or a logout and a new login, starts white (decision of Ahsan, 27 Nov 2026).
  */

@@ -193,7 +193,7 @@ describe('The shell and dark mode (templates; decision of Ahsan, 27 Nov 2026: no
   });
 
   it('BPA124_theDarkRuleIsTheTemplatesFilter', () => {
-    // ui-design/03-Personas-all.html: .dark { filter: invert(.92) hue-rotate(180deg); background: #FFFFFF }
+    // docs/ui-prototype/03-Personas-all.html: .dark { filter: invert(.92) hue-rotate(180deg); background: #FFFFFF }
     expect(styles).toMatch(/\.dark\s*\{[^}]*filter:\s*invert\(0?\.92\)\s*hue-rotate\(180deg\)/);
     expect(styles).toMatch(/\.dark\s*\{[^}]*background:\s*#ffffff/i);
   });

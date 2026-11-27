@@ -1,6 +1,6 @@
 /*
  * STAR BPA portal: global styles (ADR 0017, amended by BPA-23 and again by BPA-125). Plain CSS, no UI library.
- * BPA-125 (decision of Ahsan, 27 Nov 2026): the look is the ui-design templates', exactly. Colours, type, radii, shadows and spacing are their values, named here by
+ * BPA-125 (decision of Ahsan, 27 Nov 2026): the look is the docs/ui-prototype templates', exactly. Colours, type, radii, shadows and spacing are their values, named here by
  * role (the templates define no variables; the names are ours: docs/ui-screen-map.md sections 10 and 11). Fonts: Manrope for headings, Nunito Sans for text.
  * Elements, labels and roles are the ones the tests use; styling never changes them.
  */

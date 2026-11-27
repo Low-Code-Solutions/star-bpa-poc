@@ -1,5 +1,5 @@
 /**
- * The eleven personas (docs/04; personas.yaml): a user's one Camunda group names the role. The display names, departments and initials are the ones the ui-design
+ * The eleven personas (docs/04; personas.yaml): a user's one Camunda group names the role. The display names, departments and initials are the ones the docs/ui-prototype
  * templates show (ASSUMPTION: no source names them, docs/ui-screen-map.md Q7 and Q18). Unknown groups fall back to the group ID.
  */
 export type Persona = { name: string; department: string; initials: string };

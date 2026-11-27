@@ -1,4 +1,4 @@
-/** SVG paths of the ui-design templates (24 x 24 viewBox, line icons). Decorative: aria-hidden. */
+/** SVG paths of the docs/ui-prototype templates (24 x 24 viewBox, line icons). Decorative: aria-hidden. */
 export const ICON_PATHS = {
   menu: 'M4 6h16M4 12h16M4 18h16',
   moon: 'M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z',

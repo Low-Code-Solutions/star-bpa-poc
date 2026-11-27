@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Icon, type IconName } from '../Icon';
 
 /**
- * The page header of the ui-design templates (docs/ui-screen-map.md 11.3): a 52 px icon tile, the h1, a sub-title and, at the right, the page's actions.
+ * The page header of the docs/ui-prototype templates (docs/ui-screen-map.md 11.3): a 52 px icon tile, the h1, a sub-title and, at the right, the page's actions.
  * Breadcrumb, "Data as of", the date range and Export come with the stories that need them.
  */
 export function PageHeader({

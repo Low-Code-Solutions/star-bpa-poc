@@ -2,7 +2,7 @@ import { Icon } from '@/components/common/Icon';
 import { useAuth } from '@/context/AuthContext';
 
 /**
- * The top bar of the ui-design templates (docs/ui-screen-map.md 11.2): the menu button (phone only), then "Dark mode" and "Logout". The search and "Notifications"
+ * The top bar of the docs/ui-prototype templates (docs/ui-screen-map.md 11.2): the menu button (phone only), then "Dark mode" and "Logout". The search and "Notifications"
  * are not here: no story builds them (Q22 closed 27 Nov 2026; BPA-132 is parked). "Logout" stays visible on a phone, where the template hides it (BPA-125 scenario 5).
  */
 export function TopBar({ dark, onToggleDark, onOpenMenu }: { dark: boolean; onToggleDark: () => void; onOpenMenu: () => void }) {

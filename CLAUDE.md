@@ -20,8 +20,9 @@ branch, PR and write-back rules as everyone else's.
   - `backend/`: the Spring Boot project root (`backend/pom.xml`; Flyway migrations in
     `backend/src/main/resources/db/migration/`). Also under `backend/`, outside the Maven build:
     `mocks/` (WireMock mappings and files) and `postgres/init/` (database init).
-  - `frontend/`: the React portal. `docs/`: standards, `adr/` (architecture decisions) and
-    `form-specs/` (field specs for React screens; nothing deploys them).
+  - `frontend/`: the React portal. `docs/`: standards, `adr/` (architecture decisions),
+    `form-specs/` (field specs for React screens; nothing deploys them) and `ui-prototype/` (the approved
+    standalone HTML export of the UI prototype, reference only; `docs/ui-screen-map.md` says how it is used).
 - Delivery artifacts (ADR 0015), paths from the repo root: `intent/<EPIC-KEY>-<kebab>/` holds the
   epic's `intent.md`, `spec.md` and `plans/BPA-<n>.md`; `REVIEW.md` holds the review passes;
   `.claude/` holds agents and hooks. Never create them under `backend/`.
