@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '@/App';
 
@@ -38,7 +38,7 @@ function fakeBackend() {
         session = { username, groups: ['time-method-analyst'] };
         return json(200, session);
       }
-      return json(401, { status: 401, detail: 'Wrong username or password' }, 'application/problem+json');
+      return json(401, { status: 401, detail: 'Username or password is incorrect' }, 'application/problem+json');
     }
     if (path === '/api/v1/auth/logout') {
       session = null;
@@ -66,15 +66,15 @@ describe('App', () => {
 
     await user.type(await screen.findByLabelText('Username'), 'time-method-analyst');
     await user.type(screen.getByLabelText('Password'), 'right');
-    await user.click(screen.getByRole('button', { name: 'Log in' }));
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    // BPA-44: the username equals its group ID, so check the user line and the group list separately.
-    expect((await screen.findByText(/Logged in as/)).textContent).toContain('time-method-analyst');
-    expect(within(screen.getByRole('list', { name: 'Groups' })).getByText('time-method-analyst')).toBeInTheDocument();
+    // BPA-125: the shell shows the persona (name and department), not "Logged in as" and the group list, as the templates do.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.getAllByText(/Time & Method Analyst/).length).toBeGreaterThan(0);
     const login = calls.find((c) => c.path === '/api/v1/auth/login');
     expect(login?.xsrf).toBe('token-123');
 
-    await user.click(screen.getByRole('button', { name: 'Log out' }));
+    await user.click(screen.getByRole('button', { name: 'Logout' }));
 
     expect(await screen.findByLabelText('Username')).toBeInTheDocument();
     expect(calls.find((c) => c.path === '/api/v1/auth/logout')?.xsrf).toBe('token-123');
@@ -88,10 +88,10 @@ describe('App', () => {
 
     await user.type(await screen.findByLabelText('Username'), 'time-method-analyst');
     await user.type(screen.getByLabelText('Password'), 'wrong');
-    await user.click(screen.getByRole('button', { name: 'Log in' }));
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Wrong username or password');
-    expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Username or password is incorrect');
+    expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
   });
 
   it('BPA43_loginServiceDownIsNotShownAsWrongPassword', async () => {
@@ -102,10 +102,10 @@ describe('App', () => {
 
     await user.type(await screen.findByLabelText('Username'), 'camunda-down');
     await user.type(screen.getByLabelText('Password'), 'any');
-    await user.click(screen.getByRole('button', { name: 'Log in' }));
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Login is not available right now');
-    expect(alert).not.toHaveTextContent('Wrong username or password');
+    expect(alert).not.toHaveTextContent('Username or password is incorrect');
   });
 });
