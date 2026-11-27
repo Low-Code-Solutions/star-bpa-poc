@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TopBar } from '@/components/layout/TopBar';
@@ -16,6 +16,20 @@ export function MainLayout() {
   const [drawer, setDrawer] = useState(false);
   const persona = me ? personaOf(me) : null;
   const groups = me?.groups ?? [];
+
+  // Escape closes the phone drawer (QA review of BPA-125).
+  useEffect(() => {
+    if (!drawer) {
+      return;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setDrawer(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [drawer]);
 
   return (
     <div className={dark ? 'shell dark' : 'shell'}>
@@ -46,7 +60,7 @@ export function MainLayout() {
                 ×
               </button>
             </div>
-            <Sidebar groups={groups} />
+            <Sidebar groups={groups} onNavigate={() => setDrawer(false)} />
           </div>
           <button type="button" className="drawer__shade" onClick={() => setDrawer(false)} aria-label="Close menu" />
         </div>

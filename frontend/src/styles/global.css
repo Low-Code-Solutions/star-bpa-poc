@@ -33,7 +33,9 @@
   /* The names the existing screens use, mapped to the templates' colours (the marking-paint yellow is kept for the job tag only) */
   --steel-ink: var(--text);
   --mill-scale: var(--text-muted);
-  --plate: var(--surface);
+  --plate: var(
+    --surface-muted
+  ); /* the old page grey, now the "different from the white sheet" cue of the existing screens (row hover, context panel, return notice) */
   --sheet: var(--surface);
   --marking-paint: #f2b705;
   --signal-red: var(--danger-text);
@@ -564,6 +566,10 @@ textarea:focus-visible {
   gap: var(--space-4);
   padding: var(--space-5);
   background: var(--sheet);
+  /* BPA-125: the page is white now, so the sheet needs the templates' card edge to stand off it */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 /* The job tag: a stamped, punched fabrication tag (the one bold element). */
@@ -768,7 +774,7 @@ textarea:focus-visible {
 .notice--error {
   color: var(--signal-red);
   font-weight: 600;
-  background: #fbeceb;
+  background: var(--danger-tint);
 }
 
 .notice--return {

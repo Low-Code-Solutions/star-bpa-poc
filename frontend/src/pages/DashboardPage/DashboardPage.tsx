@@ -17,7 +17,11 @@ export function DashboardPage({ api }: { api: Api }) {
   }
   const persona = personaOf(me);
   const count = projects.data ? projects.data.length : null;
-  const subtitle = [persona.name, persona.department, count === null ? null : `${count} assigned projects`]
+  const subtitle = [
+    persona.name,
+    persona.department,
+    count === null ? null : `${count} assigned ${count === 1 ? 'project' : 'projects'}`,
+  ]
     .filter(Boolean)
     .join(' · ');
   return (

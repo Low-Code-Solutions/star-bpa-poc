@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '@/App';
 import { readFileSync } from 'node:fs';
@@ -36,6 +36,9 @@ function fakeBackend() {
     if (path === '/api/v1/auth/logout') {
       session = null;
       return new Response(null, { status: 204 });
+    }
+    if (path === '/api/v1/me/projects') {
+      return session ? json(200, [{ projectRef: 'PRJ-139' }]) : json(401, { status: 401 });
     }
     if (path === '/api/v1/tasks') {
       return session ? json(200, []) : json(401, { status: 401 });
@@ -114,6 +117,21 @@ describe('Sign in and sign out (BPA-125)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Username or password is incorrect');
     expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument();
+  });
+
+  // The template marks the username field for "Username or password is incorrect" (lgEk 'u'), ties no text to it, and clears the message when the user types.
+  it('a wrong login marks the username field, links the message to it, and typing clears both', async () => {
+    const { user } = await openSignIn();
+    await signInAs(user, 'xx.user', 'whatever');
+    const alert = await screen.findByRole('alert');
+
+    expect(screen.getByLabelText('Username')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Username')).toHaveAttribute('aria-describedby', alert.id);
+
+    await user.type(screen.getByLabelText('Username'), 'x');
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Username')).not.toHaveAttribute('aria-invalid', 'true');
   });
 
   it('BPA125_logout', async () => {
@@ -213,5 +231,40 @@ describe('The shell and dark mode (templates; decision of Ahsan, 27 Nov 2026: no
     await user.click(screen.getAllByRole('button', { name: 'Close menu' })[0]);
 
     expect(screen.queryByRole('button', { name: 'Close menu' })).not.toBeInTheDocument();
+  });
+
+  // QA review (BPA-125 at 4e22197): the template's drawer buttons navigate and close; tapping a menu link must not leave the drawer over the new page.
+  it('a menu link tapped in the drawer opens the page and closes the drawer', async () => {
+    const { user } = await signedIn();
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
+    const drawer = document.querySelector('.drawer') as HTMLElement;
+
+    await user.click(within(drawer).getByRole('link', { name: 'Work Packs' }));
+
+    expect(window.location.pathname).toBe('/workpacks');
+    expect(document.querySelector('.drawer')).toBeNull();
+  });
+
+  it('Escape closes the drawer', async () => {
+    const { user } = await signedIn();
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
+
+    await user.keyboard('{Escape}');
+
+    expect(document.querySelector('.drawer')).toBeNull();
+  });
+
+  // QA review: the old page colour (--plate, grey) is the "different from the sheet" colour of the existing screens (row hover, context panel, return notice);
+  // the page itself is white now, so --plate must not be white or those cues vanish.
+  it('BPA124_theLegacyPlateColourIsNotTheWhitePage', () => {
+    expect(styles).not.toMatch(/--plate:\s*var\(--surface\)/);
+    expect(styles).not.toMatch(/--plate:\s*#fff/i);
+    expect(styles).not.toMatch(/#fbeceb/i); // the error notice uses the template's danger tint token
+  });
+
+  it('the Dashboard sub-title says "1 assigned project" for one project (the template\'s plural slip is not copied)', async () => {
+    await signedIn();
+
+    expect(await screen.findByText(/Timekeeper · Production · 1 assigned project$/)).toBeInTheDocument();
   });
 });
