@@ -382,7 +382,12 @@ These are required by the Jira stories and the ADRs; every other difference is a
 4. **All numbers, names and dates are the user's real data from the backend**, never the demo values.
 5. **The prototype's defects are not copied** (section 9).
 6. **Anything the Jira Gherkin words differently from the prototype follows Jira:** BPA-125 uses "Enter your username", "Enter your password" and "Username or password is incorrect", which are also the prototype's texts, so none differs today.
-7. **Dark mode (decided: yes, 27 Nov) has no Jira story and none will be written (decision of Ahsan, 27 Nov).** It is built in BPA-125's top bar (section 12). **The top-bar search is left out for now** (Q22 closed by Ahsan, 27 Nov: "leave" it, read as left out; no story builds the search): the second visible difference from the template, until a story builds it. The rest of section 11.2 is built as written.
+7. **Dark mode (decided: yes, 27 Nov) has no Jira story and none will be written (decision of Ahsan, 27 Nov).** It is built in BPA-125's top bar (section 12). **The top-bar search is left out for now** (Q22 closed by Ahsan, 27 Nov: "leave" it, read as left out; no story builds the search): a visible difference from the template, until a story builds it.
+8. **The "Notifications" bell is left out too** (BPA-132 is parked and nothing opens: a dead button is worse than none; added 27 Nov while building BPA-125).
+9. **"Logout" stays visible on a phone.** The template hides the top-bar Logout at 640 px or less and its drawer has none, so a phone user could not sign out; BPA-125 scenario 5 needs it.
+10. **The sidebar's items are today's** (Home, Work Packs, Projects and master data, Users and projects), restyled as the template's menu item (11.4); BPA-126 replaces them with the U-D87 menu. The template's menu search is not built. The logo "STAR" and the persona (initials and name) are in the sidebar column, as in the template, not in the top bar.
+11. **The Dashboard sub-title** is built as the template writes it, "<Role> · <Department> · <n> assigned projects" (n from `GET /api/v1/me/projects`; omitted while that is not answered), including the template's plural "1 assigned projects".
+The rest of section 11.2 is built as written.
 
 ## 12. Dark mode: the template's behaviour (built in BPA-125; no Jira story)
 

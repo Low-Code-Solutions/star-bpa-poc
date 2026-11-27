@@ -14,7 +14,7 @@ export function useLogin() {
     if ('status' in result) {
       setError(
         result.status === 401
-          ? 'Wrong username or password'
+          ? 'Username or password is incorrect'
           : result.status === 503
             ? 'Login is not available right now; try again later'
             : `Login failed (${result.status})`,

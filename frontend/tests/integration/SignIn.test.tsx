@@ -2,11 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from '@/App';
-import styles from '@/styles/global.css?raw';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 // BPA-125: sign in and sign out, as the prototype's 01-Sign-in.html shows them, with the texts of the Jira Gherkin. The Jira user names ("tk.user") are the
 // prototype's; the portal's personas are the eleven Camunda groups (docs/04), so "tk.user" is `timekeeper` here (plan Q3). The tests named BPA124_ cover dark mode,
 // which the templates have and no story covers (docs/ui-screen-map.md section 12; decision of Ahsan, 27 Nov 2026). The backend is a fetch stub.
+// The stylesheet text, read as a file: Vitest turns a .css import into an empty module.
+const styles = readFileSync(resolve(process.cwd(), 'src/styles/global.css'), 'utf8');
 const PEOPLE: Record<string, string> = { timekeeper: 'right', 'time-method-analyst': 'right' };
 
 function fakeBackend() {
@@ -77,7 +80,7 @@ describe('Sign in and sign out (BPA-125)', () => {
 
     const heading = await screen.findByRole('heading', { level: 1, name: 'Dashboard' });
     expect(heading).toBeInTheDocument();
-    expect(screen.getByText(/Timekeeper/)).toBeInTheDocument(); // the sub-title names the persona and its department
+    expect(screen.getByText(/Timekeeper · Production/)).toBeInTheDocument(); // the sub-title names the persona and its department
     expect(screen.queryByRole('heading', { name: 'Sign in' })).not.toBeInTheDocument();
   });
 
