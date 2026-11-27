@@ -28,6 +28,7 @@ Top level (L1, as amended by ADR 0015):
 | Path | Holds |
 |---|---|
 | `docs/`, `docs/adr/`, `docs/form-specs/` | Standards and design docs; ADRs; field specs for React screens |
+| `docs/ui-prototype/` | The approved UI prototype as standalone HTML files (27 Nov 2026, BPA-125); reference for layout, labels, flows and the look; `docs/ui-screen-map.md` is the standing guide to it |
 | `models/bpmn/`, `models/dmn/` | Process and decision models (single copy) |
 | `api/openapi.yaml` | The API contract |
 | `templates/` | Files users download |

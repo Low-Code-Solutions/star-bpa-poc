@@ -1,7 +1,7 @@
 import { Route, Routes } from 'react-router';
 import { MainLayout } from '@/layouts/MainLayout';
 import { ProjectsPage } from '@/pages/ProjectsPage';
-import { TasksPage } from '@/pages/TasksPage';
+import { DashboardPage } from '@/pages/DashboardPage';
 import { UsersPage } from '@/pages/UsersPage';
 import { WorkPackDetailPage } from '@/pages/WorkPackDetailPage';
 import { WorkPacksPage } from '@/pages/WorkPacksPage';
@@ -18,14 +18,14 @@ export function AppRoutes({ api }: { api: Api }) {
     <Routes>
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
-          <Route index element={<TasksPage api={api} />} />
+          <Route index element={<DashboardPage api={api} />} />
           <Route path="workpacks" element={<WorkPacksPage api={api} />} />
           <Route path="workpacks/:workpackNumber" element={<WorkPackDetailPage api={api} />} />
           <Route path="projects" element={<ProjectsPage api={api} />} />
           <Route element={<ProtectedRoute groups={['ppc-team']} />}>
             <Route path="users" element={<UsersPage api={api} />} />
           </Route>
-          <Route path="*" element={<TasksPage api={api} />} />
+          <Route path="*" element={<DashboardPage api={api} />} />
         </Route>
       </Route>
     </Routes>

@@ -50,8 +50,8 @@ function fakeBackend(gate: Promise<void> = Promise.resolve()) {
 async function logIn(user: ReturnType<typeof userEvent.setup>, username: string) {
   await user.type(await screen.findByLabelText('Username'), username);
   await user.type(screen.getByLabelText('Password'), 'right');
-  await user.click(screen.getByRole('button', { name: 'Log in' }));
-  await screen.findByText(/Logged in as/);
+  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+  await screen.findByRole('heading', { name: 'Dashboard' });
 }
 
 describe('Session', () => {
@@ -73,7 +73,7 @@ describe('Session', () => {
 
     await logIn(user, 'time-method-analyst');
     expect(await screen.findByRole('button', { name: 'Create Work Pack' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Log out' }));
+    await user.click(screen.getByRole('button', { name: 'Logout' }));
     await logIn(user, 'production-team');
 
     // While the new user's list is still on its way: never the analyst's task.
